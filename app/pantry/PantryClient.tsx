@@ -1,12 +1,7 @@
 "use client";
 
+import { PANTRY_UNITS, type PantryUnit } from "@/lib/domain/pantry";
 import { useEffect, useMemo, useState } from "react";
-
-/**
- * Supported units for pantry items.
- * Keep this in sync with the server validation list in `/api/pantry`.
- */
-type PantryUnit = "count" | "g" | "oz" | "ml";
 
 /**
  * Representation of the pantry item as returned from the API.
@@ -29,7 +24,7 @@ type LoadState =
   | { status: "error"; message: string }
   | { status: "ready"; items: PantryItem[] };
 
-const units: PantryUnit[] = ["count", "g", "oz", "ml"];
+const units: PantryUnit[] = [...PANTRY_UNITS];
 
 /**
  * Format an ISO date string for display.

@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
-import { connectDB } from "@/lib/db";
 import { getAuth } from "@/lib/auth/jwt";
+import { connectDB } from "@/lib/db";
+import { isPantryUnit } from "@/lib/domain/pantry";
 import { PantryEntry } from "@/models/PantryEntry";
+import { NextResponse } from "next/server";
 
 /**
  * Normalize an unknown value to a `Date` or `null`.
@@ -47,7 +48,7 @@ export async function GET() {
  *
  * Creates a new pantry entry for the authenticated user.
  * Expected JSON body:
- * { name: string, quantity: number, unit: 'count'|'g'|'oz'|'ml', purchaseDate?: string|Date, expirationDate?: string|Date }
+ * { name: string, quantity: number, unit: PantryUnit, purchaseDate?: string|Date, expirationDate?: string|Date }
  */
 export async function POST(req: Request) {
   await connectDB();
@@ -71,7 +72,7 @@ export async function POST(req: Request) {
   }
 
   // Allowed unit values - keep this list in sync if you support more units later
-  if (!["count", "g", "oz", "ml"].includes(unit)) {
+  if (!isPantryUnit(unit)) {
     return NextResponse.json({ error: "Invalid unit" }, { status: 400 });
   }
 
