@@ -242,7 +242,21 @@ export default function PantryClient() {
                           {i.quantity} {i.unit}
                         </div>
                       </div>
-                      <div className="text-sm">{formatDate(i.expirationDate)}</div>
+
+                      <div className="flex flex-col items-end gap-1">
+                        <div className="text-sm">{formatDate(i.expirationDate)}</div>
+
+                        <button
+                          className="text-xs text-red-600 hover:underline hover:cursor-pointer"
+                          type="button"
+                          onClick={async () => {
+                            await fetch(`/api/pantry/${i._id}`, { method: "DELETE" });
+                            await load(); // refetch list
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -261,7 +275,21 @@ export default function PantryClient() {
                           {i.quantity} {i.unit}
                         </div>
                       </div>
-                      <div className="text-sm">-</div>
+
+                      <div className="flex flex-col items-end gap-1">
+                        <div className="text-sm">-</div>
+
+                        <button
+                          className="text-xs text-red-600 hover:underline hover:cursor-pointer"
+                          type="button"
+                          onClick={async () => {
+                            await fetch(`/api/pantry/${i._id}`, { method: "DELETE" });
+                            await load(); // refetch list
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
