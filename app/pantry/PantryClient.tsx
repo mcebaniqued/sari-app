@@ -1,6 +1,8 @@
 "use client";
 
-import { PANTRY_UNITS, type PantryUnit } from "@/lib/domain/pantry";
+import Modal from "@/components/modals/Modal";
+import PantryAddForm from "@/components/pantry/PantryAddForm";
+import type { PantryUnit } from "@/lib/domain/pantry";
 import { useEffect, useMemo, useState } from "react";
 
 /**
@@ -23,8 +25,6 @@ type LoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "ready"; items: PantryItem[] };
-
-const units: PantryUnit[] = [...PANTRY_UNITS];
 
 /**
  * Format an ISO date string for display.
@@ -49,16 +49,7 @@ function formatDate(iso?: string) {
 export default function PantryClient() {
   // overall load state for the list
   const [state, setState] = useState<LoadState>({ status: "loading" });
-
-  // Form state (minimal - matches server expectations)
-  const [name, setName] = useState("");
-  const [quantity, setQuantity] = useState<string>("1");
-  const [unit, setUnit] = useState<PantryUnit>("count");
-  const [expirationDate, setExpirationDate] = useState<string>("");
-
-  // UI state for submission feedback
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
 
   /**
    * Load the pantry list from the API.
@@ -108,51 +99,6 @@ export default function PantryClient() {
     return { withExp, noExp };
   }, [state]);
 
-  /**
-   * Handle form submit to create a new pantry item.
-   * - Performs client-side validation to avoid unnecessary requests
-   * - Sends JSON and shows server error messages when available
-   */
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitError(null);
-
-    const q = Number(quantity);
-    if (!name.trim()) return setSubmitError("Name is required.");
-    if (!Number.isFinite(q) || q <= 0) return setSubmitError("Quantity must be > 0.");
-
-    setSubmitting(true);
-
-    const res = await fetch("/api/pantry", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: name.trim(),
-        quantity: q,
-        unit,
-        // send `undefined` when no date is selected so the server treats it as absent
-        expirationDate: expirationDate ? expirationDate : undefined,
-      }),
-    });
-
-    setSubmitting(false);
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setSubmitError(data?.error || `Failed to add item (${res.status})`);
-      return;
-    }
-
-    // reset minimal fields after success
-    setName("");
-    setQuantity("1");
-    setUnit("count");
-    setExpirationDate("");
-
-    // Refresh list to show the newly created item
-    await load();
-  }
-
   return (
     <div className="space-y-4">
       {/* Toolbar */}
@@ -191,11 +137,7 @@ export default function PantryClient() {
             <button
               type="button"
               className="rounded-md bg-[rgb(var(--foreground))] text-[rgb(var(--background))] px-3 py-2 text-sm"
-              onClick={() => {
-                // v0: scroll to the existing inline add form.
-                // Issue #1 will replace this with a dedicated add flow/modal.
-                document.getElementById("add-item")?.scrollIntoView({ behavior: "smooth" });
-              }}
+              onClick={() => setIsAddOpen(true)}
             >
               Add
             </button>
@@ -237,68 +179,11 @@ export default function PantryClient() {
           <button
             type="button"
             className="rounded-md bg-[rgb(var(--foreground))] text-[rgb(var(--background))] px-3 py-2 text-sm"
-            // TODO: Not wired yet (future issue). Keep it as UI-only for now.
-            onClick={() => {
-              document.getElementById("add-item")?.scrollIntoView({ behavior: "smooth" });
-            }}
+            onClick={() => setIsAddOpen(true)}
           >
             Add item
           </button>
         </div>
-      </section>
-
-      {/* Add Item */}
-      <section id="add-item" className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--card))] p-4 space-y-3">
-        <h2 className="text-base font-semibold">Add item</h2>
-
-        <form onSubmit={onSubmit} className="grid gap-3">
-          <input
-            className="w-full rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[rgb(var(--ring))]"
-            placeholder="e.g., Chicken breast"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-
-          <div className="grid grid-cols-3 gap-3">
-            <input
-              className="w-full rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[rgb(var(--ring))]"
-              type="number"
-              min="0"
-              step="any"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-            />
-
-            <select
-              className="w-full rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[rgb(var(--ring))]"
-              value={unit}
-              onChange={(e) => setUnit(e.target.value as PantryUnit)}
-            >
-              {units.map((u) => (
-                <option key={u} value={u}>
-                  {u}
-                </option>
-              ))}
-            </select>
-
-            <input
-              className="w-full rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[rgb(var(--ring))]"
-              type="date"
-              value={expirationDate}
-              onChange={(e) => setExpirationDate(e.target.value)}
-            />
-          </div>
-
-          {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
-
-          <button
-            className="rounded-md bg-[rgb(var(--foreground))] text-[rgb(var(--background))] py-2 text-sm disabled:opacity-60"
-            disabled={submitting}
-            type="submit"
-          >
-            {submitting ? "Adding..." : "Add"}
-          </button>
-        </form>
       </section>
 
       {/* List */}
@@ -408,6 +293,18 @@ export default function PantryClient() {
           </div>
         ) : null}
       </section>
+
+      {/* Add item modal */}
+      {isAddOpen ? (
+        <Modal title="Add item" onClose={() => setIsAddOpen(false)}>
+          <PantryAddForm
+            onSuccess={async () => {
+              setIsAddOpen(false);
+              await load(); // refresh list immediately
+            }}
+          />
+        </Modal>
+      ) : null}
     </div>
   );
 }
