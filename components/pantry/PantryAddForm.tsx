@@ -1,7 +1,7 @@
 "use client";
 
 import { PANTRY_UNITS, type PantryUnit } from "@/lib/domain/pantry";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 const units: PantryUnit[] = [...PANTRY_UNITS];
 
@@ -9,11 +9,36 @@ interface PantryAddFormProps {
   onSuccess: () => void;
 }
 
+const inputClass =
+  "w-full rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[rgb(var(--ring))]";
+
+function Label({
+  htmlFor,
+  children,
+  required,
+}: {
+  htmlFor: string;
+  children: React.ReactNode;
+  required?: boolean;
+}) {
+  return (
+    <label htmlFor={htmlFor} className="text-sm font-medium">
+      {children}
+      {required ? <span className="ml-0.5 text-red-600">*</span> : null}
+    </label>
+  );
+}
+
 export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
+  const nameId = useId();
+  const qtyId = useId();
+  const unitId = useId();
+  const expId = useId();
+
   const [name, setName] = useState("");
-  const [quantity, setQuantity] = useState<string>("1");
+  const [quantity, setQuantity] = useState("1");
   const [unit, setUnit] = useState<PantryUnit>("count");
-  const [expirationDate, setExpirationDate] = useState<string>("");
+  const [expirationDate, setExpirationDate] = useState("");
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -22,65 +47,77 @@ export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
     e.preventDefault();
     setSubmitError(null);
 
+    const trimmedName = name.trim();
     const q = Number(quantity);
-    if (!name.trim()) return setSubmitError("Name is required.");
+
+    if (!trimmedName) return setSubmitError("Name is required.");
     if (!Number.isFinite(q) || q <= 0) return setSubmitError("Quantity must be > 0.");
 
     setSubmitting(true);
+    try {
+      const res = await fetch("/api/pantry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: trimmedName,
+          quantity: q,
+          unit,
+          expirationDate: expirationDate || undefined,
+        }),
+      });
 
-    const res = await fetch("/api/pantry", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: name.trim(),
-        quantity: q,
-        unit,
-        expirationDate: expirationDate ? expirationDate : undefined,
-      }),
-    });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setSubmitError(data?.error || `Failed to add item (${res.status})`);
+        return;
+      }
 
-    setSubmitting(false);
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setSubmitError(data?.error || `Failed to add item (${res.status})`);
-      return;
+      // Close modal on success
+      onSuccess();
+    } finally {
+      setSubmitting(false);
     }
-
-    // Close immediately.
-    onSuccess();
   }
 
   return (
     <form onSubmit={onSubmit} className="grid gap-3">
       <div className="grid gap-1">
-        <label className="text-sm font-medium">Name</label>
+        <Label htmlFor={nameId} required>
+          Name
+        </Label>
         <input
-          className="w-full rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[rgb(var(--ring))]"
+          id={nameId}
+          className={inputClass}
           placeholder="e.g., Chicken breast"
           value={name}
           onChange={(e) => setName(e.target.value)}
           autoFocus
+          aria-required="true"
         />
       </div>
 
       <div className="grid grid-cols-3 gap-3">
         <div className="grid gap-1">
-          <label className="text-sm font-medium">Qty</label>
+          <Label htmlFor={qtyId} required>
+            Quantity
+          </Label>
           <input
-            className="w-full rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[rgb(var(--ring))]"
+            id={qtyId}
+            className={inputClass}
             type="number"
             min="0"
             step="any"
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
+            aria-required="true"
           />
         </div>
 
         <div className="grid gap-1">
-          <label className="text-sm font-medium">Unit</label>
+          <Label htmlFor={unitId}>Unit</Label>
           <select
-            className="w-full rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[rgb(var(--ring))]"
+            id={unitId}
+            className={inputClass}
             value={unit}
             onChange={(e) => setUnit(e.target.value as PantryUnit)}
           >
@@ -93,9 +130,10 @@ export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
         </div>
 
         <div className="grid gap-1">
-          <label className="text-sm font-medium">Expiration</label>
+          <Label htmlFor={expId}>Expiration</Label>
           <input
-            className="w-full rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[rgb(var(--ring))]"
+            id={expId}
+            className={inputClass}
             type="date"
             value={expirationDate}
             onChange={(e) => setExpirationDate(e.target.value)}
@@ -106,7 +144,7 @@ export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
       {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
 
       <button
-        className="rounded-md bg-[rgb(var(--foreground))] text-[rgb(var(--background))] py-2 text-sm disabled:opacity-60"
+        className="rounded-md bg-[rgb(var(--foreground))] py-2 text-sm text-[rgb(var(--background))] disabled:opacity-60"
         disabled={submitting}
         type="submit"
       >
