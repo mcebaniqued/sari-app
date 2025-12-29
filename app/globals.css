@@ -1,26 +1,47 @@
 @import "tailwindcss";
 
+/* Theme tokens (v0). TODO: Replace later once you have a proper palette. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  --background: 255 255 255;
+  --foreground: 23 23 23;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --card: 255 255 255;
+  --card-foreground: 23 23 23;
+
+  --muted: 245 245 245;
+  --muted-foreground: 99 99 99;
+
+  --border: 229 229 229;
+  --ring: 59 130 246;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: 10 10 10;
+    --foreground: 237 237 237;
+
+    --card: 17 17 17;
+    --card-foreground: 237 237 237;
+
+    --muted: 24 24 24;
+    --muted-foreground: 163 163 163;
+
+    --border: 38 38 38;
+    --ring: 147 197 253;
   }
 }
 
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  height: 100%;
+}
+
+body {
+  background: rgb(var(--background));
+  color: rgb(var(--foreground));
+}
+
+/* Optional: reduce weird mobile tap highlight */
+* {
+  -webkit-tap-highlight-color: transparent;
 }

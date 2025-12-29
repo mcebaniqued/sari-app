@@ -154,14 +154,106 @@ export default function PantryClient() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Add Item */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Add item</h2>
-
-        <form onSubmit={onSubmit} className="grid gap-3 max-w-xl">
+    <div className="space-y-4">
+      {/* Toolbar */}
+      <section className="space-y-2">
+        {/* Mobile toolbar */}
+        <div className="flex flex-col gap-2 md:hidden">
+          <label className="sr-only" htmlFor="pantry-search">
+            Search pantry
+          </label>
           <input
-            className="border rounded px-3 py-2"
+            id="pantry-search"
+            placeholder="Search..."
+            className="w-full rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[rgb(var(--ring))]"
+            // TODO: Not wired yet (future issue). Keep it as UI-only for now.
+            value={""}
+            onChange={() => {}}
+          />
+
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm"
+              // TODO: Not wired yet (future issue). Keep it as UI-only for now.
+              onClick={() => {}}
+            >
+              Filter
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm"
+              // TODO: Not wired yet (future issue). Keep it as UI-only for now.
+              onClick={() => {}}
+            >
+              Sort
+            </button>
+            <button
+              type="button"
+              className="rounded-md bg-[rgb(var(--foreground))] text-[rgb(var(--background))] px-3 py-2 text-sm"
+              onClick={() => {
+                // v0: scroll to the existing inline add form.
+                // Issue #1 will replace this with a dedicated add flow/modal.
+                document.getElementById("add-item")?.scrollIntoView({ behavior: "smooth" });
+              }}
+            >
+              Add
+            </button>
+          </div>
+        </div>
+
+        {/* Desktop toolbar */}
+        <div className="hidden md:flex items-center gap-3">
+          <div className="flex-1">
+            <label className="sr-only" htmlFor="pantry-search-desktop">
+              Search pantry
+            </label>
+            <input
+              id="pantry-search-desktop"
+              placeholder="Search..."
+              className="w-full rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[rgb(var(--ring))]"
+              // TODO: Not wired yet (future issue). Keep it as UI-only for now.
+              value={""}
+              onChange={() => {}}
+            />
+          </div>
+
+          <select className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm">
+            <option>Sort: Expiration</option>
+            <option>Sort: Added (newest)</option>
+            <option>Sort: Added (oldest)</option>
+            <option>Sort: Name</option>
+          </select>
+
+          <button
+            type="button"
+            className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm"
+            // TODO: Not wired yet (future issue). Keep it as UI-only for now.
+            onClick={() => {}}
+          >
+            Filter
+          </button>
+
+          <button
+            type="button"
+            className="rounded-md bg-[rgb(var(--foreground))] text-[rgb(var(--background))] px-3 py-2 text-sm"
+            // TODO: Not wired yet (future issue). Keep it as UI-only for now.
+            onClick={() => {
+              document.getElementById("add-item")?.scrollIntoView({ behavior: "smooth" });
+            }}
+          >
+            Add item
+          </button>
+        </div>
+      </section>
+
+      {/* Add Item */}
+      <section id="add-item" className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--card))] p-4 space-y-3">
+        <h2 className="text-base font-semibold">Add item</h2>
+
+        <form onSubmit={onSubmit} className="grid gap-3">
+          <input
+            className="w-full rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[rgb(var(--ring))]"
             placeholder="e.g., Chicken breast"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -169,7 +261,7 @@ export default function PantryClient() {
 
           <div className="grid grid-cols-3 gap-3">
             <input
-              className="border rounded px-3 py-2"
+              className="w-full rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[rgb(var(--ring))]"
               type="number"
               min="0"
               step="any"
@@ -178,7 +270,7 @@ export default function PantryClient() {
             />
 
             <select
-              className="border rounded px-3 py-2"
+              className="w-full rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[rgb(var(--ring))]"
               value={unit}
               onChange={(e) => setUnit(e.target.value as PantryUnit)}
             >
@@ -190,7 +282,7 @@ export default function PantryClient() {
             </select>
 
             <input
-              className="border rounded px-3 py-2"
+              className="w-full rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[rgb(var(--ring))]"
               type="date"
               value={expirationDate}
               onChange={(e) => setExpirationDate(e.target.value)}
@@ -200,7 +292,7 @@ export default function PantryClient() {
           {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
 
           <button
-            className="rounded bg-black text-white py-2 disabled:opacity-60"
+            className="rounded-md bg-[rgb(var(--foreground))] text-[rgb(var(--background))] py-2 text-sm disabled:opacity-60"
             disabled={submitting}
             type="submit"
           >
@@ -211,88 +303,106 @@ export default function PantryClient() {
 
       {/* List */}
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Your pantry</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold">Your pantry</h2>
+        </div>
 
-        {state.status === "loading" ? <p className="text-sm">Loading…</p> : null}
+        {state.status === "loading" ? (
+          <p className="text-sm text-[rgb(var(--muted-foreground))]">Loading…</p>
+        ) : null}
 
         {state.status === "error" ? (
           <div className="space-y-2">
             <p className="text-sm text-red-600">{state.message}</p>
-            <button className="rounded border px-3 py-2" onClick={() => void load()} type="button">
+            <button
+              className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm"
+              onClick={() => void load()}
+              type="button"
+            >
               Retry
             </button>
           </div>
         ) : null}
 
         {state.status === "ready" && state.items.length === 0 ? (
-          <p className="text-sm text-gray-600">No items yet. Add your first item above.</p>
+          <p className="text-sm text-[rgb(var(--muted-foreground))]">
+            No items yet. Add your first item above.
+          </p>
         ) : null}
 
         {state.status === "ready" && state.items.length > 0 ? (
           <div className="space-y-4">
+            {/* Expiring items */}
             {withExp.length > 0 ? (
               <div className="space-y-2">
-                <h3 className="text-sm font-semibold">Expiring items</h3>
-                <ul className="divide-y border rounded">
-                  {withExp.map((i) => (
-                    <li key={i._id} className="p-3 flex justify-between gap-4">
-                      <div>
-                        <div className="font-medium">{i.name}</div>
-                        <div className="text-sm text-gray-600">
-                          {i.quantity} {i.unit}
+                <h3 className="text-sm font-semibold text-[rgb(var(--muted-foreground))]">Expiring items</h3>
+
+                <div className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--card))]">
+                  <ul className="divide-y divide-[rgb(var(--border))]">
+                    {withExp.map((i) => (
+                      <li key={i._id} className="p-3 flex items-center justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">{i.name}</div>
+                          <div className="text-sm text-[rgb(var(--muted-foreground))]">
+                            {i.quantity} {i.unit}
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="flex flex-col items-end gap-1">
-                        <div className="text-sm">{formatDate(i.expirationDate)}</div>
+                        <div className="flex items-end flex-col gap-1">
+                          <div className="text-sm whitespace-nowrap">{formatDate(i.expirationDate)}</div>
 
-                        <button
-                          className="text-xs text-red-600 hover:underline hover:cursor-pointer"
-                          type="button"
-                          onClick={async () => {
-                            await fetch(`/api/pantry/${i._id}`, { method: "DELETE" });
-                            await load(); // refetch list
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                          <button
+                            className="text-xs text-red-600 hover:underline"
+                            type="button"
+                            onClick={async () => {
+                              await fetch(`/api/pantry/${i._id}`, { method: "DELETE" });
+                              await load();
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             ) : null}
 
+            {/* No expiration date */}
             {noExp.length > 0 ? (
               <div className="space-y-2">
-                <h3 className="text-sm font-semibold">No expiration date</h3>
-                <ul className="divide-y border rounded">
-                  {noExp.map((i) => (
-                    <li key={i._id} className="p-3 flex justify-between gap-4">
-                      <div>
-                        <div className="font-medium">{i.name}</div>
-                        <div className="text-sm text-gray-600">
-                          {i.quantity} {i.unit}
+                <h3 className="text-sm font-semibold text-[rgb(var(--muted-foreground))]">No expiration date</h3>
+
+                <div className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--card))]">
+                  <ul className="divide-y divide-[rgb(var(--border))]">
+                    {noExp.map((i) => (
+                      <li key={i._id} className="p-3 flex items-center justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">{i.name}</div>
+                          <div className="text-sm text-[rgb(var(--muted-foreground))]">
+                            {i.quantity} {i.unit}
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="flex flex-col items-end gap-1">
-                        <div className="text-sm">-</div>
+                        <div className="flex items-end flex-col gap-1">
+                          <div className="text-sm whitespace-nowrap">-</div>
 
-                        <button
-                          className="text-xs text-red-600 hover:underline hover:cursor-pointer"
-                          type="button"
-                          onClick={async () => {
-                            await fetch(`/api/pantry/${i._id}`, { method: "DELETE" });
-                            await load(); // refetch list
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                          <button
+                            className="text-xs text-red-600 hover:underline"
+                            type="button"
+                            onClick={async () => {
+                              await fetch(`/api/pantry/${i._id}`, { method: "DELETE" });
+                              await load();
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             ) : null}
           </div>
