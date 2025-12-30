@@ -2,7 +2,11 @@
 
 import Modal from "@/components/modals/Modal";
 import PantryAddForm from "@/components/pantry/PantryAddForm";
-import type { PantryUnit } from "@/lib/domain/pantry";
+import {
+  DATE_LABEL_TYPE_LABELS,
+  type DateLabelType,
+  type PantryUnit,
+} from "@/lib/domain/pantry";
 import { useEffect, useMemo, useState } from "react";
 
 /**
@@ -14,7 +18,8 @@ type PantryItem = {
   name: string;
   quantity: number;
   unit: PantryUnit;
-  expirationDate?: string; // ISO date string
+  dateLabelType?: DateLabelType;
+  dateOnPackage?: string; // ISO date string
   createdAt?: string; // ISO date string
 };
 
@@ -36,6 +41,12 @@ function formatDate(iso?: string) {
   if (!iso) return "-";
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? "-" : d.toLocaleDateString();
+}
+
+function formatPackageDateLine(i: PantryItem) {
+  if (!i.dateOnPackage) return "-";
+  const label = i.dateLabelType ? DATE_LABEL_TYPE_LABELS[i.dateLabelType] : "Date on package";
+  return `${label} · ${formatDate(i.dateOnPackage)}`;
 }
 
 /**
@@ -88,15 +99,20 @@ export default function PantryClient() {
    *
    * We memoize this so sorting only runs when the source `state` changes.
    */
-  const { withExp, noExp } = useMemo(() => {
+  const { withDate, noDate } = useMemo(() => {
     const items = state.status === "ready" ? state.items : [];
-    const withExp = items
-      .filter((i) => i.expirationDate)
-      .sort((a, b) => new Date(a.expirationDate!).getTime() - new Date(b.expirationDate!).getTime());
-    const noExp = items
-      .filter((i) => !i.expirationDate)
-      .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
-    return { withExp, noExp };
+
+    const withDate = items
+      .filter((i) => Boolean(i.dateOnPackage))
+      .sort((a, b) => new Date(a.dateOnPackage!).getTime() - new Date(b.dateOnPackage!).getTime());
+
+    const noDate = items
+      .filter((i) => !i.dateOnPackage)
+      .sort(
+        (a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()
+      );
+
+    return { withDate, noDate };
   }, [state]);
 
   return (
@@ -161,7 +177,7 @@ export default function PantryClient() {
           </div>
 
           <select className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm">
-            <option>Sort: Expiration</option>
+            <option>Sort: Package date</option>
             <option>Sort: Added (newest)</option>
             <option>Sort: Added (oldest)</option>
             <option>Sort: Name</option>
@@ -217,14 +233,16 @@ export default function PantryClient() {
 
         {state.status === "ready" && state.items.length > 0 ? (
           <div className="space-y-4">
-            {/* Expiring items */}
-            {withExp.length > 0 ? (
+            {/* With package date */}
+            {withDate.length > 0 ? (
               <div className="space-y-2">
-                <h3 className="text-sm font-semibold text-[rgb(var(--muted-foreground))]">Expiring items</h3>
+                <h3 className="text-sm font-semibold text-[rgb(var(--muted-foreground))]">
+                  Items with a package date
+                </h3>
 
                 <div className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--card))]">
                   <ul className="divide-y divide-[rgb(var(--border))]">
-                    {withExp.map((i) => (
+                    {withDate.map((i) => (
                       <li key={i._id} className="p-3 flex items-center justify-between gap-4">
                         <div className="min-w-0">
                           <div className="font-medium truncate">{i.name}</div>
@@ -234,7 +252,7 @@ export default function PantryClient() {
                         </div>
 
                         <div className="flex items-end flex-col gap-1">
-                          <div className="text-sm whitespace-nowrap">{formatDate(i.expirationDate)}</div>
+                          <div className="text-sm whitespace-nowrap">{formatPackageDateLine(i)}</div>
 
                           <button
                             className="text-xs text-red-600 hover:underline"
@@ -254,14 +272,16 @@ export default function PantryClient() {
               </div>
             ) : null}
 
-            {/* No expiration date */}
-            {noExp.length > 0 ? (
+            {/* No package date */}
+            {noDate.length > 0 ? (
               <div className="space-y-2">
-                <h3 className="text-sm font-semibold text-[rgb(var(--muted-foreground))]">No expiration date</h3>
+                <h3 className="text-sm font-semibold text-[rgb(var(--muted-foreground))]">
+                  No expiration date
+                </h3>
 
                 <div className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--card))]">
                   <ul className="divide-y divide-[rgb(var(--border))]">
-                    {noExp.map((i) => (
+                    {noDate.map((i) => (
                       <li key={i._id} className="p-3 flex items-center justify-between gap-4">
                         <div className="min-w-0">
                           <div className="font-medium truncate">{i.name}</div>

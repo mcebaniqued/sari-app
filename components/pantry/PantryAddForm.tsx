@@ -1,7 +1,13 @@
 "use client";
 
-import { PANTRY_UNITS, type PantryUnit } from "@/lib/domain/pantry";
-import { useId, useState } from "react";
+import {
+  DATE_LABEL_TYPES,
+  DATE_LABEL_TYPE_LABELS,
+  PANTRY_UNITS,
+  type DateLabelType,
+  type PantryUnit,
+} from "@/lib/domain/pantry";
+import { useEffect, useId, useState } from "react";
 
 const units: PantryUnit[] = [...PANTRY_UNITS];
 
@@ -10,7 +16,13 @@ interface PantryAddFormProps {
 }
 
 const inputClass =
-  "w-full rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[rgb(var(--ring))]";
+  "h-10 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 text-sm text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--muted-foreground))] outline-none focus:ring-2 focus:ring-[rgb(var(--ring))] disabled:cursor-not-allowed disabled:opacity-60";
+
+const linkButtonAdd =
+  "text-sm font-medium text-[rgb(var(--foreground))] underline underline-offset-4 hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ring))] rounded";
+
+const linkButtonRemove =
+  "text-xs font-medium text-red-500 hover:underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-red-500/40 rounded";
 
 function Label({
   htmlFor,
@@ -33,15 +45,27 @@ export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
   const nameId = useId();
   const qtyId = useId();
   const unitId = useId();
-  const expId = useId();
+  const dateLabelId = useId();
+  const dateOnPkgId = useId();
 
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [unit, setUnit] = useState<PantryUnit>("count");
-  const [expirationDate, setExpirationDate] = useState("");
+  const [addPackageDate, setAddPackageDate] = useState(false);
+
+  // Only used when addPackageDate === true
+  const [dateLabelType, setDateLabelType] = useState<DateLabelType>("not_sure");
+  const [dateOnPackage, setDateOnPackage] = useState("");
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // If the user removes the date section, clear fields so we don't accidentally submit stale values.
+  useEffect(() => {
+    if (addPackageDate) return;
+    setDateLabelType("not_sure");
+    setDateOnPackage("");
+  }, [addPackageDate]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -62,7 +86,8 @@ export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
           name: trimmedName,
           quantity: q,
           unit,
-          expirationDate: expirationDate || undefined,
+          dateLabelType: addPackageDate ? dateLabelType : undefined,
+          dateOnPackage: addPackageDate ? dateOnPackage || undefined : undefined,
         }),
       });
 
@@ -81,6 +106,7 @@ export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
 
   return (
     <form onSubmit={onSubmit} className="grid gap-3">
+      {/* Name */}
       <div className="grid gap-1">
         <Label htmlFor={nameId} required>
           Name
@@ -96,7 +122,8 @@ export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      {/* Quantity + Unit */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="grid gap-1">
           <Label htmlFor={qtyId} required>
             Quantity
@@ -128,28 +155,75 @@ export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
             ))}
           </select>
         </div>
+      </div>
 
-        <div className="grid gap-1">
-          <Label htmlFor={expId}>Expiration</Label>
-          <input
-            id={expId}
-            className={inputClass}
-            type="date"
-            value={expirationDate}
-            onChange={(e) => setExpirationDate(e.target.value)}
-          />
+      {/* Expiration date */}
+      <div className="grid gap-2">
+        <div>
+          {addPackageDate ? (
+            <p className="text-sm font-medium text-[rgb(var(--foreground))]">Expiration date</p>
+          ) : null}
+
+          {/* Action row */}
+          <div>
+            <button
+              type="button"
+              className={addPackageDate ? linkButtonRemove : linkButtonAdd}
+              onClick={() => setAddPackageDate((v) => !v)}
+              aria-expanded={addPackageDate}
+              aria-controls="expiration-date-fields"
+            >
+              {addPackageDate ? "Remove expiration date" : "Add expiration date"}
+            </button>
+          </div>
+        </div>
+
+        {/* Controlled region */}
+        <div id="expiration-date-fields">
+          {addPackageDate ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid gap-1">
+                <Label htmlFor={dateLabelId}>Label type</Label>
+                <select
+                  id={dateLabelId}
+                  className={inputClass}
+                  value={dateLabelType}
+                  onChange={(e) => setDateLabelType(e.target.value as DateLabelType)}
+                >
+                  {DATE_LABEL_TYPES.map((v) => (
+                    <option key={v} value={v}>
+                      {DATE_LABEL_TYPE_LABELS[v]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid gap-1">
+                <Label htmlFor={dateOnPkgId}>Date on package</Label>
+                <input
+                  id={dateOnPkgId}
+                  className={inputClass}
+                  type="date"
+                  value={dateOnPackage}
+                  onChange={(e) => setDateOnPackage(e.target.value)}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 
       {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
 
-      <button
-        className="rounded-md bg-[rgb(var(--foreground))] py-2 text-sm text-[rgb(var(--background))] disabled:opacity-60"
-        disabled={submitting}
-        type="submit"
-      >
-        {submitting ? "Adding..." : "Add"}
-      </button>
+      <div className="mt-2 border-t border-[rgb(var(--border))] pt-4">
+        <button
+          className="h-10 w-full rounded-lg bg-[rgb(var(--foreground))] text-sm font-medium text-[rgb(var(--background))] shadow-sm disabled:opacity-60"
+          disabled={submitting}
+          type="submit"
+        >
+          {submitting ? "Adding..." : "Add"}
+        </button>
+      </div>
     </form>
   );
 }
