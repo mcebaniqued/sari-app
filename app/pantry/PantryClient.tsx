@@ -61,6 +61,7 @@ export default function PantryClient() {
   // overall load state for the list
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   /**
    * Load the pantry list from the API.
@@ -186,8 +187,7 @@ export default function PantryClient() {
           <button
             type="button"
             className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm"
-            // TODO: Not wired yet (future issue). Keep it as UI-only for now.
-            onClick={() => {}}
+            onClick={() => setIsFilterOpen(true)}
           >
             Filter
           </button>
@@ -323,6 +323,15 @@ export default function PantryClient() {
               await load(); // refresh list immediately
             }}
           />
+        </Modal>
+      ) : null}
+
+      {/* Filter modal */}
+      {isFilterOpen ? (
+        <Modal title="Filter" onClose={() => setIsFilterOpen(false)}>
+          <div>
+            <p className="text-sm text-[rgb(var(--muted-foreground))]">Filter options will go here.</p>
+          </div>
         </Modal>
       ) : null}
     </div>
