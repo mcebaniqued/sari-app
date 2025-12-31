@@ -138,18 +138,9 @@ export default function PantryClient() {
             <button
               type="button"
               className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm"
-              // TODO: Not wired yet (future issue). Keep it as UI-only for now.
-              onClick={() => {}}
+              onClick={() => setIsFilterOpen(true)}
             >
-              Filter
-            </button>
-            <button
-              type="button"
-              className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm"
-              // TODO: Not wired yet (future issue). Keep it as UI-only for now.
-              onClick={() => {}}
-            >
-              Sort
+              Filter & Sort
             </button>
             <button
               type="button"
