@@ -320,8 +320,23 @@ export default function PantryClient() {
       {/* Filter modal */}
       {isFilterOpen ? (
         <Modal title="Filter" onClose={() => setIsFilterOpen(false)}>
-          <div>
+          <div className='flex flex-col gap-4'>
             <p className="text-sm text-[rgb(var(--muted-foreground))]">Filter options will go here.</p>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 mt-4">
+            <button
+              className="h-10 w-24 rounded-lg border border-[rgb(var(--border))] text-sm font-medium text-[rgb(var(--foreground))] shadow-sm"
+              onClick={() => setIsFilterOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className="h-10 w-24 rounded-lg bg-[rgb(var(--foreground))] text-sm font-medium text-[rgb(var(--background))] shadow-sm disabled:opacity-60"
+              onClick={() => {}} // TODO: Not wired yet
+            >
+              Apply
+            </button>
           </div>
         </Modal>
       ) : null}
