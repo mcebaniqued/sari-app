@@ -2,6 +2,7 @@
 
 import Modal from "@/components/modals/Modal";
 import PantryAddForm from "@/components/pantry/PantryAddForm";
+import { PantrySortSelect } from "@/components/pantry/PantrySortSelect";
 import {
   DATE_LABEL_TYPE_LABELS,
   type DateLabelType,
@@ -58,8 +59,7 @@ function formatPackageDateLine(i: PantryItem) {
  * - Separate items with expiration dates from those without, and sort them
  */
 export default function PantryClient() {
-  // overall load state for the list
-  const [state, setState] = useState<LoadState>({ status: "loading" });
+  const [state, setState] = useState<LoadState>({ status: "loading" }); // overall load state for the list
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
@@ -154,6 +154,7 @@ export default function PantryClient() {
 
         {/* Desktop toolbar */}
         <div className="hidden md:flex items-center gap-3">
+          {/* Search Bar */}
           <div className="flex-1">
             <label className="sr-only" htmlFor="pantry-search-desktop">
               Search pantry
@@ -168,13 +169,10 @@ export default function PantryClient() {
             />
           </div>
 
-          <select className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm">
-            <option>Sort: Package date</option>
-            <option>Sort: Added (newest)</option>
-            <option>Sort: Added (oldest)</option>
-            <option>Sort: Name</option>
-          </select>
+          {/* Sort Dropdown */}
+          <PantrySortSelect />
 
+          {/* Filter Button */}
           <button
             type="button"
             className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm"
@@ -320,10 +318,12 @@ export default function PantryClient() {
       {/* Filter modal */}
       {isFilterOpen ? (
         <Modal title="Filter" onClose={() => setIsFilterOpen(false)}>
+          {/* Body/content for filter modal */}
           <div className='flex flex-col gap-4'>
-            <p className="text-sm text-[rgb(var(--muted-foreground))]">Filter options will go here.</p>
+            <PantrySortSelect />
           </div>
 
+          {/* CTA Buttons */}
           <div className="flex items-center justify-end gap-3 mt-4">
             <button
               className="h-10 w-24 rounded-lg border border-[rgb(var(--border))] text-sm font-medium text-[rgb(var(--foreground))] shadow-sm"
