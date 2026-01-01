@@ -1,27 +1,20 @@
+import { PANTRY_SORT_OPTION_LABELS, PantrySortOption } from "@/lib/domain/pantry";
+
 type PantrySortSelectProps = {
-  value: string;
-  onChange: (value: string) => void;
+  value: PantrySortOption;
+  onChange: (value: PantrySortOption) => void;
 };
 
 export function PantrySortSelect({ value, onChange }: PantrySortSelectProps) {
-  const sortOptions = [
-    {value: 'packageDateNewest', label: 'Package Date: Newest'},
-    {value: 'packageDateOldest', label: 'Package Date: Oldest'},
-    {value: 'addedDateNewest', label: 'Added Date: Newest'},
-    {value: 'addedDateOldest', label: 'Added Date: Oldest'},
-    {value: 'nameAZ', label: 'Name: A-Z'},
-    {value: 'nameZA', label: 'Name: Z-A'},
-  ];
-
   return (
     <select
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => onChange(e.target.value as PantrySortOption)}
       className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm"
     >
-      {sortOptions.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
+      {Object.entries(PANTRY_SORT_OPTION_LABELS).map(([opt, label]) => (
+        <option key={opt} value={opt as PantrySortOption}>
+          {label}
         </option>
       ))}
     </select>

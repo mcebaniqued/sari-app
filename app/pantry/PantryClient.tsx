@@ -5,6 +5,8 @@ import PantryAddForm from "@/components/pantry/PantryAddForm";
 import { PantrySortSelect } from "@/components/pantry/PantrySortSelect";
 import {
   DATE_LABEL_TYPE_LABELS,
+  DEFAULT_PANTRY_SORT,
+  PantrySortOption,
   type DateLabelType,
   type PantryUnit,
 } from "@/lib/domain/pantry";
@@ -44,11 +46,50 @@ function formatDate(iso?: string) {
   return Number.isNaN(d.getTime()) ? "-" : d.toLocaleDateString();
 }
 
+/**
+ * Format the package date line for a pantry item.
+ * @param i - pantry item
+ * @returns formatted line like `Best if used by · 01/01/2024` or `-` if no date
+ */
 function formatPackageDateLine(i: PantryItem) {
   if (!i.dateOnPackage) return "-";
   const label = i.dateLabelType ? DATE_LABEL_TYPE_LABELS[i.dateLabelType] : "Date on package";
   return `${label} · ${formatDate(i.dateOnPackage)}`;
 }
+
+/**
+ * Get a sort function based on the selected sort option.
+ * @param sortOption - selected sort option
+ * @param hasDate- whether to expect items to have dateOnPackage defined
+ * @returns comparison function for Array.prototype.sort
+ */
+const sortBasedOnOption = (sortOption: PantrySortOption, hasDate: boolean) => {
+  switch (sortOption) {
+    case 'packageDateNewest':
+      if (hasDate) {
+        return (a: PantryItem, b: PantryItem) => new Date(b.dateOnPackage!).getTime() - new Date(a.dateOnPackage!).getTime();
+      }
+      // Fallback for items without dateOnPackage
+      return (a: PantryItem, b: PantryItem) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
+    case 'packageDateOldest':
+      if (hasDate) {
+        return (a: PantryItem, b: PantryItem) => new Date(a.dateOnPackage!).getTime() - new Date(b.dateOnPackage!).getTime();
+      }
+      // Fallback for items without dateOnPackage
+      return (a: PantryItem, b: PantryItem) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime();
+    case 'addedDateNewest':
+      return (a: PantryItem, b: PantryItem) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
+    case 'addedDateOldest':
+      return (a: PantryItem, b: PantryItem) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime();
+    case 'nameAZ':
+      return (a: PantryItem, b: PantryItem) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    case 'nameZA':
+      return (a: PantryItem, b: PantryItem) => b.name.localeCompare(a.name, undefined, { sensitivity: "base" });
+    default:
+      // Safest fallback. Don't use dateOnPackage as it may be undefined, especially for noDate.
+      return (a: PantryItem, b: PantryItem) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
+  }
+};
 
 /**
  * Client component that shows the user's pantry and a small form to add items.
@@ -62,8 +103,8 @@ export default function PantryClient() {
   const [state, setState] = useState<LoadState>({ status: "loading" }); // overall load state for the list
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [sortOption, setSortOption] = useState('packageDateNewest');
-  const [draftSortOption, setDraftSortOption] = useState(sortOption);
+  const [sortOption, setSortOption] = useState(DEFAULT_PANTRY_SORT);
+  const [draftSortOption, setDraftSortOption] = useState(DEFAULT_PANTRY_SORT);
 
   /**
    * Load the pantry list from the API.
@@ -137,34 +178,6 @@ export default function PantryClient() {
    */
   const { withDate, noDate } = useMemo(() => {
     const items = state.status === "ready" ? state.items : [];
-
-    const sortBasedOnOption = (sortOption: string, hasDate: boolean) => {
-      switch (sortOption) {
-        case 'packageDateNewest':
-          if (hasDate) {
-            return (a: PantryItem, b: PantryItem) => new Date(b.dateOnPackage!).getTime() - new Date(a.dateOnPackage!).getTime();
-          }
-          // Fallback for items without dateOnPackage
-          return (a: PantryItem, b: PantryItem) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
-        case 'packageDateOldest':
-          if (hasDate) {
-            return (a: PantryItem, b: PantryItem) => new Date(a.dateOnPackage!).getTime() - new Date(b.dateOnPackage!).getTime();
-          }
-          // Fallback for items without dateOnPackage
-          return (a: PantryItem, b: PantryItem) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime();
-        case 'addedDateNewest':
-          return (a: PantryItem, b: PantryItem) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
-        case 'addedDateOldest':
-          return (a: PantryItem, b: PantryItem) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime();
-        case 'nameAZ':
-          return (a: PantryItem, b: PantryItem) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
-        case 'nameZA':
-          return (a: PantryItem, b: PantryItem) => b.name.localeCompare(a.name, undefined, { sensitivity: "base" });
-        default:
-          // Safest fallback. Don't use dateOnPackage as it may be undefined, especially for noDate.
-          return (a: PantryItem, b: PantryItem) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
-      }
-    };
 
     const withDate = items
       .filter((i) => Boolean(i.dateOnPackage))
