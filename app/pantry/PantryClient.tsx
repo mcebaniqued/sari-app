@@ -62,6 +62,7 @@ export default function PantryClient() {
   const [state, setState] = useState<LoadState>({ status: "loading" }); // overall load state for the list
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [sortOption, setSortOption] = useState('packageDateNewest');
 
   /**
    * Load the pantry list from the API.
@@ -170,7 +171,10 @@ export default function PantryClient() {
           </div>
 
           {/* Sort Dropdown */}
-          <PantrySortSelect />
+          <PantrySortSelect
+            value={sortOption}
+            onChange={setSortOption}
+          />
 
           {/* Filter Button */}
           <button
@@ -319,8 +323,11 @@ export default function PantryClient() {
       {isFilterOpen ? (
         <Modal title="Filter" onClose={() => setIsFilterOpen(false)}>
           {/* Body/content for filter modal */}
-          <div className='flex flex-col gap-4'>
-            <PantrySortSelect />
+          <div className='flex flex-col md:hidden gap-4'>
+            <PantrySortSelect
+              value={sortOption}
+              onChange={() => {}}
+            />
           </div>
 
           {/* CTA Buttons */}

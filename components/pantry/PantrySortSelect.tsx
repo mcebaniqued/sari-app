@@ -1,4 +1,9 @@
-export function PantrySortSelect() {
+type PantrySortSelectProps = {
+  value: string;
+  onChange: (value: string) => void;
+};
+
+export function PantrySortSelect({ value, onChange }: PantrySortSelectProps) {
   const sortOptions = [
     {value: 'packageDateNewest', label: 'Package Date: Newest'},
     {value: 'packageDateOldest', label: 'Package Date: Oldest'},
@@ -10,6 +15,8 @@ export function PantrySortSelect() {
 
   return (
     <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
       className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm"
     >
       {sortOptions.map((option) => (
