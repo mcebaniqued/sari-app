@@ -63,6 +63,7 @@ export default function PantryClient() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [sortOption, setSortOption] = useState('packageDateNewest');
+  const [draftSortOption, setDraftSortOption] = useState(sortOption);
 
   /**
    * Load the pantry list from the API.
@@ -93,6 +94,39 @@ export default function PantryClient() {
       await load();
     })();
   }, []);
+
+  /**
+   * Open the filter modal.
+   * - Sets the draft state to the current value.
+   * - Opens the modal.
+   */
+  function openFilterModal() {
+    // Set draft to current value
+    setDraftSortOption(sortOption);
+
+    // Open modal
+    setIsFilterOpen(true);
+  }
+
+  /**
+   * Close the filter modal without applying changes.
+   */
+  function closeFilterModal() {
+    setIsFilterOpen(false);
+  }
+
+  /**
+   * Apply the filter and sort options.
+   * - Sets the main sort option from the draft.
+   * - Closes the modal.
+   */
+  function applyFilterAndSort() {
+    // Apply sort
+    setSortOption(draftSortOption);
+
+    // Close modal
+    setIsFilterOpen(false);
+  }
 
   /**
    * Partition and sort items for display.
@@ -139,7 +173,7 @@ export default function PantryClient() {
             <button
               type="button"
               className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm"
-              onClick={() => setIsFilterOpen(true)}
+              onClick={openFilterModal}
             >
               Filter & Sort
             </button>
@@ -180,7 +214,7 @@ export default function PantryClient() {
           <button
             type="button"
             className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm"
-            onClick={() => setIsFilterOpen(true)}
+            onClick={openFilterModal}
           >
             Filter
           </button>
@@ -321,12 +355,12 @@ export default function PantryClient() {
 
       {/* Filter modal */}
       {isFilterOpen ? (
-        <Modal title="Filter" onClose={() => setIsFilterOpen(false)}>
+        <Modal title="Filter" onClose={closeFilterModal}>
           {/* Body/content for filter modal */}
           <div className='flex flex-col md:hidden gap-4'>
             <PantrySortSelect
-              value={sortOption}
-              onChange={() => {}}
+              value={draftSortOption}
+              onChange={setDraftSortOption}
             />
           </div>
 
@@ -334,13 +368,13 @@ export default function PantryClient() {
           <div className="flex items-center justify-end gap-3 mt-4">
             <button
               className="h-10 w-24 rounded-lg border border-[rgb(var(--border))] text-sm font-medium text-[rgb(var(--foreground))] shadow-sm"
-              onClick={() => setIsFilterOpen(false)}
+              onClick={closeFilterModal}
             >
               Cancel
             </button>
             <button
               className="h-10 w-24 rounded-lg bg-[rgb(var(--foreground))] text-sm font-medium text-[rgb(var(--background))] shadow-sm disabled:opacity-60"
-              onClick={() => {}} // TODO: Not wired yet
+              onClick={applyFilterAndSort}
             >
               Apply
             </button>
