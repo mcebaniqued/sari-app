@@ -138,18 +138,44 @@ export default function PantryClient() {
   const { withDate, noDate } = useMemo(() => {
     const items = state.status === "ready" ? state.items : [];
 
+    const sortBasedOnOption = (sortOption: string, hasDate: boolean) => {
+      switch (sortOption) {
+        case 'packageDateNewest':
+          if (hasDate) {
+            return (a: PantryItem, b: PantryItem) => new Date(b.dateOnPackage!).getTime() - new Date(a.dateOnPackage!).getTime();
+          }
+          // Fallback for items without dateOnPackage
+          return (a: PantryItem, b: PantryItem) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
+        case 'packageDateOldest':
+          if (hasDate) {
+            return (a: PantryItem, b: PantryItem) => new Date(a.dateOnPackage!).getTime() - new Date(b.dateOnPackage!).getTime();
+          }
+          // Fallback for items without dateOnPackage
+          return (a: PantryItem, b: PantryItem) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime();
+        case 'addedDateNewest':
+          return (a: PantryItem, b: PantryItem) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
+        case 'addedDateOldest':
+          return (a: PantryItem, b: PantryItem) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime();
+        case 'nameAZ':
+          return (a: PantryItem, b: PantryItem) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+        case 'nameZA':
+          return (a: PantryItem, b: PantryItem) => b.name.localeCompare(a.name, undefined, { sensitivity: "base" });
+        default:
+          // Safest fallback. Don't use dateOnPackage as it may be undefined, especially for noDate.
+          return (a: PantryItem, b: PantryItem) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
+      }
+    };
+
     const withDate = items
       .filter((i) => Boolean(i.dateOnPackage))
-      .sort((a, b) => new Date(a.dateOnPackage!).getTime() - new Date(b.dateOnPackage!).getTime());
+      .sort(sortBasedOnOption(sortOption, true));
 
     const noDate = items
       .filter((i) => !i.dateOnPackage)
-      .sort(
-        (a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()
-      );
+      .sort(sortBasedOnOption(sortOption, false));
 
     return { withDate, noDate };
-  }, [state]);
+  }, [state, sortOption]);
 
   return (
     <div className="space-y-4">
