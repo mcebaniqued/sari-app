@@ -2,6 +2,7 @@
 
 import Modal from "@/components/modals/Modal";
 import PantryAddForm from "@/components/pantry/PantryAddForm";
+import PantryFilterSortForm from "@/components/pantry/PantryFilterSortForm";
 import { PantrySortSelect } from "@/components/pantry/PantrySortSelect";
 import {
   DATE_LABEL_TYPE_LABELS,
@@ -10,6 +11,7 @@ import {
   type DateLabelType,
   type PantryUnit,
 } from "@/lib/domain/pantry";
+import { compareAsc, compareDesc, compareNameAZ, toTime } from "@/lib/domain/sort";
 import { useEffect, useMemo, useState } from "react";
 
 /**
@@ -65,29 +67,32 @@ function formatPackageDateLine(i: PantryItem) {
  */
 const sortBasedOnOption = (sortOption: PantrySortOption, hasDate: boolean) => {
   switch (sortOption) {
-    case 'packageDateNewest':
-      if (hasDate) {
-        return (a: PantryItem, b: PantryItem) => new Date(b.dateOnPackage!).getTime() - new Date(a.dateOnPackage!).getTime();
-      }
-      // Fallback for items without dateOnPackage
-      return (a: PantryItem, b: PantryItem) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
-    case 'packageDateOldest':
-      if (hasDate) {
-        return (a: PantryItem, b: PantryItem) => new Date(a.dateOnPackage!).getTime() - new Date(b.dateOnPackage!).getTime();
-      }
-      // Fallback for items without dateOnPackage
-      return (a: PantryItem, b: PantryItem) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime();
-    case 'addedDateNewest':
-      return (a: PantryItem, b: PantryItem) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
-    case 'addedDateOldest':
-      return (a: PantryItem, b: PantryItem) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime();
-    case 'nameAZ':
-      return (a: PantryItem, b: PantryItem) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
-    case 'nameZA':
-      return (a: PantryItem, b: PantryItem) => b.name.localeCompare(a.name, undefined, { sensitivity: "base" });
+    case "packageDateNewest":
+      return hasDate
+        ? (a: PantryItem, b: PantryItem) => compareDesc(toTime(a.dateOnPackage), toTime(b.dateOnPackage))
+        // Fallback for items without dateOnPackage
+        : (a: PantryItem, b: PantryItem) => compareDesc(toTime(a.createdAt), toTime(b.createdAt));
+
+    case "packageDateOldest":
+      return hasDate
+        ? (a: PantryItem, b: PantryItem) => compareAsc(toTime(a.dateOnPackage), toTime(b.dateOnPackage))
+        // Fallback for items without dateOnPackage
+        : (a: PantryItem, b: PantryItem) => compareAsc(toTime(a.createdAt), toTime(b.createdAt));
+
+    case "addedDateNewest":
+      return (a: PantryItem, b: PantryItem) => compareDesc(toTime(a.createdAt), toTime(b.createdAt));
+    case "addedDateOldest":
+      return (a: PantryItem, b: PantryItem) => compareAsc(toTime(a.createdAt), toTime(b.createdAt));
+
+    case "nameAZ":
+      return (a: PantryItem, b: PantryItem) => compareNameAZ(a.name, b.name);
+
+    case "nameZA":
+      return (a: PantryItem, b: PantryItem) => compareNameAZ(b.name, a.name);
+
     default:
       // Safest fallback. Don't use dateOnPackage as it may be undefined, especially for noDate.
-      return (a: PantryItem, b: PantryItem) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
+      return (a: PantryItem, b: PantryItem) => compareDesc(toTime(a.createdAt), toTime(b.createdAt));
   }
 };
 
@@ -394,30 +399,13 @@ export default function PantryClient() {
 
       {/* Filter modal */}
       {isFilterOpen ? (
-        <Modal title="Filter" onClose={closeFilterModal}>
-          {/* Body/content for filter modal */}
-          <div className='flex flex-col md:hidden gap-4'>
-            <PantrySortSelect
-              value={draftSortOption}
-              onChange={setDraftSortOption}
-            />
-          </div>
-
-          {/* CTA Buttons */}
-          <div className="flex items-center justify-end gap-3 mt-4">
-            <button
-              className="h-10 w-24 rounded-lg border border-[rgb(var(--border))] text-sm font-medium text-[rgb(var(--foreground))] shadow-sm"
-              onClick={closeFilterModal}
-            >
-              Cancel
-            </button>
-            <button
-              className="h-10 w-24 rounded-lg bg-[rgb(var(--foreground))] text-sm font-medium text-[rgb(var(--background))] shadow-sm disabled:opacity-60"
-              onClick={applyFilterAndSort}
-            >
-              Apply
-            </button>
-          </div>
+        <Modal title="Filter & Sort" onClose={closeFilterModal}>
+          <PantryFilterSortForm
+            draftSortOption={draftSortOption}
+            onDraftSortChange={setDraftSortOption}
+            onCancel={closeFilterModal}
+            onApply={applyFilterAndSort}
+          />
         </Modal>
       ) : null}
     </div>
