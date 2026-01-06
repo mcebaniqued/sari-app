@@ -35,3 +35,29 @@ export const DATE_LABEL_TYPE_LABELS: Record<DateLabelType, string> = {
   expiration_date: "Expiration date",
   not_sure: "Not sure",
 };
+
+export const PANTRY_SORT_OPTIONS = [
+  "packageDateNewest",
+  "packageDateOldest",
+  "addedDateNewest",
+  "addedDateOldest",
+  "nameAZ",
+  "nameZA",
+] as const;
+
+export const DEFAULT_PANTRY_SORT: PantrySortOption = PANTRY_SORT_OPTIONS[0];
+
+export type PantrySortOption = (typeof PANTRY_SORT_OPTIONS)[number];
+
+export const PANTRY_SORT_OPTION_LABELS: Record<PantrySortOption, string> = {
+  packageDateNewest: "Package Date: Newest",
+  packageDateOldest: "Package Date: Oldest",
+  addedDateNewest: "Added Date: Newest",
+  addedDateOldest: "Added Date: Oldest",
+  nameAZ: "Name: A-Z",
+  nameZA: "Name: Z-A",
+};
+
+export function isPantrySortOption(v: unknown): v is PantrySortOption {
+  return typeof v === "string" && (PANTRY_SORT_OPTIONS as readonly PantrySortOption[]).includes(v as PantrySortOption);
+}

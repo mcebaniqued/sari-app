@@ -2,11 +2,16 @@
 
 import Modal from "@/components/modals/Modal";
 import PantryAddForm from "@/components/pantry/PantryAddForm";
+import PantryFilterSortForm from "@/components/pantry/PantryFilterSortForm";
+import { PantrySortSelect } from "@/components/pantry/PantrySortSelect";
 import {
   DATE_LABEL_TYPE_LABELS,
+  DEFAULT_PANTRY_SORT,
+  PantrySortOption,
   type DateLabelType,
   type PantryUnit,
 } from "@/lib/domain/pantry";
+import { compareAsc, compareDesc, compareNameAZ, toTime } from "@/lib/domain/sort";
 import { useEffect, useMemo, useState } from "react";
 
 /**
@@ -43,11 +48,53 @@ function formatDate(iso?: string) {
   return Number.isNaN(d.getTime()) ? "-" : d.toLocaleDateString();
 }
 
+/**
+ * Format the package date line for a pantry item.
+ * @param i - pantry item
+ * @returns formatted line like `Best if used by · 01/01/2024` or `-` if no date
+ */
 function formatPackageDateLine(i: PantryItem) {
   if (!i.dateOnPackage) return "-";
   const label = i.dateLabelType ? DATE_LABEL_TYPE_LABELS[i.dateLabelType] : "Date on package";
   return `${label} · ${formatDate(i.dateOnPackage)}`;
 }
+
+/**
+ * Get a sort function based on the selected sort option.
+ * @param sortOption - selected sort option
+ * @param hasDate- whether to expect items to have dateOnPackage defined
+ * @returns comparison function for Array.prototype.sort
+ */
+const sortBasedOnOption = (sortOption: PantrySortOption, hasDate: boolean) => {
+  switch (sortOption) {
+    case "packageDateNewest":
+      return hasDate
+        ? (a: PantryItem, b: PantryItem) => compareDesc(toTime(a.dateOnPackage), toTime(b.dateOnPackage))
+        // Fallback for items without dateOnPackage
+        : (a: PantryItem, b: PantryItem) => compareDesc(toTime(a.createdAt), toTime(b.createdAt));
+
+    case "packageDateOldest":
+      return hasDate
+        ? (a: PantryItem, b: PantryItem) => compareAsc(toTime(a.dateOnPackage), toTime(b.dateOnPackage))
+        // Fallback for items without dateOnPackage
+        : (a: PantryItem, b: PantryItem) => compareAsc(toTime(a.createdAt), toTime(b.createdAt));
+
+    case "addedDateNewest":
+      return (a: PantryItem, b: PantryItem) => compareDesc(toTime(a.createdAt), toTime(b.createdAt));
+    case "addedDateOldest":
+      return (a: PantryItem, b: PantryItem) => compareAsc(toTime(a.createdAt), toTime(b.createdAt));
+
+    case "nameAZ":
+      return (a: PantryItem, b: PantryItem) => compareNameAZ(a.name, b.name);
+
+    case "nameZA":
+      return (a: PantryItem, b: PantryItem) => compareNameAZ(b.name, a.name);
+
+    default:
+      // Safest fallback. Don't use dateOnPackage as it may be undefined, especially for noDate.
+      return (a: PantryItem, b: PantryItem) => compareDesc(toTime(a.createdAt), toTime(b.createdAt));
+  }
+};
 
 /**
  * Client component that shows the user's pantry and a small form to add items.
@@ -58,9 +105,11 @@ function formatPackageDateLine(i: PantryItem) {
  * - Separate items with expiration dates from those without, and sort them
  */
 export default function PantryClient() {
-  // overall load state for the list
-  const [state, setState] = useState<LoadState>({ status: "loading" });
+  const [state, setState] = useState<LoadState>({ status: "loading" }); // overall load state for the list
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [sortOption, setSortOption] = useState(DEFAULT_PANTRY_SORT);
+  const [draftSortOption, setDraftSortOption] = useState(DEFAULT_PANTRY_SORT);
 
   /**
    * Load the pantry list from the API.
@@ -93,6 +142,39 @@ export default function PantryClient() {
   }, []);
 
   /**
+   * Open the filter modal.
+   * - Sets the draft state to the current value.
+   * - Opens the modal.
+   */
+  function openFilterModal() {
+    // Set draft to current value
+    setDraftSortOption(sortOption);
+
+    // Open modal
+    setIsFilterOpen(true);
+  }
+
+  /**
+   * Close the filter modal without applying changes.
+   */
+  function closeFilterModal() {
+    setIsFilterOpen(false);
+  }
+
+  /**
+   * Apply the filter and sort options.
+   * - Sets the main sort option from the draft.
+   * - Closes the modal.
+   */
+  function applyFilterAndSort() {
+    // Apply sort
+    setSortOption(draftSortOption);
+
+    // Close modal
+    setIsFilterOpen(false);
+  }
+
+  /**
    * Partition and sort items for display.
    * - `withExp`: items with an expiration date, sorted earliest-first
    * - `noExp`: items without an expiration date, newest-first by createdAt
@@ -104,16 +186,14 @@ export default function PantryClient() {
 
     const withDate = items
       .filter((i) => Boolean(i.dateOnPackage))
-      .sort((a, b) => new Date(a.dateOnPackage!).getTime() - new Date(b.dateOnPackage!).getTime());
+      .sort(sortBasedOnOption(sortOption, true));
 
     const noDate = items
       .filter((i) => !i.dateOnPackage)
-      .sort(
-        (a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()
-      );
+      .sort(sortBasedOnOption(sortOption, false));
 
     return { withDate, noDate };
-  }, [state]);
+  }, [state, sortOption]);
 
   return (
     <div className="space-y-4">
@@ -137,18 +217,9 @@ export default function PantryClient() {
             <button
               type="button"
               className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm"
-              // TODO: Not wired yet (future issue). Keep it as UI-only for now.
-              onClick={() => {}}
+              onClick={openFilterModal}
             >
-              Filter
-            </button>
-            <button
-              type="button"
-              className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm"
-              // TODO: Not wired yet (future issue). Keep it as UI-only for now.
-              onClick={() => {}}
-            >
-              Sort
+              Filter & Sort
             </button>
             <button
               type="button"
@@ -162,6 +233,7 @@ export default function PantryClient() {
 
         {/* Desktop toolbar */}
         <div className="hidden md:flex items-center gap-3">
+          {/* Search Bar */}
           <div className="flex-1">
             <label className="sr-only" htmlFor="pantry-search-desktop">
               Search pantry
@@ -176,18 +248,17 @@ export default function PantryClient() {
             />
           </div>
 
-          <select className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm">
-            <option>Sort: Package date</option>
-            <option>Sort: Added (newest)</option>
-            <option>Sort: Added (oldest)</option>
-            <option>Sort: Name</option>
-          </select>
+          {/* Sort Dropdown */}
+          <PantrySortSelect
+            value={sortOption}
+            onChange={setSortOption}
+          />
 
+          {/* Filter Button */}
           <button
             type="button"
             className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm"
-            // TODO: Not wired yet (future issue). Keep it as UI-only for now.
-            onClick={() => {}}
+            onClick={openFilterModal}
           >
             Filter
           </button>
@@ -322,6 +393,18 @@ export default function PantryClient() {
               setIsAddOpen(false);
               await load(); // refresh list immediately
             }}
+          />
+        </Modal>
+      ) : null}
+
+      {/* Filter modal */}
+      {isFilterOpen ? (
+        <Modal title="Filter & Sort" onClose={closeFilterModal}>
+          <PantryFilterSortForm
+            draftSortOption={draftSortOption}
+            onDraftSortChange={setDraftSortOption}
+            onCancel={closeFilterModal}
+            onApply={applyFilterAndSort}
           />
         </Modal>
       ) : null}
