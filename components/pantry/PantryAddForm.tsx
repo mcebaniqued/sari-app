@@ -7,7 +7,7 @@ import {
   type DateLabelType,
   type PantryUnit,
 } from "@/lib/domain/pantry";
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 
 const units: PantryUnit[] = [...PANTRY_UNITS];
 
@@ -17,12 +17,6 @@ interface PantryAddFormProps {
 
 const inputClass =
   "h-10 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 text-sm text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--muted-foreground))] outline-none focus:ring-2 focus:ring-[rgb(var(--ring))] disabled:cursor-not-allowed disabled:opacity-60";
-
-const linkButtonAdd =
-  "text-sm font-medium text-[rgb(var(--foreground))] underline underline-offset-4 hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ring))] rounded";
-
-const linkButtonRemove =
-  "text-xs font-medium text-red-500 hover:underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-red-500/40 rounded";
 
 function Label({
   htmlFor,
@@ -51,21 +45,12 @@ export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [unit, setUnit] = useState<PantryUnit>("count");
-  const [addPackageDate, setAddPackageDate] = useState(false);
 
-  // Only used when addPackageDate === true
   const [dateLabelType, setDateLabelType] = useState<DateLabelType>("not_sure");
   const [dateOnPackage, setDateOnPackage] = useState("");
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  // If the user removes the date section, clear fields so we don't accidentally submit stale values.
-  useEffect(() => {
-    if (addPackageDate) return;
-    setDateLabelType("not_sure");
-    setDateOnPackage("");
-  }, [addPackageDate]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -86,8 +71,8 @@ export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
           name: trimmedName,
           quantity: q,
           unit,
-          dateLabelType: addPackageDate ? dateLabelType : undefined,
-          dateOnPackage: addPackageDate ? dateOnPackage || undefined : undefined,
+          dateLabelType,
+          dateOnPackage: dateOnPackage || undefined,
         }),
       });
 
@@ -141,7 +126,7 @@ export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
         </div>
 
         <div className="grid gap-1">
-          <Label htmlFor={unitId}>Unit</Label>
+          <Label htmlFor={unitId} required>Unit</Label>
           <select
             id={unitId}
             className={inputClass}
@@ -157,60 +142,43 @@ export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
         </div>
       </div>
 
-      {/* Expiration date */}
-      <div className="grid gap-2">
-        <div>
-          {addPackageDate ? (
-            <p className="text-sm font-medium text-[rgb(var(--foreground))]">Expiration date</p>
-          ) : null}
+      {/* Optional details */}
+      <div className="mt-4 grid gap-2">
+        <p className="text-xs font-medium text-[rgb(var(--muted-foreground))]">
+          Optional details
+        </p>
 
-          {/* Action row */}
-          <div>
-            <button
-              type="button"
-              className={addPackageDate ? linkButtonRemove : linkButtonAdd}
-              onClick={() => setAddPackageDate((v) => !v)}
-              aria-expanded={addPackageDate}
-              aria-controls="expiration-date-fields"
+        {/* Package date */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid gap-1">
+            <Label htmlFor={dateLabelId}>Label type</Label>
+            <select
+              id={dateLabelId}
+              className={inputClass}
+              value={dateLabelType}
+              onChange={(e) => setDateLabelType(e.target.value as DateLabelType)}
             >
-              {addPackageDate ? "Remove expiration date" : "Add expiration date"}
-            </button>
+              {DATE_LABEL_TYPES.map((v) => (
+                <option key={v} value={v}>
+                  {DATE_LABEL_TYPE_LABELS[v]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid gap-1">
+            <Label htmlFor={dateOnPkgId}>Date on package</Label>
+            <input
+              id={dateOnPkgId}
+              className={inputClass}
+              type="date"
+              value={dateOnPackage}
+              onChange={(e) => setDateOnPackage(e.target.value)}
+            />
           </div>
         </div>
 
-        {/* Controlled region */}
-        <div id="expiration-date-fields">
-          {addPackageDate ? (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="grid gap-1">
-                <Label htmlFor={dateLabelId}>Label type</Label>
-                <select
-                  id={dateLabelId}
-                  className={inputClass}
-                  value={dateLabelType}
-                  onChange={(e) => setDateLabelType(e.target.value as DateLabelType)}
-                >
-                  {DATE_LABEL_TYPES.map((v) => (
-                    <option key={v} value={v}>
-                      {DATE_LABEL_TYPE_LABELS[v]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid gap-1">
-                <Label htmlFor={dateOnPkgId}>Date on package</Label>
-                <input
-                  id={dateOnPkgId}
-                  className={inputClass}
-                  type="date"
-                  value={dateOnPackage}
-                  onChange={(e) => setDateOnPackage(e.target.value)}
-                />
-              </div>
-            </div>
-          ) : null}
-        </div>
+        {/* Add more fields here */}
       </div>
 
       {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
