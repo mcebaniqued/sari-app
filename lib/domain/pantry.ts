@@ -1,4 +1,8 @@
-export const PANTRY_UNITS = ["count", "g", "oz", "ml"] as const;
+export const COUNT_UNITS = ["count"] as const;
+export const WEIGHT_UNITS = ["oz", "lb", "g", "kg"] as const;
+export const VOLUME_UNITS = ["fl oz", "cup", "ml", "l"] as const;
+
+export const PANTRY_UNITS = [...COUNT_UNITS, ...WEIGHT_UNITS, ...VOLUME_UNITS] as const;
 export type PantryUnit = (typeof PANTRY_UNITS)[number];
 
 export const PANTRY_STATUSES = ["ACTIVE", "CONSUMED", "DISCARDED"] as const;
