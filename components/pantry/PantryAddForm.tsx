@@ -1,15 +1,15 @@
 "use client";
 
 import {
+  COUNT_UNITS,
   DATE_LABEL_TYPES,
   DATE_LABEL_TYPE_LABELS,
-  PANTRY_UNITS,
+  VOLUME_UNITS,
+  WEIGHT_UNITS,
   type DateLabelType,
   type PantryUnit,
 } from "@/lib/domain/pantry";
 import { useId, useState } from "react";
-
-const units: PantryUnit[] = [...PANTRY_UNITS];
 
 interface PantryAddFormProps {
   onSuccess: () => void;
@@ -133,11 +133,30 @@ export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
             value={unit}
             onChange={(e) => setUnit(e.target.value as PantryUnit)}
           >
-            {units.map((u) => (
-              <option key={u} value={u}>
-                {u}
-              </option>
-            ))}
+            {/* Count group */}
+            <optgroup label="Count">
+              {COUNT_UNITS.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </optgroup>
+            {/* Weight group */}
+            <optgroup label="Weight">
+              {WEIGHT_UNITS.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </optgroup>
+            {/* Volume group */}
+            <optgroup label="Volume">
+              {VOLUME_UNITS.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </optgroup>
           </select>
         </div>
       </div>
