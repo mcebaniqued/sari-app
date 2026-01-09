@@ -1,3 +1,4 @@
+import ToastContainerClient from "@/components/toast/ToastContainerClient";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -26,6 +27,7 @@ export default function RootLayout({
     <html lang="en" className="h-full font-sans">
       <body className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
         {children}
+        <ToastContainerClient />
       </body>
     </html>
   );
