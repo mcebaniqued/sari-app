@@ -69,17 +69,17 @@ function formatPackageDateLine(i: PantryItem) {
  */
 const sortBasedOnOption = (sortOption: PantrySortOption, hasDate: boolean) => {
   switch (sortOption) {
-    case "packageDateNewest":
-      return hasDate
-        ? (a: PantryItem, b: PantryItem) => compareDesc(toTime(a.dateOnPackage), toTime(b.dateOnPackage))
-        // Fallback for items without dateOnPackage
-        : (a: PantryItem, b: PantryItem) => compareDesc(toTime(a.createdAt), toTime(b.createdAt));
-
-    case "packageDateOldest":
+    case "expirationDateSoonest":
       return hasDate
         ? (a: PantryItem, b: PantryItem) => compareAsc(toTime(a.dateOnPackage), toTime(b.dateOnPackage))
         // Fallback for items without dateOnPackage
         : (a: PantryItem, b: PantryItem) => compareAsc(toTime(a.createdAt), toTime(b.createdAt));
+
+    case "expirationDateLatest":
+      return hasDate
+        ? (a: PantryItem, b: PantryItem) => compareDesc(toTime(a.dateOnPackage), toTime(b.dateOnPackage))
+        // Fallback for items without dateOnPackage
+        : (a: PantryItem, b: PantryItem) => compareDesc(toTime(a.createdAt), toTime(b.createdAt));
 
     case "addedDateNewest":
       return (a: PantryItem, b: PantryItem) => compareDesc(toTime(a.createdAt), toTime(b.createdAt));

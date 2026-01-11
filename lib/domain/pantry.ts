@@ -41,8 +41,8 @@ export const DATE_LABEL_TYPE_LABELS: Record<DateLabelType, string> = {
 };
 
 export const PANTRY_SORT_OPTIONS = [
-  "packageDateNewest",
-  "packageDateOldest",
+  "expirationDateSoonest",
+  "expirationDateLatest",
   "addedDateNewest",
   "addedDateOldest",
   "nameAZ",
@@ -54,8 +54,8 @@ export const DEFAULT_PANTRY_SORT: PantrySortOption = PANTRY_SORT_OPTIONS[0];
 export type PantrySortOption = (typeof PANTRY_SORT_OPTIONS)[number];
 
 export const PANTRY_SORT_OPTION_LABELS: Record<PantrySortOption, string> = {
-  packageDateNewest: "Package Date: Newest",
-  packageDateOldest: "Package Date: Oldest",
+  expirationDateSoonest: "Expiration: Soonest",
+  expirationDateLatest: "Expiration: Latest",
   addedDateNewest: "Added Date: Newest",
   addedDateOldest: "Added Date: Oldest",
   nameAZ: "Name: A-Z",
