@@ -14,7 +14,7 @@ import {
 } from "@/lib/domain/pantry";
 import { compareAsc, compareDesc, compareNameAZ, toTime } from "@/lib/domain/sort";
 import { notifySuccess } from "@/lib/ui/toast/toast";
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 /**
  * Representation of the pantry item as returned from the API.
@@ -181,8 +181,8 @@ export default function PantryClient() {
    * Handle search input changes.
    * @param e - change event from the search input
    */
-  function onSearchChange(e: ChangeEvent<HTMLInputElement>) {
-    setSearchQuery(e.target.value);
+  function onSearchChange(nextQuery: string) {
+    setSearchQuery(nextQuery);
   }
 
   // Trimmed search query for filtering. We trim here so that the memoized sorting only runs when the meaningful query changes, not when the user types extra spaces.
@@ -217,13 +217,18 @@ export default function PantryClient() {
     return { withDate, noDate };
   }, [state, sortOption, q]);
 
+  // Used for conditional rendering
+  const hasItems = state.status === "ready" && state.items.length > 0;
+  const hasSearch = q !== "";
+  const hasVisibleResults = withDate.length > 0 || noDate.length > 0;
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
       <section className="space-y-2">
         {/* Mobile toolbar */}
         <div className="flex flex-col gap-2 md:hidden">
-          <SearchBar query={searchQuery} onQueryChange={onSearchChange} />
+          <SearchBar query={searchQuery} onChangeQuery={onSearchChange} label="Search pantry" />
 
           <div className="flex items-center justify-end gap-2">
             <button
@@ -247,7 +252,7 @@ export default function PantryClient() {
         <div className="hidden md:flex items-center gap-3">
           {/* Search Bar */}
           <div className="flex-1">
-            <SearchBar query={searchQuery} onQueryChange={onSearchChange} />
+            <SearchBar query={searchQuery} onChangeQuery={onSearchChange} label="Search pantry" />
           </div>
 
           {/* Sort Dropdown */}
@@ -305,9 +310,9 @@ export default function PantryClient() {
         ) : null}
 
         {/* Only show the lists if we're ready and have items. This avoids showing "No items match your search" when we haven't loaded yet. */}
-        {state.status === "ready" && state.items.length > 0 ?
+        {hasItems ?
           // If there's a search query but no results, show a message. Otherwise show the lists (withDate and noDate).
-          q !== "" && withDate.length === 0 && noDate.length === 0 ? (
+          hasSearch && !hasVisibleResults ? (
             <p className="text-sm text-[rgb(var(--muted-foreground))]">
               No items match your search.
             </p>
