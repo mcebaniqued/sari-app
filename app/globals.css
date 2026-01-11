@@ -13,6 +13,16 @@
 
   --border: 229 229 229;
   --ring: 59 130 246;
+
+  /* Override Toastify variables */
+  --toastify-color-light: rgb(var(--card));
+  --toastify-text-color-light: rgb(var(--card-foreground));
+  --toastify-color-dark: rgb(var(--card));
+  --toastify-text-color-dark: rgb(var(--card-foreground));
+
+  --toastify-toast-background: rgb(var(--card));
+  --toastify-toast-shadow: 0 1px 8px rgba(0, 0, 0, 0.12);
+  --toastify-toast-bd-radius: 8px;
 }
 
 @media (prefers-color-scheme: dark) {

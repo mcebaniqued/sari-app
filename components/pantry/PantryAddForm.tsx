@@ -12,7 +12,13 @@ import {
 import { useId, useState } from "react";
 
 interface PantryAddFormProps {
-  onSuccess: () => void;
+  onSuccess: (item: {
+    name: string;
+    quantity: number;
+    unit: PantryUnit;
+    dateLabelType: DateLabelType;
+    dateOnPackage?: string;
+  }) => void;
 }
 
 const inputClass =
@@ -83,7 +89,7 @@ export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
       }
 
       // Close modal on success
-      onSuccess();
+      onSuccess({ name: trimmedName, quantity: q, unit, dateLabelType, dateOnPackage });
     } finally {
       setSubmitting(false);
     }
