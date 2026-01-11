@@ -4,6 +4,7 @@ import Modal from "@/components/modals/Modal";
 import PantryAddForm from "@/components/pantry/PantryAddForm";
 import PantryFilterSortForm from "@/components/pantry/PantryFilterSortForm";
 import { PantrySortSelect } from "@/components/pantry/PantrySortSelect";
+import SearchBar from "@/components/search/SearchBar";
 import {
   DATE_LABEL_TYPE_LABELS,
   DEFAULT_PANTRY_SORT,
@@ -111,6 +112,7 @@ export default function PantryClient() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [sortOption, setSortOption] = useState(DEFAULT_PANTRY_SORT);
   const [draftSortOption, setDraftSortOption] = useState(DEFAULT_PANTRY_SORT);
+  const [searchQuery, setSearchQuery] = useState("");
 
   /**
    * Load the pantry list from the API.
@@ -176,25 +178,49 @@ export default function PantryClient() {
   }
 
   /**
+   * Handle search input changes.
+   * @param e - change event from the search input
+   */
+  function onSearchChange(nextQuery: string) {
+    setSearchQuery(nextQuery);
+  }
+
+  // Trimmed search query for filtering. We trim here so that the memoized sorting only runs when the meaningful query changes, not when the user types extra spaces.
+  const q = searchQuery.trim();
+
+  /**
    * Partition and sort items for display.
-   * - `withExp`: items with an expiration date, sorted earliest-first
-   * - `noExp`: items without an expiration date, newest-first by createdAt
+   * - `withDate`: items with a package date, sorted earliest-first
+   * - `noDate`: items without a package date, newest-first by createdAt
    *
-   * We memoize this so sorting only runs when the source `state` changes.
+   * We memoize this so sorting only runs when the source `state`, `sortOption`, and `q` changes.
    */
   const { withDate, noDate } = useMemo(() => {
-    const items = state.status === "ready" ? state.items : [];
+    const qLower = q.toLowerCase(); // Prevents from calling `toLowerCase` repeatedly in the filter below.
 
-    const withDate = items
+    // First filter based on search query. If the query is empty, show all items.
+    const searchItems = state.status === "ready" && q !== ""
+      ? state.items.filter((i) => i.name.toLowerCase().includes(qLower))
+      : state.status === "ready"
+        ? state.items
+        : [];
+
+    // Then partition based on presence of dateOnPackage and sort each list based on the selected sort option.
+    const withDate = searchItems
       .filter((i) => Boolean(i.dateOnPackage))
       .sort(sortBasedOnOption(sortOption, true));
 
-    const noDate = items
+    const noDate = searchItems
       .filter((i) => !i.dateOnPackage)
       .sort(sortBasedOnOption(sortOption, false));
 
     return { withDate, noDate };
-  }, [state, sortOption]);
+  }, [state, sortOption, q]);
+
+  // Used for conditional rendering
+  const hasItems = state.status === "ready" && state.items.length > 0;
+  const hasSearch = q !== "";
+  const hasVisibleResults = withDate.length > 0 || noDate.length > 0;
 
   return (
     <div className="space-y-4">
@@ -202,17 +228,7 @@ export default function PantryClient() {
       <section className="space-y-2">
         {/* Mobile toolbar */}
         <div className="flex flex-col gap-2 md:hidden">
-          <label className="sr-only" htmlFor="pantry-search">
-            Search pantry
-          </label>
-          <input
-            id="pantry-search"
-            placeholder="Search..."
-            className="w-full rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[rgb(var(--ring))]"
-            // TODO: Not wired yet (future issue). Keep it as UI-only for now.
-            value={""}
-            onChange={() => {}}
-          />
+          <SearchBar query={searchQuery} onChangeQuery={onSearchChange} label="Search pantry" />
 
           <div className="flex items-center justify-end gap-2">
             <button
@@ -236,17 +252,7 @@ export default function PantryClient() {
         <div className="hidden md:flex items-center gap-3">
           {/* Search Bar */}
           <div className="flex-1">
-            <label className="sr-only" htmlFor="pantry-search-desktop">
-              Search pantry
-            </label>
-            <input
-              id="pantry-search-desktop"
-              placeholder="Search..."
-              className="w-full rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[rgb(var(--ring))]"
-              // TODO: Not wired yet (future issue). Keep it as UI-only for now.
-              value={""}
-              onChange={() => {}}
-            />
+            <SearchBar query={searchQuery} onChangeQuery={onSearchChange} label="Search pantry" />
           </div>
 
           {/* Sort Dropdown */}
@@ -303,89 +309,96 @@ export default function PantryClient() {
           </p>
         ) : null}
 
-        {state.status === "ready" && state.items.length > 0 ? (
-          <div className="space-y-4">
-            {/* With package date */}
-            {withDate.length > 0 ? (
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold text-[rgb(var(--muted-foreground))]">
-                  Items with a package date
-                </h3>
+        {/* Only show the lists if we're ready and have items. This avoids showing "No items match your search" when we haven't loaded yet. */}
+        {hasItems ?
+          // If there's a search query but no results, show a message. Otherwise show the lists (withDate and noDate).
+          hasSearch && !hasVisibleResults ? (
+            <p className="text-sm text-[rgb(var(--muted-foreground))]">
+              No items match your search.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {/* With package date */}
+              {withDate.length > 0 ? (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-[rgb(var(--muted-foreground))]">
+                    Items with a package date
+                  </h3>
 
-                <div className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--card))]">
-                  <ul className="divide-y divide-[rgb(var(--border))]">
-                    {withDate.map((i) => (
-                      <li key={i._id} className="p-3 flex items-center justify-between gap-4">
-                        <div className="min-w-0">
-                          <div className="font-medium truncate">{i.name}</div>
-                          <div className="text-sm text-[rgb(var(--muted-foreground))]">
-                            {i.quantity} {i.unit}
+                  <div className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--card))]">
+                    <ul className="divide-y divide-[rgb(var(--border))]">
+                      {withDate.map((i) => (
+                        <li key={i._id} className="p-3 flex items-center justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">{i.name}</div>
+                            <div className="text-sm text-[rgb(var(--muted-foreground))]">
+                              {i.quantity} {i.unit}
+                            </div>
                           </div>
-                        </div>
 
-                        <div className="flex items-end flex-col gap-1">
-                          <div className="text-sm whitespace-nowrap">{formatPackageDateLine(i)}</div>
+                          <div className="flex items-end flex-col gap-1">
+                            <div className="text-sm whitespace-nowrap">{formatPackageDateLine(i)}</div>
 
-                          <button
-                            className="text-xs text-red-600 hover:underline"
-                            type="button"
-                            onClick={async () => {
-                              await fetch(`/api/pantry/${i._id}`, { method: "DELETE" });
-                              notifySuccess("Item removed", `${i.name} · ${i.quantity} ${i.unit} · ${formatPackageDateLine(i)}`);
-                              await load();
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            ) : null}
-
-            {/* No package date */}
-            {noDate.length > 0 ? (
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold text-[rgb(var(--muted-foreground))]">
-                  No expiration date
-                </h3>
-
-                <div className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--card))]">
-                  <ul className="divide-y divide-[rgb(var(--border))]">
-                    {noDate.map((i) => (
-                      <li key={i._id} className="p-3 flex items-center justify-between gap-4">
-                        <div className="min-w-0">
-                          <div className="font-medium truncate">{i.name}</div>
-                          <div className="text-sm text-[rgb(var(--muted-foreground))]">
-                            {i.quantity} {i.unit}
+                            <button
+                              className="text-xs text-red-600 hover:underline"
+                              type="button"
+                              onClick={async () => {
+                                await fetch(`/api/pantry/${i._id}`, { method: "DELETE" });
+                                notifySuccess("Item removed", `${i.name} · ${i.quantity} ${i.unit} · ${formatPackageDateLine(i)}`);
+                                await load();
+                              }}
+                            >
+                              Delete
+                            </button>
                           </div>
-                        </div>
-
-                        <div className="flex items-end flex-col gap-1">
-                          <div className="text-sm whitespace-nowrap">-</div>
-
-                          <button
-                            className="text-xs text-red-600 hover:underline"
-                            type="button"
-                            onClick={async () => {
-                              await fetch(`/api/pantry/${i._id}`, { method: "DELETE" });
-                              notifySuccess("Item removed", `${i.name} · ${i.quantity} ${i.unit}`);
-                              await load();
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+              ) : null}
+
+              {/* No package date */}
+              {noDate.length > 0 ? (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-[rgb(var(--muted-foreground))]">
+                    No expiration date
+                  </h3>
+
+                  <div className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--card))]">
+                    <ul className="divide-y divide-[rgb(var(--border))]">
+                      {noDate.map((i) => (
+                        <li key={i._id} className="p-3 flex items-center justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">{i.name}</div>
+                            <div className="text-sm text-[rgb(var(--muted-foreground))]">
+                              {i.quantity} {i.unit}
+                            </div>
+                          </div>
+
+                          <div className="flex items-end flex-col gap-1">
+                            <div className="text-sm whitespace-nowrap">-</div>
+
+                            <button
+                              className="text-xs text-red-600 hover:underline"
+                              type="button"
+                              onClick={async () => {
+                                await fetch(`/api/pantry/${i._id}`, { method: "DELETE" });
+                                notifySuccess("Item removed", `${i.name} · ${i.quantity} ${i.unit}`);
+                                await load();
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
       </section>
 
       {/* Add item modal */}
