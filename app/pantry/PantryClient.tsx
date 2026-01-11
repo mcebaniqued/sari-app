@@ -331,7 +331,7 @@ export default function PantryClient() {
                             type="button"
                             onClick={async () => {
                               await fetch(`/api/pantry/${i._id}`, { method: "DELETE" });
-                              notifySuccess("Item removed", `${i.name} • ${i.quantity} ${i.unit} • ${formatPackageDateLine(i)}`);
+                              notifySuccess("Item removed", `${i.name} · ${i.quantity} ${i.unit} · ${formatPackageDateLine(i)}`);
                               await load();
                             }}
                           >
@@ -371,7 +371,7 @@ export default function PantryClient() {
                             type="button"
                             onClick={async () => {
                               await fetch(`/api/pantry/${i._id}`, { method: "DELETE" });
-                              notifySuccess("Item removed", `${i.name} • ${i.quantity} ${i.unit}`);
+                              notifySuccess("Item removed", `${i.name} · ${i.quantity} ${i.unit}`);
                               await load();
                             }}
                           >
@@ -394,7 +394,7 @@ export default function PantryClient() {
           <PantryAddForm
             onSuccess={async ({ name, quantity, unit, dateLabelType, dateOnPackage }) => {
               setIsAddOpen(false);
-              notifySuccess("Item added", `${name} • ${quantity} ${unit} ${dateOnPackage ? `• ${DATE_LABEL_TYPE_LABELS[dateLabelType]} ${formatDate(dateOnPackage)}` : ""}`);
+              notifySuccess("Item added", `${name} · ${quantity} ${unit} ${dateOnPackage ? `· ${DATE_LABEL_TYPE_LABELS[dateLabelType]} ${formatDate(dateOnPackage)}` : ""}`);
               await load(); // refresh list immediately
             }}
           />
