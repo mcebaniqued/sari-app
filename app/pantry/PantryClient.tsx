@@ -12,6 +12,7 @@ import {
   type PantryUnit,
 } from "@/lib/domain/pantry";
 import { compareAsc, compareDesc, compareNameAZ, toTime } from "@/lib/domain/sort";
+import { notifySuccess } from "@/lib/ui/toast/toast";
 import { useEffect, useMemo, useState } from "react";
 
 /**
@@ -56,7 +57,7 @@ function formatDate(iso?: string) {
 function formatPackageDateLine(i: PantryItem) {
   if (!i.dateOnPackage) return "-";
   const label = i.dateLabelType ? DATE_LABEL_TYPE_LABELS[i.dateLabelType] : "Date on package";
-  return `${label} · ${formatDate(i.dateOnPackage)}`;
+  return `${label} ${formatDate(i.dateOnPackage)}`;
 }
 
 /**
@@ -330,6 +331,7 @@ export default function PantryClient() {
                             type="button"
                             onClick={async () => {
                               await fetch(`/api/pantry/${i._id}`, { method: "DELETE" });
+                              notifySuccess("Item removed", `${i.name} • ${i.quantity} ${i.unit} • ${formatPackageDateLine(i)}`);
                               await load();
                             }}
                           >
@@ -369,6 +371,7 @@ export default function PantryClient() {
                             type="button"
                             onClick={async () => {
                               await fetch(`/api/pantry/${i._id}`, { method: "DELETE" });
+                              notifySuccess("Item removed", `${i.name} • ${i.quantity} ${i.unit}`);
                               await load();
                             }}
                           >
@@ -389,8 +392,9 @@ export default function PantryClient() {
       {isAddOpen ? (
         <Modal title="Add item" onClose={() => setIsAddOpen(false)}>
           <PantryAddForm
-            onSuccess={async () => {
+            onSuccess={async ({ name, quantity, unit, dateLabelType, dateOnPackage }) => {
               setIsAddOpen(false);
+              notifySuccess("Item added", `${name} • ${quantity} ${unit} ${dateOnPackage ? `• ${DATE_LABEL_TYPE_LABELS[dateLabelType]} ${formatDate(dateOnPackage)}` : ""}`);
               await load(); // refresh list immediately
             }}
           />
