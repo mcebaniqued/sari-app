@@ -187,24 +187,29 @@ export default function PantryClient() {
 
   /**
    * Partition and sort items for display.
-   * - `withExp`: items with an expiration date, sorted earliest-first
-   * - `noExp`: items without an expiration date, newest-first by createdAt
+   * - `withDate`: items with a package date, sorted earliest-first
+   * - `noDate`: items without a package date, newest-first by createdAt
    *
-   * We memoize this so sorting only runs when the source `state` changes.
+   * We memoize this so sorting only runs when the source `state`, `sortOption`, and `searchQuery` changes.
    */
   const { withDate, noDate } = useMemo(() => {
-    const items = state.status === "ready" ? state.items : [];
+    const q = searchQuery.trim().toLowerCase();
+    const searchItems = state.status === "ready" && q !== ""
+      ? state.items.filter((i) => i.name.toLowerCase().includes(q))
+      : state.status === "ready"
+        ? state.items
+        : [];
 
-    const withDate = items
+    const withDate = searchItems
       .filter((i) => Boolean(i.dateOnPackage))
       .sort(sortBasedOnOption(sortOption, true));
 
-    const noDate = items
+    const noDate = searchItems
       .filter((i) => !i.dateOnPackage)
       .sort(sortBasedOnOption(sortOption, false));
 
     return { withDate, noDate };
-  }, [state, sortOption]);
+  }, [state, sortOption, searchQuery]);
 
   return (
     <div className="space-y-4">
