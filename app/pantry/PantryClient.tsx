@@ -112,6 +112,7 @@ export default function PantryClient() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [sortOption, setSortOption] = useState(DEFAULT_PANTRY_SORT);
   const [draftSortOption, setDraftSortOption] = useState(DEFAULT_PANTRY_SORT);
+  const [searchQuery, setSearchQuery] = useState("");
 
   /**
    * Load the pantry list from the API.
@@ -177,6 +178,14 @@ export default function PantryClient() {
   }
 
   /**
+   * Handle search input changes.
+   * @param e - change event from the search input
+   */
+  function onSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setSearchQuery(e.target.value);
+  }
+
+  /**
    * Partition and sort items for display.
    * - `withExp`: items with an expiration date, sorted earliest-first
    * - `noExp`: items without an expiration date, newest-first by createdAt
@@ -203,7 +212,7 @@ export default function PantryClient() {
       <section className="space-y-2">
         {/* Mobile toolbar */}
         <div className="flex flex-col gap-2 md:hidden">
-          <SearchBar />
+          <SearchBar query={searchQuery} onQueryChange={onSearchChange} />
 
           <div className="flex items-center justify-end gap-2">
             <button
@@ -227,7 +236,7 @@ export default function PantryClient() {
         <div className="hidden md:flex items-center gap-3">
           {/* Search Bar */}
           <div className="flex-1">
-            <SearchBar />
+            <SearchBar query={searchQuery} onQueryChange={onSearchChange} />
           </div>
 
           {/* Sort Dropdown */}
