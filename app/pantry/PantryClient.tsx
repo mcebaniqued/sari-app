@@ -4,6 +4,7 @@ import Modal from "@/components/modals/Modal";
 import PantryAddForm from "@/components/pantry/PantryAddForm";
 import PantryFilterSortForm from "@/components/pantry/PantryFilterSortForm";
 import { PantrySortSelect } from "@/components/pantry/PantrySortSelect";
+import SearchBar from "@/components/search/SearchBar";
 import {
   DATE_LABEL_TYPE_LABELS,
   DEFAULT_PANTRY_SORT,
@@ -202,17 +203,7 @@ export default function PantryClient() {
       <section className="space-y-2">
         {/* Mobile toolbar */}
         <div className="flex flex-col gap-2 md:hidden">
-          <label className="sr-only" htmlFor="pantry-search">
-            Search pantry
-          </label>
-          <input
-            id="pantry-search"
-            placeholder="Search..."
-            className="w-full rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[rgb(var(--ring))]"
-            // TODO: Not wired yet (future issue). Keep it as UI-only for now.
-            value={""}
-            onChange={() => {}}
-          />
+          <SearchBar />
 
           <div className="flex items-center justify-end gap-2">
             <button
@@ -236,17 +227,7 @@ export default function PantryClient() {
         <div className="hidden md:flex items-center gap-3">
           {/* Search Bar */}
           <div className="flex-1">
-            <label className="sr-only" htmlFor="pantry-search-desktop">
-              Search pantry
-            </label>
-            <input
-              id="pantry-search-desktop"
-              placeholder="Search..."
-              className="w-full rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[rgb(var(--ring))]"
-              // TODO: Not wired yet (future issue). Keep it as UI-only for now.
-              value={""}
-              onChange={() => {}}
-            />
+            <SearchBar />
           </div>
 
           {/* Sort Dropdown */}
