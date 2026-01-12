@@ -1,11 +1,11 @@
 import { PANTRY_SORT_OPTION_LABELS, PantrySortOption } from "@/lib/domain/pantry";
 
-type PantrySortSelectProps = {
+interface PantrySortSelectProps {
   value: PantrySortOption;
   onChange: (value: PantrySortOption) => void;
 };
 
-export function PantrySortSelect({ value, onChange }: PantrySortSelectProps) {
+export default function PantrySortSelect({ value, onChange }: PantrySortSelectProps) {
   return (
     <select
       value={value}
