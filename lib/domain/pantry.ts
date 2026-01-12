@@ -1,3 +1,48 @@
+/**
+ * Representation of the pantry item as returned from the API.
+ * Dates are serialized as ISO strings by `NextResponse`.
+ */
+export type PantryItem = {
+  _id: string;
+  name: string;
+  quantity: number;
+  unit: PantryUnit;
+  dateLabelType?: DateLabelType;
+  dateOnPackage?: string; // ISO date string
+  createdAt?: string; // ISO date string
+};
+
+/**
+ * Local load state for async data fetching.
+ */
+export type LoadState =
+  | { status: "loading" }
+  | { status: "error"; message: string }
+  | { status: "ready"; items: PantryItem[] };
+
+/**
+ * Format an ISO date string for display.
+ * Returns `-` for missing or invalid values.
+ *
+ * @param iso - optional ISO date string
+ */
+export function formatDate(iso?: string) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "-" : d.toLocaleDateString();
+}
+
+/**
+ * Format the package date line for a pantry item.
+ * @param i - pantry item
+ * @returns formatted line like `Best if used by · 01/01/2024` or `-` if no date
+ */
+export function formatPackageDateLine(i: PantryItem) {
+  if (!i.dateOnPackage) return "-";
+  const label = i.dateLabelType ? DATE_LABEL_TYPE_LABELS[i.dateLabelType] : "Date on package";
+  return `${label} ${formatDate(i.dateOnPackage)}`;
+}
+
 export const COUNT_UNITS = ["count"] as const;
 export const WEIGHT_UNITS = ["oz", "lb", "g", "kg"] as const;
 export const VOLUME_UNITS = ["fl oz", "cup", "ml", "l"] as const;

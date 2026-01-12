@@ -1,5 +1,5 @@
 import { PantrySortOption } from "@/lib/domain/pantry";
-import { PantrySortSelect } from "./PantrySortSelect";
+import PantrySortSelect from "./PantrySortSelect";
 
 type PantryFilterSortFormProps = {
   draftSortOption: PantrySortOption;
