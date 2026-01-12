@@ -47,6 +47,7 @@ export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
   const unitId = useId();
   const dateLabelId = useId();
   const dateOnPkgId = useId();
+  const purchaseDateId = useId();
 
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
@@ -54,6 +55,7 @@ export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
 
   const [dateLabelType, setDateLabelType] = useState<DateLabelType>("not_sure");
   const [dateOnPackage, setDateOnPackage] = useState("");
+  const [purchaseDate, setPurchaseDate] = useState("");
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -79,6 +81,7 @@ export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
           unit,
           dateLabelType,
           dateOnPackage: dateOnPackage || undefined,
+          purchaseDate: purchaseDate || undefined,
         }),
       });
 
@@ -203,7 +206,19 @@ export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
           </div>
         </div>
 
-        {/* Add more fields here */}
+        {/* Purchase date */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid gap-1">
+            <Label htmlFor={purchaseDateId}>Purchase date</Label>
+            <input
+              id={purchaseDateId}
+              className={inputClass}
+              type="date"
+              value={purchaseDate}
+              onChange={(e) => setPurchaseDate(e.target.value)}
+            />
+          </div>
+        </div>
       </div>
 
       {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}

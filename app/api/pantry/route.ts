@@ -54,9 +54,9 @@ export async function GET() {
  *   name: string,
  *   quantity: number,
  *   unit: PantryUnit,
- *   purchaseDate?: string|Date,
  *   dateLabelType?: DateLabelType,
  *   dateOnPackage?: string|Date
+ *   purchaseDate?: string|Date,
  * }
  */
 export async function POST(req: Request) {
@@ -85,9 +85,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid unit" }, { status: 400 });
   }
 
-  // Normalize optional date fields to real Date objects or `undefined` for mongoose
-  const purchaseDate = toDateOrNull(body?.purchaseDate);
-
   // Optional fields:
   // - If provided, validate dateLabelType against supported values.
   // - If invalid, return 400 (better than silently dropping).
@@ -99,7 +96,9 @@ export async function POST(req: Request) {
   }
   const dateLabelType = isDateLabelType(rawDateLabelType) ? rawDateLabelType : undefined;
 
+  // Coerce date fields to Date objects or null. If the input is invalid, these will be null.
   const dateOnPackage = toDateOrNull(body?.dateOnPackage);
+  const purchaseDate = toDateOrNull(body?.purchaseDate);
 
   // Create the pantry entry in MongoDB (Mongoose model)
   const created = await PantryEntry.create({
