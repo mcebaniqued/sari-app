@@ -21,23 +21,53 @@ import { useEffect, useMemo, useState } from "react";
 /**
  * Get a sort function based on the selected sort option.
  * @param sortOption - selected sort option
- * @param hasDate- whether to expect items to have dateOnPackage defined
  * @returns comparison function for Array.prototype.sort
  */
-const sortBasedOnOption = (sortOption: PantrySortOption, hasDate: boolean) => {
+const sortBasedOnOption = (sortOption: PantrySortOption) => {
+  function compareExpirationWithFallback(a: PantryItem, b: PantryItem) {
+    if (a.dateOnPackage) {
+      // If only a has dateOnPackage, it goes first
+      return -1;
+    } else if (b.dateOnPackage) {
+      // If only b has dateOnPackage, it goes first
+      return 1;
+    } else {
+      // If neither have dateOnPackage, sort by createdAt (newest first), then name (A-Z), then _id to ensure consistent order
+      const c1 = compareDesc(toTime(a.createdAt), toTime(b.createdAt));
+      if (c1 !== 0) {
+        return c1;
+      }
+
+      const c2 = compareNameAZ(a.name, b.name);
+      if (c2 !== 0) {
+        return c2;
+      }
+
+      return a._id.localeCompare(b._id);
+    }
+  }
+
   switch (sortOption) {
     case "expirationDateSoonest":
-      return hasDate
-        ? (a: PantryItem, b: PantryItem) => compareAsc(toTime(a.dateOnPackage), toTime(b.dateOnPackage))
-        // Fallback for items without dateOnPackage
-        : (a: PantryItem, b: PantryItem) => compareAsc(toTime(a.createdAt), toTime(b.createdAt));
-
+      return (a: PantryItem, b: PantryItem) => {
+        // If both have dateOnPackage, sort by it
+        if (a.dateOnPackage && b.dateOnPackage) {
+          return compareAsc(toTime(a.dateOnPackage), toTime(b.dateOnPackage));
+        } else {
+          // If one or both don't have dateOnPackage, use the fallback that puts items with dates first, then sorts by createdAt and name
+          return compareExpirationWithFallback(a, b);
+        }
+      };
     case "expirationDateLatest":
-      return hasDate
-        ? (a: PantryItem, b: PantryItem) => compareDesc(toTime(a.dateOnPackage), toTime(b.dateOnPackage))
-        // Fallback for items without dateOnPackage
-        : (a: PantryItem, b: PantryItem) => compareDesc(toTime(a.createdAt), toTime(b.createdAt));
-
+      return (a: PantryItem, b: PantryItem) => {
+        // If both have dateOnPackage, sort by it
+        if (a.dateOnPackage && b.dateOnPackage) {
+          return compareDesc(toTime(a.dateOnPackage), toTime(b.dateOnPackage));
+        } else {
+          // If one or both don't have dateOnPackage, use the fallback that puts items with dates first, then sorts by createdAt and name
+          return compareExpirationWithFallback(a, b);
+        }
+      };
     case "addedDateNewest":
       return (a: PantryItem, b: PantryItem) => compareDesc(toTime(a.createdAt), toTime(b.createdAt));
     case "addedDateOldest":
@@ -152,7 +182,7 @@ export default function PantryClient() {
    *
    * We memoize this so sorting only runs when the source `state`, `sortOption`, and `q` changes.
    */
-  const { withDate, noDate } = useMemo(() => {
+  const pantryItems = useMemo(() => {
     const qLower = q.toLowerCase(); // Prevents from calling `toLowerCase` repeatedly in the filter below.
 
     // First filter based on search query. If the query is empty, show all items.
@@ -162,16 +192,9 @@ export default function PantryClient() {
         ? state.items
         : [];
 
-    // Then partition based on presence of dateOnPackage and sort each list based on the selected sort option.
-    const withDate = searchItems
-      .filter((i) => Boolean(i.dateOnPackage))
-      .sort(sortBasedOnOption(sortOption, true));
-
-    const noDate = searchItems
-      .filter((i) => !i.dateOnPackage)
-      .sort(sortBasedOnOption(sortOption, false));
-
-    return { withDate, noDate };
+    // Then sort based on the selected sort option.
+    return [...searchItems] // We spread to avoid mutating the original array in state.
+      .sort(sortBasedOnOption(sortOption));
   }, [state, sortOption, q]);
 
   return (
@@ -188,8 +211,7 @@ export default function PantryClient() {
       {/* List */}
       <PantryListSection
         state={state}
-        withDate={withDate}
-        noDate={noDate}
+        pantryItems={pantryItems}
         searchQuery={searchQuery}
         onLoad={load}
         onDelete={async (item) => {

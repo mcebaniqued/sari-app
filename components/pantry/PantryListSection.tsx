@@ -2,8 +2,7 @@ import { formatPackageDateLine, LoadState, PantryItem } from "@/lib/domain/pantr
 
 interface PantryListSectionProps {
   state: LoadState;
-  withDate: PantryItem[];
-  noDate: PantryItem[];
+  pantryItems: PantryItem[];
   searchQuery: string;
   onLoad: () => void;
   onDelete: (item: PantryItem) => Promise<void>;
@@ -11,8 +10,7 @@ interface PantryListSectionProps {
 
 export default function PantryListSection({
   state,
-  withDate,
-  noDate,
+  pantryItems,
   searchQuery,
   onLoad,
   onDelete,
@@ -22,7 +20,7 @@ export default function PantryListSection({
   const hasItems = state.status === "ready" && state.items.length > 0;
   const hasNoItems = state.status === "ready" && state.items.length === 0;
   const hasSearch = q !== "";
-  const hasVisibleResults = withDate.length > 0 || noDate.length > 0;
+  const hasVisibleResults = pantryItems.length > 0;
 
   return (
     <section className="space-y-3">
@@ -60,35 +58,12 @@ export default function PantryListSection({
           <p className="text-sm text-[rgb(var(--muted-foreground))]">
             No items match your search.
           </p>
-        ) : (
-          <div className="space-y-4">
-            {/* With package date */}
-            {withDate.length > 0 ? (
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold text-[rgb(var(--muted-foreground))]">
-                  Items with a package date
-                </h3>
-
-                <div className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--card))]">
-                  <PantryList items={withDate} onDelete={onDelete} />
-                </div>
-              </div>
-            ) : null}
-
-            {/* No package date */}
-            {noDate.length > 0 ? (
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold text-[rgb(var(--muted-foreground))]">
-                  No expiration date
-                </h3>
-
-                <div className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--card))]">
-                  <PantryList items={noDate} onDelete={onDelete} />
-                </div>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+        ) : hasVisibleResults ? (
+            <div className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--card))]">
+              <PantryList items={pantryItems} onDelete={onDelete} />
+            </div>
+          ) : null
+        : null}
     </section>
   )
 }
