@@ -223,8 +223,23 @@ export default function PantryClient() {
 
       {/* Add item modal */}
       {isAddOpen ? (
-        <Modal title="Add item" onClose={() => setIsAddOpen(false)}>
+        <Modal
+          title="Add item"
+          onClose={() => setIsAddOpen(false)}
+          footer={
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                form="pantry-add-form"
+                className="h-10 rounded-lg bg-[rgb(var(--foreground))] px-6 text-sm font-medium text-[rgb(var(--background))]"
+              >
+                Add
+              </button>
+            </div>
+          }
+        >
           <PantryAddForm
+            formId="pantry-add-form"
             onSuccess={async ({ name, quantity, unit, dateLabelType, dateOnPackage }) => {
               setIsAddOpen(false);
               notifySuccess("Item added", `${name} · ${quantity} ${unit} ${dateOnPackage ? `· ${DATE_LABEL_TYPE_LABELS[dateLabelType]} ${formatDate(dateOnPackage)}` : ""}`);
@@ -236,12 +251,31 @@ export default function PantryClient() {
 
       {/* Filter modal */}
       {isFilterOpen ? (
-        <Modal title="Filter & Sort" onClose={closeFilterModal}>
+        <Modal
+          title="Filter & Sort"
+          onClose={closeFilterModal}
+          footer={
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                className="h-10 w-24 rounded-lg border border-[rgb(var(--border))] text-sm font-medium text-[rgb(var(--foreground))] shadow-sm"
+                onClick={closeFilterModal}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="h-10 w-24 rounded-lg bg-[rgb(var(--foreground))] text-sm font-medium text-[rgb(var(--background))] shadow-sm disabled:opacity-60"
+                onClick={applyFilterAndSort}
+              >
+                Apply
+              </button>
+            </div>
+          }
+        >
           <PantryFilterSortForm
             draftSortOption={draftSortOption}
             onDraftSortChange={setDraftSortOption}
-            onCancel={closeFilterModal}
-            onApply={applyFilterAndSort}
           />
         </Modal>
       ) : null}
