@@ -12,6 +12,7 @@ import {
 import { useId, useState } from "react";
 
 interface PantryAddFormProps {
+  formId: string;
   onSuccess: (item: {
     name: string;
     quantity: number;
@@ -41,7 +42,7 @@ function Label({
   );
 }
 
-export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
+export default function PantryAddForm({ formId, onSuccess }: PantryAddFormProps) {
   const nameId = useId();
   const qtyId = useId();
   const unitId = useId();
@@ -58,7 +59,6 @@ export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
   const [purchaseDate, setPurchaseDate] = useState("");
 
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -70,168 +70,159 @@ export default function PantryAddForm({ onSuccess }: PantryAddFormProps) {
     if (!trimmedName) return setSubmitError("Name is required.");
     if (!Number.isFinite(q) || q <= 0) return setSubmitError("Quantity must be > 0.");
 
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/pantry", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: trimmedName,
-          quantity: q,
-          unit,
-          dateLabelType,
-          dateOnPackage: dateOnPackage || undefined,
-          purchaseDate: purchaseDate || undefined,
-        }),
-      });
+    const res = await fetch("/api/pantry", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: trimmedName,
+        quantity: q,
+        unit,
+        dateLabelType,
+        dateOnPackage: dateOnPackage || undefined,
+        purchaseDate: purchaseDate || undefined,
+      }),
+    });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setSubmitError(data?.error || `Failed to add item (${res.status})`);
-        return;
-      }
-
-      // Close modal on success
-      onSuccess({ name: trimmedName, quantity: q, unit, dateLabelType, dateOnPackage });
-    } finally {
-      setSubmitting(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setSubmitError(data?.error || `Failed to add item (${res.status})`);
+      return;
     }
+
+    // Close modal on success
+    onSuccess({ name: trimmedName, quantity: q, unit, dateLabelType, dateOnPackage });
   }
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-3">
-      {/* Name */}
-      <div className="grid gap-1">
-        <Label htmlFor={nameId} required>
-          Name
-        </Label>
-        <input
-          id={nameId}
-          className={inputClass}
-          placeholder="e.g., Chicken breast"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          autoFocus
-          aria-required="true"
-        />
-      </div>
-
-      {/* Quantity + Unit */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <form id={formId} onSubmit={onSubmit} className="flex flex-col min-h-full">
+      <div className="grid gap-3">
+        {/* Name */}
         <div className="grid gap-1">
-          <Label htmlFor={qtyId} required>
-            Quantity
+          <Label htmlFor={nameId} required>
+            Name
           </Label>
           <input
-            id={qtyId}
+            id={nameId}
             className={inputClass}
-            type="number"
-            min="0"
-            step="any"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
+            placeholder="e.g., Chicken breast"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoFocus
             aria-required="true"
           />
         </div>
 
-        <div className="grid gap-1">
-          <Label htmlFor={unitId} required>Unit</Label>
-          <select
-            id={unitId}
-            className={inputClass}
-            value={unit}
-            onChange={(e) => setUnit(e.target.value as PantryUnit)}
-          >
-            {/* Count group */}
-            <optgroup label="Count">
-              {COUNT_UNITS.map((u) => (
-                <option key={u} value={u}>
-                  {u}
-                </option>
-              ))}
-            </optgroup>
-            {/* Weight group */}
-            <optgroup label="Weight">
-              {WEIGHT_UNITS.map((u) => (
-                <option key={u} value={u}>
-                  {u}
-                </option>
-              ))}
-            </optgroup>
-            {/* Volume group */}
-            <optgroup label="Volume">
-              {VOLUME_UNITS.map((u) => (
-                <option key={u} value={u}>
-                  {u}
-                </option>
-              ))}
-            </optgroup>
-          </select>
-        </div>
-      </div>
-
-      {/* Optional details */}
-      <div className="mt-4 grid gap-2">
-        <p className="text-xs font-medium text-[rgb(var(--muted-foreground))]">
-          Optional details
-        </p>
-
-        {/* Package date */}
+        {/* Quantity + Unit */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="grid gap-1">
-            <Label htmlFor={dateLabelId}>Label type</Label>
-            <select
-              id={dateLabelId}
+            <Label htmlFor={qtyId} required>
+              Quantity
+            </Label>
+            <input
+              id={qtyId}
               className={inputClass}
-              value={dateLabelType}
-              onChange={(e) => setDateLabelType(e.target.value as DateLabelType)}
+              type="number"
+              min="0"
+              step="any"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              aria-required="true"
+            />
+          </div>
+
+          <div className="grid gap-1">
+            <Label htmlFor={unitId} required>Unit</Label>
+            <select
+              id={unitId}
+              className={inputClass}
+              value={unit}
+              onChange={(e) => setUnit(e.target.value as PantryUnit)}
             >
-              {DATE_LABEL_TYPES.map((v) => (
-                <option key={v} value={v}>
-                  {DATE_LABEL_TYPE_LABELS[v]}
-                </option>
-              ))}
+              {/* Count group */}
+              <optgroup label="Count">
+                {COUNT_UNITS.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </optgroup>
+              {/* Weight group */}
+              <optgroup label="Weight">
+                {WEIGHT_UNITS.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </optgroup>
+              {/* Volume group */}
+              <optgroup label="Volume">
+                {VOLUME_UNITS.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </div>
-
-          <div className="grid gap-1">
-            <Label htmlFor={dateOnPkgId}>Date on package</Label>
-            <input
-              id={dateOnPkgId}
-              className={inputClass}
-              type="date"
-              value={dateOnPackage}
-              onChange={(e) => setDateOnPackage(e.target.value)}
-            />
-          </div>
         </div>
 
-        {/* Purchase date */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="grid gap-1">
-            <Label htmlFor={purchaseDateId}>Purchase date</Label>
-            <input
-              id={purchaseDateId}
-              className={inputClass}
-              type="date"
-              value={purchaseDate}
-              onChange={(e) => setPurchaseDate(e.target.value)}
-            />
+        {/* Optional details */}
+        <div className="mt-4 grid gap-2">
+          <p className="text-xs font-medium text-[rgb(var(--muted-foreground))]">
+            Optional details
+          </p>
+
+          {/* Package date */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid gap-1">
+              <Label htmlFor={dateLabelId}>Label type</Label>
+              <select
+                id={dateLabelId}
+                className={inputClass}
+                value={dateLabelType}
+                onChange={(e) => setDateLabelType(e.target.value as DateLabelType)}
+              >
+                {DATE_LABEL_TYPES.map((v) => (
+                  <option key={v} value={v}>
+                    {DATE_LABEL_TYPE_LABELS[v]}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid gap-1">
+              <Label htmlFor={dateOnPkgId}>Date on package</Label>
+              <input
+                id={dateOnPkgId}
+                className={inputClass}
+                type="date"
+                value={dateOnPackage}
+                onChange={(e) => setDateOnPackage(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Purchase date */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid gap-1">
+              <Label htmlFor={purchaseDateId}>Purchase date</Label>
+              <input
+                id={purchaseDateId}
+                className={inputClass}
+                type="date"
+                value={purchaseDate}
+                onChange={(e) => setPurchaseDate(e.target.value)}
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
-
-      <div className="mt-2 border-t border-[rgb(var(--border))] pt-4">
-        <button
-          className="h-10 w-full rounded-lg bg-[rgb(var(--foreground))] text-sm font-medium text-[rgb(var(--background))] shadow-sm disabled:opacity-60"
-          disabled={submitting}
-          type="submit"
-        >
-          {submitting ? "Adding..." : "Add"}
-        </button>
-      </div>
+      {submitError ? (
+        <div className="mt-auto pt-4">
+          <p className="text-sm text-red-600">{submitError}</p>
+        </div>
+      ) : null}
     </form>
   );
 }

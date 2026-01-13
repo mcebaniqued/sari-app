@@ -6,6 +6,7 @@ import { FaXmark } from "react-icons/fa6";
 type ModalProps = {
   title?: string;
   children: React.ReactNode;
+  footer?: React.ReactNode;
   onClose: () => void;
   closeOnBackdrop?: boolean;
 };
@@ -13,6 +14,7 @@ type ModalProps = {
 export default function Modal({
   title,
   children,
+  footer,
   onClose,
   closeOnBackdrop = true,
 }: ModalProps) {
@@ -54,18 +56,18 @@ export default function Modal({
           tabIndex={-1}
           className="
             pointer-events-auto
-            w-full h-[85vh] md:h-auto
-            md:max-w-xl
+            w-full md:max-w-xl
+            h-full md:max-h-[60vh]
             bg-[rgb(var(--card))] text-[rgb(var(--card-foreground))]
             border border-[rgb(var(--border))]
             shadow-xl
-            rounded-t-2xl md:rounded-2xl
+            md:rounded-2xl
             outline-none
             flex flex-col
           "
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-[rgb(var(--border))]">
+          <div className="flex shrink-0 items-center justify-between p-4 border-b border-[rgb(var(--border))]">
             <h2 id={titleId} className="text-base font-semibold">
               {title ?? ""}
             </h2>
@@ -87,7 +89,16 @@ export default function Modal({
           </div>
 
           {/* Body */}
-          <div className="p-4 overflow-y-auto">{children}</div>
+          <div className="flex-1 min-h-0 p-4 overflow-y-auto">
+            {children}
+          </div>
+
+          {/* Footer */}
+          {footer ? (
+            <div className="shrink-0 p-4 border-t border-[rgb(var(--border))]">
+              {footer}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
