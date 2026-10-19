@@ -2,30 +2,60 @@
   "name": "sari-app",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+  "type": "module",
+  "workspaces": [
+    "packages/contracts",
+    "api",
+    "web"
+  ],
+  "engines": {
+    "node": ">=24 <27",
+    "npm": ">=11"
   },
-  "dependencies": {
-    "bcryptjs": "^3.0.3",
-    "jose": "^6.1.3",
-    "mongoose": "^9.0.2",
-    "next": "16.1.1",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
-    "react-icons": "^5.5.0",
-    "react-toastify": "^11.0.5"
+  "scripts": {
+    "contracts:build": "npm run build -w @sari/contracts",
+    "predev": "npm run contracts:build",
+    "dev": "concurrently --kill-others --names contracts,api,web \"npm run dev -w @sari/contracts\" \"npm run dev -w @sari/api\" \"npm run dev -w @sari/web\"",
+    "build": "npm run build --workspaces",
+    "start": "npm run start -w @sari/api",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "pretypecheck": "npm run contracts:build",
+    "typecheck": "npm run typecheck --workspaces",
+    "pretest": "npm run contracts:build",
+    "test": "npm run test --workspaces --if-present",
+    "pretest:coverage": "npm run contracts:build",
+    "test:coverage": "npm run test:coverage --workspaces --if-present",
+    "pretest:e2e": "npm run contracts:build",
+    "test:e2e": "playwright test",
+    "knip": "knip",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run knip && npm run test && npm run build",
+    "prepare": "husky"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.1.1",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^24.19.2",
+    "@vitest/coverage-v8": "5.0.5",
+    "concurrently": "^10.0.6",
+    "eslint": "^10.13.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.13.0",
+    "husky": "^9.1.7",
+    "knip": "^6.42.0",
+    "lint-staged": "^17.6.0",
+    "prettier": "^3.9.10",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.71.2",
+    "vitest": "5.0.5"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs,ts,tsx}": [
+      "eslint --fix --max-warnings 0",
+      "prettier --write"
+    ],
+    "*.{json,yaml,yml,md,css,html}": "prettier --write"
   }
 }

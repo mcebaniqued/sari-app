@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+  --color-canvas: #f6f7f2;
+  --color-ink: #24372c;
+  --color-muted: #59695d;
+  --color-accent: #35704b;
+  --color-line: #d6dfd4;
+  --font-sans: "Segoe UI", system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    margin: 0;
+    min-width: 320px;
+  }
+
+  a:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 6px;
+    border-radius: 2px;
+  }
+}
