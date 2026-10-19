@@ -18,6 +18,7 @@
     "dev": "concurrently --kill-others --names contracts,api,web \"npm run dev -w @sari/contracts\" \"npm run dev -w @sari/api\" \"npm run dev -w @sari/web\"",
     "build": "npm run build --workspaces",
     "start": "npm run start -w @sari/api",
+    "prelint": "npm run contracts:build",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
