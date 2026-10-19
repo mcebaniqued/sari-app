@@ -5,7 +5,9 @@ import type {
   ReadyResponse,
 } from "@sari/contracts";
 import express, { type ErrorRequestHandler, type Response } from "express";
+
 import { connectDatabase } from "./db.js";
+import { foodItemsRouter } from "./food-items/routes.js";
 
 const app = express();
 app.disable("x-powered-by");
@@ -28,6 +30,8 @@ app.get(
     }
   },
 );
+
+app.use("/api/v1/food-items", foodItemsRouter);
 
 app.use((_req, res: Response<ApiErrorResponse>) => {
   res

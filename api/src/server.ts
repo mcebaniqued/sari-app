@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+
 import app from "./app.js";
 
 const port = Number(process.env.PORT ?? 3001);
@@ -7,12 +8,14 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 }
 
 const server = app.listen(port, () => {
-  console.log(`Sari API listening on http://localhost:${port}`);
+  console.info(`Sari API listening on http://localhost:${port}`);
 });
 
 let shuttingDown = false;
 function shutdown() {
-  if (shuttingDown) return;
+  if (shuttingDown) {
+    return;
+  }
   shuttingDown = true;
 
   const timeout = setTimeout(() => process.exit(1), 10_000);

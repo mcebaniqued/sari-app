@@ -4,9 +4,13 @@ let connectionPromise: Promise<typeof mongoose> | undefined;
 
 export async function connectDatabase(): Promise<void> {
   const uri = process.env.MONGODB_URI?.trim();
-  if (!uri) throw new Error("MONGODB_URI is not configured.");
+  if (!uri) {
+    throw new Error("MONGODB_URI is not configured.");
+  }
 
-  if (mongoose.connection.readyState === 1) return;
+  if (mongoose.connection.readyState === mongoose.ConnectionStates.connected) {
+    return;
+  }
 
   connectionPromise ??= mongoose
     .connect(uri, {
