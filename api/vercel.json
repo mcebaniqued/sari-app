@@ -1,0 +1,5 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "HUSKY=0 npm ci --include=dev --workspaces --include-workspace-root",
+  "buildCommand": "npm run build -w @sari/contracts && npm run build"
+}

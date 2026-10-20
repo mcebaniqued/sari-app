@@ -1,4 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "installCommand": "HUSKY=0 npm ci --include=dev --workspaces --include-workspace-root",
+  "buildCommand": "npm run build -w @sari/contracts && npm run build",
+  "rewrites": [
+    {
+      "source": "/api/v1/:path*",
+      "destination": "https://sari-api.vercel.app/api/v1/:path*"
+    },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
