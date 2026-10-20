@@ -215,6 +215,8 @@ Allow access to files outside each root directory, because the workspace lockfil
 
 Each application's `vercel.json` records its install and build commands. Include development dependencies because the build requires TypeScript and Vite, and the root prepare script invokes Husky. `HUSKY=0` disables Git hooks in the deployment environment.
 
+The root `.vercelignore` excludes local environment files and test artifacts from CLI uploads. Production credentials belong in Vercel environment variables, not uploaded source files.
+
 `web/vercel.json` routes API requests to the API production domain **before** the SPA fallback. If the API hostname changes, update this destination:
 
 ```json
