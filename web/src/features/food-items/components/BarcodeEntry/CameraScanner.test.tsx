@@ -5,20 +5,39 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import CameraScanner from "./CameraScanner";
 
-const { decode, stop } = vi.hoisted(() => ({ decode: vi.fn(), stop: vi.fn() }));
+const { decode, stop, reader } = vi.hoisted(() => ({
+  decode: vi.fn(),
+  stop: vi.fn(),
+  reader: vi.fn(),
+}));
 vi.mock("@zxing/browser", () => ({
   BrowserMultiFormatReader: class {
+    constructor(hints: unknown, options: unknown) {
+      reader(hints, options);
+    }
     decodeFromStream = decode;
   },
 }));
-vi.mock("@zxing/library", () => ({
-  BarcodeFormat: { UPC_A: 1, EAN_13: 2, EAN_8: 3, ITF: 4 },
-  DecodeHintType: { POSSIBLE_FORMATS: 1 },
-}));
+
+function read(value: string, format = BarcodeFormat.UPC_A) {
+  const callback = decode.mock.calls[0]?.[2] as (
+    result: { getText: () => string; getBarcodeFormat: () => BarcodeFormat },
+    error: undefined,
+    controls: { stop: () => void },
+  ) => void;
+  act(() => {
+    callback(
+      { getText: () => value, getBarcodeFormat: () => format },
+      undefined,
+      { stop },
+    );
+  });
+}
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
@@ -36,7 +55,7 @@ describe("camera scanning lifecycle", () => {
     return { stream, trackStop, getUserMedia };
   }
 
-  it("accepts one detection and stops all camera tracks", async () => {
+  it("requires repeated matching reads before accepting and stopping the camera", async () => {
     const { trackStop } = camera();
     const onDetected = vi.fn();
     const view = render(
@@ -45,18 +64,134 @@ describe("camera scanning lifecycle", () => {
     await waitFor(() => {
       expect(decode).toHaveBeenCalledOnce();
     });
-    const callback = decode.mock.calls[0]?.[2] as (
-      result: { getText: () => string },
-      error: undefined,
-      controls: { stop: () => void },
-    ) => void;
-    act(() => {
-      callback({ getText: () => "012345678905" }, undefined, { stop });
-      callback({ getText: () => "012345678905" }, undefined, { stop });
-    });
+    read("012345678905");
+    read("012345678905");
+    expect(onDetected).not.toHaveBeenCalled();
+    expect(trackStop).not.toHaveBeenCalled();
+    read("012345678905");
+    read("012345678905");
     expect(onDetected).toHaveBeenCalledExactlyOnceWith("012345678905");
     expect(trackStop).toHaveBeenCalled();
     view.unmount();
+  });
+  it("rejects short ITF results with the reported wrong digits despite their valid GTIN checksum", async () => {
+    const { trackStop } = camera();
+    const onDetected = vi.fn();
+    render(<CameraScanner onDetected={onDetected} onType={vi.fn()} />);
+    await waitFor(() => {
+      expect(decode).toHaveBeenCalledOnce();
+    });
+    const hints = reader.mock.calls[0]?.[0] as Map<DecodeHintType, unknown>;
+    expect(hints.get(DecodeHintType.ALLOWED_LENGTHS)).toEqual([14]);
+    for (let i = 0; i < 3; i++) {
+      read("25384482", BarcodeFormat.ITF);
+    }
+    expect(onDetected).not.toHaveBeenCalled();
+    expect(trackStop).not.toHaveBeenCalled();
+    for (let i = 0; i < 3; i++) {
+      read("853807005033");
+    }
+    expect(onDetected).toHaveBeenCalledExactlyOnceWith("853807005033");
+  });
+  it("discards an isolated valid misread when the following frames identify another barcode", async () => {
+    camera();
+    const onDetected = vi.fn();
+    render(<CameraScanner onDetected={onDetected} onType={vi.fn()} />);
+    await waitFor(() => {
+      expect(decode).toHaveBeenCalledOnce();
+    });
+    read("25384482", BarcodeFormat.EAN_8);
+    read("853807005033");
+    read("853807005033");
+    expect(onDetected).not.toHaveBeenCalled();
+    read("853807005033");
+    expect(onDetected).toHaveBeenCalledExactlyOnceWith("853807005033");
+  });
+  it.each([
+    ["96385074", BarcodeFormat.EAN_8],
+    ["0853807005033", BarcodeFormat.EAN_13],
+    ["00853807005033", BarcodeFormat.ITF],
+  ])("still accepts repeated supported barcode %s", async (value, format) => {
+    camera();
+    const onDetected = vi.fn();
+    render(<CameraScanner onDetected={onDetected} onType={vi.fn()} />);
+    await waitFor(() => {
+      expect(decode).toHaveBeenCalledOnce();
+    });
+    for (let i = 0; i < 3; i++) {
+      read(value, format);
+    }
+    expect(onDetected).toHaveBeenCalledExactlyOnceWith(value);
+  });
+  it.each([
+    ["853807005034", BarcodeFormat.UPC_A],
+    ["853807005033", BarcodeFormat.EAN_8],
+    ["00853807005033", BarcodeFormat.CODE_128],
+  ])("ignores invalid or unsupported results %s/%s", async (value, format) => {
+    const { trackStop } = camera();
+    const onDetected = vi.fn();
+    render(<CameraScanner onDetected={onDetected} onType={vi.fn()} />);
+    await waitFor(() => {
+      expect(decode).toHaveBeenCalledOnce();
+    });
+    for (let i = 0; i < 3; i++) {
+      read(value, format);
+    }
+    expect(onDetected).not.toHaveBeenCalled();
+    expect(trackStop).not.toHaveBeenCalled();
+  });
+  it("counts equivalent UPC/EAN reads together while preserving printed leading zeros", async () => {
+    camera();
+    const onDetected = vi.fn();
+    render(<CameraScanner onDetected={onDetected} onType={vi.fn()} />);
+    await waitFor(() => {
+      expect(decode).toHaveBeenCalledOnce();
+    });
+    read("853807005033");
+    read("0853807005033", BarcodeFormat.EAN_13);
+    read("0853807005033", BarcodeFormat.EAN_13);
+    expect(onDetected).toHaveBeenCalledExactlyOnceWith("0853807005033");
+  });
+  it("requires a fresh sequence after conflicting or invalid results", async () => {
+    camera();
+    const onDetected = vi.fn();
+    render(<CameraScanner onDetected={onDetected} onType={vi.fn()} />);
+    await waitFor(() => {
+      expect(decode).toHaveBeenCalledOnce();
+    });
+    read("853807005033");
+    read("853807005033");
+    read("012345678905");
+    read("853807005033");
+    read("853807005033");
+    read("853807005034");
+    read("853807005033");
+    read("853807005033");
+    expect(onDetected).not.toHaveBeenCalled();
+    read("853807005033");
+    expect(onDetected).toHaveBeenCalledExactlyOnceWith("853807005033");
+  });
+  it("does not reuse stale reads or accept callbacks after dismissal", async () => {
+    vi.useFakeTimers();
+    camera();
+    const onDetected = vi.fn();
+    const view = render(
+      <CameraScanner onDetected={onDetected} onType={vi.fn()} />,
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    read("853807005033");
+    read("853807005033");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1501);
+    });
+    read("853807005033");
+    read("853807005033");
+    expect(onDetected).not.toHaveBeenCalled();
+    view.unmount();
+    read("853807005033");
+    expect(onDetected).not.toHaveBeenCalled();
   });
   it("stops a stream whose permission resolves after dismissal", async () => {
     const { trackStop, getUserMedia, stream } = camera();
