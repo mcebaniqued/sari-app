@@ -21,76 +21,92 @@ export default function ProductReview({
   onKeep,
   onUnlink,
 }: Props) {
+  if (!productId) {
+    return null;
+  }
+  const size =
+    product?.packageQuantity && product.packageUnit
+      ? `${String(product.packageQuantity)} ${product.packageUnit}`
+      : null;
   return (
-    <div className="space-y-2 text-sm">
+    <section
+      aria-label="Matched product"
+      className="space-y-2 rounded-control border border-border-default bg-surface-subtle p-3 text-sm"
+    >
       {message && (
         <p role="status" className="text-content-muted">
           {message}
         </p>
       )}
-      {productId && (
-        <div className="space-y-2 rounded-control border border-border-default bg-surface-subtle p-3">
-          <p className="font-medium">
-            Linked product: {product?.name ?? "USDA product"}
-          </p>
-          {product?.brand && <p>{product.brand}</p>}
-          {product && (
-            <p>
-              Package:{" "}
-              {product.packageDescription ??
-                "Size unavailable — enter quantity manually"}
-            </p>
-          )}
-          {barcode && (
-            <p className="break-all text-content-muted">Barcode: {barcode}</p>
-          )}
-          {product && (
-            <p className="text-content-muted">
-              Source:{" "}
+      <p className="font-medium">{product?.name ?? "Saved product"}</p>
+      {(product?.brand ?? size) && (
+        <p className="text-content-muted">
+          {[product?.brand, size ? `Listed size: ${size}` : null]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+      )}
+      {product && !size && (
+        <p className="text-content-muted">
+          Check the package size and enter the amount you have.
+        </p>
+      )}
+      {replacing && (
+        <div className="space-y-2">
+          <p>Keep your entries or use the matching product's details.</p>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={onKeep}
+              className="min-h-11 text-brand underline focus-visible:outline-2 focus-visible:outline-brand"
+            >
+              Keep my entries
+            </button>
+            <button
+              type="button"
+              onClick={onReplace}
+              className="min-h-11 text-brand underline focus-visible:outline-2 focus-visible:outline-brand"
+            >
+              Replace entered fields
+            </button>
+          </div>
+        </div>
+      )}
+      <div className="flex flex-wrap items-start justify-between gap-x-3">
+        <details className="min-w-0 flex-1 text-xs text-content-muted">
+          <summary className="min-h-11 cursor-pointer py-3 focus-visible:outline-2 focus-visible:outline-brand">
+            More product details
+          </summary>
+          <div className="space-y-1 pb-2">
+            {product && (
               <a
-                className="text-brand underline"
+                className="inline-block text-brand underline"
                 href={product.sourceUrl}
                 target="_blank"
                 rel="noreferrer"
               >
-                USDA FoodData Central
-              </a>{" "}
-              · Last checked {new Date(product.checkedAt).toLocaleDateString()}
-            </p>
-          )}
-          {replacing && (
-            <div className="space-y-2">
+                Details from USDA
+              </a>
+            )}
+            {barcode && <p className="break-all">Barcode: {barcode}</p>}
+            {product?.packageDescription && (
+              <p>Package label: {product.packageDescription}</p>
+            )}
+            {product && (
               <p>
-                Some fields already contain your entries. Keep them or replace
-                them with the available USDA suggestions.
+                Last checked {new Date(product.checkedAt).toLocaleDateString()}
               </p>
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={onKeep}
-                  className="text-brand underline"
-                >
-                  Keep my entries
-                </button>
-                <button
-                  type="button"
-                  onClick={onReplace}
-                  className="text-brand underline"
-                >
-                  Replace entered fields
-                </button>
-              </div>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={onUnlink}
-            className="text-brand underline"
-          >
-            Remove product link
-          </button>
-        </div>
-      )}
-    </div>
+            )}
+          </div>
+        </details>
+        <button
+          type="button"
+          onClick={onUnlink}
+          className="min-h-11 text-xs text-brand underline focus-visible:outline-2 focus-visible:outline-brand"
+        >
+          Remove product link
+        </button>
+      </div>
+    </section>
   );
 }

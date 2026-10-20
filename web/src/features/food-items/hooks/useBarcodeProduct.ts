@@ -22,11 +22,15 @@ export function useBarcodeProduct(
     const controller = new AbortController();
     if (item?.productId) {
       void getFoodProduct(item.productId, controller.signal)
-        .then(setProduct)
+        .then((product) => {
+          if (!controller.signal.aborted) {
+            setProduct(product);
+          }
+        })
         .catch(() => {
           if (!controller.signal.aborted) {
             setMessage(
-              "Linked product details are unavailable. Your saved values are unchanged; you can remove its link.",
+              "Product details are unavailable. Your saved entries have been kept.",
             );
           }
         });
@@ -81,8 +85,8 @@ export function useBarcodeProduct(
       setBarcode(result.product.barcode);
       setMessage(
         result.stale
-          ? "Using previously cached USDA details; a refresh could not be completed. Check the package before saving."
-          : "USDA match found. Review the suggested details before saving.",
+          ? "Using saved details. Check them against the package."
+          : "Item found.",
       );
       apply(result.product, false);
       return true;

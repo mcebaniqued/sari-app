@@ -46,6 +46,7 @@ export default function FoodItemFields({ values, onChange }: Props) {
             min="0"
             max="1000000"
             step="any"
+            aria-describedby="quantity-hint"
             value={values.quantity}
             onChange={(event) => {
               onChange("quantity", event.target.value);
@@ -72,6 +73,12 @@ export default function FoodItemFields({ values, onChange }: Props) {
             ))}
           </select>
         </div>
+        <p
+          id="quantity-hint"
+          className="col-span-2 -mt-2 text-xs text-content-muted"
+        >
+          Enter the amount you have.
+        </p>
       </div>
       <div>
         <label
