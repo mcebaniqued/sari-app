@@ -53,28 +53,6 @@ export default function FoodItemForm({
 
   return (
     <div ref={entryRef} aria-busy={saving}>
-      {!item && (
-        <div
-          role="group"
-          aria-label="Item entry method"
-          className="mx-6 mt-5 grid grid-cols-2 gap-1 rounded-control bg-surface-subtle p-1"
-        >
-          {(["manual", "barcode"] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={mode === value}
-              disabled={disabled || saving}
-              onClick={() => {
-                switchMode(value);
-              }}
-              className={`min-h-11 rounded-control px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50 ${mode === value ? "bg-brand text-content-inverse" : "text-content hover:bg-surface-hover"}`}
-            >
-              {value === "manual" ? "Manual entry" : "Barcode"}
-            </button>
-          ))}
-        </div>
-      )}
       {mode === "barcode" ? (
         <BarcodeEntry
           disabled={disabled}
@@ -107,7 +85,7 @@ export default function FoodItemForm({
         >
           <fieldset
             disabled={disabled || saving}
-            className="space-y-5 px-6 py-6"
+            className={`space-y-5 px-6 pt-6 ${item ? "pb-6" : "pb-2"}`}
           >
             <ProductReview
               product={barcode.product}
@@ -129,6 +107,20 @@ export default function FoodItemForm({
               </p>
             )}
           </fieldset>
+          {!item && (
+            <div className="flex justify-end px-6 pb-3">
+              <button
+                type="button"
+                disabled={disabled || saving}
+                onClick={() => {
+                  switchMode("barcode");
+                }}
+                className="min-h-11 rounded-control px-2 py-2 text-sm text-brand hover:bg-surface-hover disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+              >
+                Input barcode instead
+              </button>
+            </div>
+          )}
           <div className="flex items-center justify-end gap-3 border-t border-border-default bg-surface-subtle/60 px-6 py-4">
             <button
               type="button"

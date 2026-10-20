@@ -58,7 +58,7 @@ export default function BarcodeEntry({
       }}
       aria-busy={loading}
     >
-      <fieldset disabled={disabled} className="space-y-5 px-6 py-6">
+      <fieldset disabled={disabled} className="space-y-5 px-6 pt-6 pb-2">
         {camera ? (
           <CameraScanner
             onDetected={(barcode) => {
@@ -105,24 +105,6 @@ export default function BarcodeEntry({
                 ends.
               </p>
             </div>
-            {(error || message) && (
-              <div className="space-y-2">
-                <p
-                  id="barcode-error"
-                  role="alert"
-                  className="text-sm text-danger"
-                >
-                  {error || message}
-                </p>
-                <button
-                  type="button"
-                  onClick={onManual}
-                  className="min-h-11 text-sm font-medium text-brand underline focus-visible:outline-2 focus-visible:outline-brand"
-                >
-                  Enter details manually
-                </button>
-              </div>
-            )}
             <button
               type="button"
               onClick={() => {
@@ -130,14 +112,33 @@ export default function BarcodeEntry({
                 setError("");
                 setCamera(true);
               }}
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control px-3 py-2 text-sm font-medium text-brand hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-brand"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-control px-2 py-2 text-sm text-brand hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-brand"
             >
               <LuCamera aria-hidden="true" className="size-4" />
               Scan with camera
             </button>
+            {(error || message) && (
+              <p
+                id="barcode-error"
+                role="alert"
+                className="text-sm text-danger"
+              >
+                {error || message}
+              </p>
+            )}
           </>
         )}
       </fieldset>
+      <div className="flex justify-end px-6 pb-3">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={onManual}
+          className="min-h-11 rounded-control px-2 py-2 text-sm text-brand hover:bg-surface-hover disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+        >
+          Enter details manually
+        </button>
+      </div>
       <div className="flex items-center justify-end gap-3 border-t border-border-default bg-surface-subtle/60 px-6 py-4">
         <button
           type="button"
