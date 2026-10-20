@@ -182,7 +182,7 @@ A reusable React Toastify notification component reports create, update, delete,
 
 ESLint uses strict TypeScript type-aware rules, React Hooks checks, JSX accessibility checks, import sorting, unused import detection, and Playwright rules, with zero warnings allowed. The maintained `@htmlacademy/eslint-plugin-jsx-a11y` fork supports the project’s ESLint 10 version.
 
-The frontend routes HTTP 403 responses from pantry reads and writes to `/access-denied`, replacing the rejected route in history. Bulk deletion stops scheduling additional batches after a forbidden response and retains completed outcomes. Other errors stay with their form or recovery control. Authentication and ownership are enforced by the backend as described above. This milestone is for local development; deployment remains deferred.
+The frontend routes HTTP 403 responses from pantry reads and writes to `/access-denied`, replacing the rejected route in history. Bulk deletion stops scheduling additional batches after a forbidden response and retains completed outcomes. Other errors stay with their form or recovery control. Authentication and ownership are enforced by the backend as described above. See Vercel deployment below for production setup and acceptance checks.
 
 ### Persistence tests
 
@@ -196,35 +196,49 @@ Remove-Item Env:TEST_MONGODB_URI
 
 Integration tests never load `api/.env` and delete only the records they create. Browser tests exercise the real AG Grid and modal interactions against an API fixture, including sorting, filtering, selection, partial bulk failures, keyboard focus, and mobile layout. Unit tests isolate modal and persistence behavior from jsdom's layout limitations. The API integration suite verifies actual writes and reads against MongoDB.
 
-## Vercel deployment preparation
+## Vercel deployment
+
+The Vercel projects are `sari-api` and `sari-web` in Miguel's projects. Their production domains are `https://sari-api.vercel.app` and `https://sari-web.vercel.app`.
 
 Use two Vercel projects connected to this repository:
 
-| Setting          | API project                                            | Frontend project                                    |
-| ---------------- | ------------------------------------------------------ | --------------------------------------------------- |
-| Root directory   | `api`                                                  | `web`                                               |
-| Framework        | Express                                                | Vite                                                |
-| Build command    | `npm run build -w @sari/contracts && npm run build`    | `npm run build -w @sari/contracts && npm run build` |
-| Output directory | Leave the Express preset default                       | `dist`                                              |
-| Environment      | `MONGODB_URI`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` | Relative API base path is the default               |
+| Setting          | API project                                                          | Frontend project                                    |
+| ---------------- | -------------------------------------------------------------------- | --------------------------------------------------- |
+| Root directory   | `api`                                                                | `web`                                               |
+| Framework        | Express                                                              | Vite                                                |
+| Build command    | `npm run build -w @sari/contracts && npm run build`                  | `npm run build -w @sari/contracts && npm run build` |
+| Install command  | `HUSKY=0 npm ci --include=dev --workspaces --include-workspace-root` | Same                                                |
+| Output directory | Leave the Express preset default                                     | `dist`                                              |
+| Environment      | `MONGODB_URI`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`               | Relative API base path is the default               |
 
 Allow access to files outside each root directory, because the workspace lockfile, shared TypeScript configuration, and contracts package are outside the application directories. Build commands must compile the contracts package before the application so runtime imports and declaration files are available. Use Node 24.x in both projects. The API's default-exported `src/app.ts` is its Vercel entry point; `src/server.ts` is for conventional local/server hosting.
 
-After the API project's actual URL is known, add its rewrite **before** the SPA fallback in `web/vercel.json`. Replace the example hostname with that project's real production hostname:
+Each application's `vercel.json` records its install and build commands. Include development dependencies because the build requires TypeScript and Vite, and the root prepare script invokes Husky. `HUSKY=0` disables Git hooks in the deployment environment.
+
+`web/vercel.json` routes API requests to the API production domain **before** the SPA fallback. If the API hostname changes, update this destination:
 
 ```json
 {
   "rewrites": [
     {
       "source": "/api/v1/:path*",
-      "destination": "https://YOUR-API-PROJECT.vercel.app/api/v1/:path*"
+      "destination": "https://sari-api.vercel.app/api/v1/:path*"
     },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
 ```
 
-Keep `VITE_API_BASE_URL=/api/v1` so browser requests remain same-origin. The committed Vercel configuration currently contains only the SPA fallback; production API routing requires the real backend hostname. Do not deploy food features until that route and the Atlas connection are verified.
+Keep `VITE_API_BASE_URL=/api/v1` so browser requests remain same-origin. Set the API project's production `BETTER_AUTH_URL` to `https://sari-web.vercel.app`, use a dedicated production `BETTER_AUTH_SECRET`, and configure `MONGODB_URI` and optional `USDA_API_KEY` as backend secrets. Do not give preview deployments production database credentials.
+
+For CLI deployments, run from the repository root so both application directories and the contracts package are uploaded:
+
+```sh
+npx vercel deploy . --project sari-api --scope miguels-projects-51fb4258 --prod
+npx vercel deploy . --project sari-web --scope miguels-projects-51fb4258 --prod
+```
+
+Verify `/api/v1/health` and `/api/v1/ready` through the frontend domain, then check registration, login, pantry persistence, and a direct refresh of `/pantry`. Automatic Git deployments require the Vercel GitHub integration to have access to this repository; connecting the Codex GitHub app alone does not grant that access.
 
 ## Previous implementation
 
