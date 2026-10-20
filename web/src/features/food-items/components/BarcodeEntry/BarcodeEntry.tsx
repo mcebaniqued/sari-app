@@ -112,7 +112,7 @@ export default function BarcodeEntry({
                 setError("");
                 setCamera(true);
               }}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-control px-2 py-2 text-sm text-brand hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-brand"
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control px-2 py-2 text-sm text-brand hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-brand"
             >
               <LuCamera aria-hidden="true" className="size-4" />
               Scan with camera
@@ -134,7 +134,7 @@ export default function BarcodeEntry({
           type="button"
           disabled={disabled}
           onClick={onManual}
-          className="min-h-11 rounded-control px-2 py-2 text-sm text-brand hover:bg-surface-hover disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          className="min-h-11 rounded-control px-2 py-2 text-sm text-brand underline-offset-4 hover:underline disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         >
           Enter details manually
         </button>

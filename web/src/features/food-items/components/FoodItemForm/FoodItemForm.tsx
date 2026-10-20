@@ -115,7 +115,7 @@ export default function FoodItemForm({
                 onClick={() => {
                   switchMode("barcode");
                 }}
-                className="min-h-11 rounded-control px-2 py-2 text-sm text-brand hover:bg-surface-hover disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                className="min-h-11 rounded-control px-2 py-2 text-sm text-brand underline-offset-4 hover:underline disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
               >
                 Input barcode instead
               </button>
