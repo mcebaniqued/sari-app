@@ -142,7 +142,7 @@ export default function CameraScanner({ onDetected, onType }: Props) {
       <button
         type="button"
         onClick={onType}
-        className={`min-h-11 rounded-control px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-brand ${guidance === 2 || error ? "bg-brand text-content-inverse" : "text-brand hover:bg-surface-hover"}`}
+        className={`inline-flex min-h-11 w-full items-center justify-center rounded-control px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-brand ${guidance === 2 || error ? "bg-brand text-content-inverse" : "text-brand hover:bg-surface-hover"}`}
       >
         Enter barcode manually
       </button>
