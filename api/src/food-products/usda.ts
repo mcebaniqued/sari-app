@@ -1,5 +1,7 @@
 import { foodProductSchema, normalizeBarcode } from "@sari/contracts";
 
+import { parsePackageSize } from "./packageSize.js";
+
 export class LookupError extends Error {
   constructor(
     public readonly code: string,
@@ -97,38 +99,6 @@ export function selectUsdaFood(raw: unknown, barcode: string): string {
   return String(first.fdcId);
 }
 
-/** Conservative: never turn a serving or an ambiguous multipack into package contents. */
-function packageSize(description: string | null) {
-  const match = description?.match(
-    /^\s*(\d+(?:\.\d+)?)\s*(g|grams?|kg|kilograms?|ml|millilit(?:er|re)s?|l|lit(?:er|re)s?|oz|onz|ounces?|lb|lbs|pounds?|fl\s*oz)\s*$/i,
-  );
-  if (!match) {
-    return { packageQuantity: null, packageUnit: null };
-  }
-  const quantity = Number(match[1]);
-  if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1_000_000) {
-    return { packageQuantity: null, packageUnit: null };
-  }
-  const unit = (match[2] ?? "").toLowerCase().replace(/\s/g, "");
-  const normalized =
-    unit.startsWith("kg") || unit.startsWith("kilogram")
-      ? "kg"
-      : unit.startsWith("ml") || unit.startsWith("millilit")
-        ? "ml"
-        : unit.startsWith("fl")
-          ? "fl oz"
-          : unit.startsWith("lb") || unit.startsWith("pound")
-            ? "lb"
-            : unit.startsWith("oz") ||
-                unit === "onz" ||
-                unit.startsWith("ounce")
-              ? "oz"
-              : unit.startsWith("g")
-                ? "g"
-                : "l";
-  return { packageQuantity: quantity, packageUnit: normalized };
-}
-
 export function mapUsdaFood(
   raw: unknown,
   barcode: string,
@@ -156,7 +126,7 @@ export function mapUsdaFood(
     name: text(food.description),
     brand: text(food.brandName) ?? text(food.brandOwner),
     packageDescription,
-    ...packageSize(packageDescription),
+    ...parsePackageSize(packageDescription),
     provider: "usda",
     externalId: String(food.fdcId),
     marketCountry: text(food.marketCountry),
