@@ -1,6 +1,23 @@
 import type { FoodItem } from "@sari/contracts";
-import type { GridApi } from "ag-grid-community";
+import type { GridApi, IRowNode } from "ag-grid-community";
 import { useEffect, useRef, useState } from "react";
+
+function getPageNodes(api: GridApi<FoodItem>) {
+  const start = api.paginationGetCurrentPage() * api.paginationGetPageSize();
+  const end = start + api.paginationGetPageSize();
+  const nodes: IRowNode<FoodItem>[] = [];
+  api.forEachNode((node) => {
+    if (
+      node.data &&
+      node.rowIndex !== null &&
+      node.rowIndex >= start &&
+      node.rowIndex < end
+    ) {
+      nodes.push(node);
+    }
+  });
+  return nodes;
+}
 
 export default function SelectPageHeader({ api }: { api: GridApi<FoodItem> }) {
   const input = useRef<HTMLInputElement>(null);
@@ -11,24 +28,9 @@ export default function SelectPageHeader({ api }: { api: GridApi<FoodItem> }) {
       if (!active || api.isDestroyed()) {
         return;
       }
-      const start =
-        api.paginationGetCurrentPage() * api.paginationGetPageSize();
-      const end = start + api.paginationGetPageSize();
-      let selected = 0;
-      let total = 0;
-      api.forEachNode((node) => {
-        if (
-          node.data &&
-          node.rowIndex !== null &&
-          node.rowIndex >= start &&
-          node.rowIndex < end
-        ) {
-          total++;
-          if (node.isSelected()) {
-            selected++;
-          }
-        }
-      });
+      const nodes = getPageNodes(api);
+      const selected = nodes.filter((node) => node.isSelected()).length;
+      const total = nodes.length;
       setSelection((current) =>
         current.selected === selected && current.total === total
           ? current
@@ -62,19 +64,13 @@ export default function SelectPageHeader({ api }: { api: GridApi<FoodItem> }) {
       checked={selection.total > 0 && selection.selected === selection.total}
       disabled={selection.total === 0}
       onChange={(event) => {
-        const start =
-          api.paginationGetCurrentPage() * api.paginationGetPageSize();
-        const end = start + api.paginationGetPageSize();
-        const checked = event.target.checked;
-        api.forEachNode((node) => {
-          if (
-            node.data &&
-            node.rowIndex !== null &&
-            node.rowIndex >= start &&
-            node.rowIndex < end
-          ) {
-            node.setSelected(checked);
-          }
+        const nodes = getPageNodes(api);
+        api.setNodesSelected({ nodes, newValue: event.currentTarget.checked });
+        // AG Grid delivers selection events asynchronously. A controlled input
+        // must reflect this click before React restores its checked state.
+        setSelection({
+          selected: nodes.filter((node) => node.isSelected()).length,
+          total: nodes.length,
         });
       }}
       className="size-4 cursor-pointer accent-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed"
