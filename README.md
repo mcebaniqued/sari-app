@@ -219,11 +219,18 @@ The root `.vercelignore` excludes local environment files and test artifacts fro
 
 `web/vercel.mjs` routes API requests **before** the SPA fallback. Production defaults to `https://sari-api.vercel.app`. Preview builds require `SARI_API_ORIGIN=https://sari-api-preview.vercel.app` and fail if it is missing or explicitly points to the production API.
 
-Production, local development, and previews use separate databases and users: `sari_prod`, `sari_dev`, and `sari_preview`. Open `https://sari-web-staging.vercel.app` on your phone to test staging; sign in to Vercel first, then use a separate Sari preview account. See [database operations](docs/database-operations.md) for credential boundaries, deployment details, and the verified backup/restore workflow.
+Production, local development, and previews use separate databases and users: `sari_prod`, `sari_dev`, and `sari_preview`. Open `https://sari-web-preview.vercel.app` on your phone to test preview; sign in to Vercel first, then use a separate Sari preview account. See [database operations](docs/database-operations.md) for credential boundaries, deployment details, and the verified backup/restore workflow.
 
-Git deployments are enabled for all four projects. Pushes to `staging` update `sari-api-preview` and the protected `sari-web-staging` frontend. Pushes to `main` update the production `sari-api` and `sari-web` projects. Ignored Build Step settings skip other branches in each project. The staging frontend's domain is assigned to the `staging` Preview branch; the preview API uses its Production target with `staging` as its production branch, while retaining only preview database credentials. Vercel's environment label does not determine which database the API uses.
+Use **preview** consistently for the pre-release environment:
 
-CI runs on pushes to both branches and on pull requests. Wait for CI and both deployments to succeed before testing a pushed revision. Frontend and API deployments finish independently; there is no atomic deployment or CI gate in Vercel. Keep API changes compatible with the preceding frontend during rollout. Release staging through a separate `staging` → `main` PR: `main` requires a PR, the `validate` check, and resolved conversations, including for administrators. No staging-to-main merge is automated.
+| Environment | Git branch | Vercel frontend    | Vercel API         | MongoDB database/user |
+| ----------- | ---------- | ------------------ | ------------------ | --------------------- |
+| Preview     | `preview`  | `sari-web-preview` | `sari-api-preview` | `sari_preview`        |
+| Production  | `main`     | `sari-web`         | `sari-api`         | `sari_prod`           |
+
+Git deployments are enabled for all four projects. Pushes to `preview` update `sari-api-preview` and the protected `sari-web-preview` frontend. Pushes to `main` update the production `sari-api` and `sari-web` projects. Ignored Build Step settings skip other branches in each project. The preview frontend's domain is assigned to the `preview` Preview branch; the preview API uses its Production target with `preview` as its production branch, while retaining only preview database credentials. Vercel's environment label does not determine which database the API uses.
+
+CI runs on pushes to both branches and on pull requests. Wait for CI and both deployments to succeed before testing a pushed revision. Frontend and API deployments finish independently; there is no atomic deployment or CI gate in Vercel. Keep API changes compatible with the preceding frontend during rollout. Release preview through a separate `preview` → `main` PR: `main` requires a PR, the `validate` check, and resolved conversations, including for administrators. No preview-to-main merge is automated.
 
 Keep `VITE_API_BASE_URL=/api/v1` so browser requests remain same-origin. Set the API project's production `BETTER_AUTH_URL` to `https://sari-web.vercel.app`, use a dedicated production `BETTER_AUTH_SECRET`, and configure `MONGODB_URI` and optional `USDA_API_KEY` as backend secrets. Do not give preview deployments production database credentials.
 
