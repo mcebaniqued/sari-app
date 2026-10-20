@@ -22,21 +22,21 @@ Export the frozen database to a protected archive, restore into a new database u
 
 ## Preview deployments
 
-The stable frontend preview is `https://sari-web-preview.vercel.app`, backed by `https://sari-api-preview.vercel.app`. The preview API uses a separate authentication secret and trusts the stable preview frontend origin. Preview accounts, sessions, pantry entries, and product caches stay in `sari_preview`.
+The stable staging frontend is `https://sari-web-staging.vercel.app`, backed by `https://sari-api-preview.vercel.app`. The preview API uses a separate authentication secret and sets `BETTER_AUTH_URL` to the staging frontend origin. It retains `https://sari-web-preview.vercel.app` in `AUTH_TRUSTED_ORIGINS` for the older, manually assigned preview. Preview accounts, sessions, pantry entries, and product caches stay in `sari_preview`.
 
-`web/vercel.mjs` selects the API origin at configuration time. Production defaults to `https://sari-api.vercel.app`. The `sari-web` Preview environment sets `SARI_API_ORIGIN=https://sari-api-preview.vercel.app`. A preview build fails if the origin is missing or explicitly points to the production API. Keep this value server-side; browsers continue using `/api/v1`.
+`web/vercel.mjs` selects the API origin at configuration time. Production defaults to `https://sari-api.vercel.app`. The `sari-web-staging` Production and Preview environments set `SARI_API_ORIGIN=https://sari-api-preview.vercel.app`; the original `sari-web` Preview environment retains the same setting. A preview build fails if the origin is missing or explicitly points to the production API. Keep this value server-side; browsers continue using `/api/v1`. Environment-dependent rewrites are constructed outside the exported config object so Git preflight leaves them to the build-time compiler rather than partially extracting an invalid rewrite.
 
-Use the stable preview URL for account flows. Arbitrary branch/deployment URLs are not automatically trusted authentication origins. Add an exact origin to the preview API's `AUTH_TRUSTED_ORIGINS` only when that URL needs its own account flow; do not add preview origins to production. Deploy the preview API and frontend together when their contracts change. The preview API project uses its Production target to provide a stable backend domain; it still has only preview database credentials.
+Use the stable staging URL for account flows. Arbitrary branch/deployment URLs are not automatically trusted authentication origins. Add an exact origin to the preview API's `AUTH_TRUSTED_ORIGINS` only when that URL needs its own account flow; do not add preview origins to production. Pushes to `staging` automatically deploy both projects. The preview API project's Production branch is `staging`; the staging frontend's `staging` Preview branch owns its stable domain. Both projects skip builds for other branches. Wait for both deployments and CI to pass before testing. API/frontend rollout is independent, so contract changes must remain compatible during deployment.
 
-From the repository root:
+Manual fallback from the repository root, after checking out the intended staging revision:
 
 ```powershell
 npx vercel deploy . --project sari-api-preview --scope miguels-projects-51fb4258 --prod
-npx vercel deploy . --project sari-web --scope miguels-projects-51fb4258 --environment preview
-npx vercel alias set <frontend-preview-deployment-url> sari-web-preview.vercel.app --scope miguels-projects-51fb4258
+npx vercel deploy . --project sari-web-staging --scope miguels-projects-51fb4258 --environment preview
+npx vercel alias set <frontend-preview-deployment-url> sari-web-staging.vercel.app --scope miguels-projects-51fb4258
 ```
 
-Vercel Authentication protects the frontend preview. For automated browser tests, obtain a short-lived development OIDC token from the linked `web` project with `vercel env run` and send it as `x-vercel-trusted-oidc-idp-token` only to the preview frontend origin. Never disable deployment protection or expose the token in browser JavaScript.
+Vercel Authentication protects the frontend preview. For automated browser tests, obtain a short-lived development OIDC token with `vercel env run --project sari-web-staging --scope miguels-projects-51fb4258` and send it as `x-vercel-trusted-oidc-idp-token` only to the staging frontend origin. Never disable deployment protection or expose the token in browser JavaScript.
 
 Preview barcode lookups require a separate `USDA_API_KEY` in the preview API project. Manual entry works without it. A shared preview database is disposable; do not enter production or sensitive personal data.
 

@@ -21,12 +21,16 @@ if (
   );
 }
 
+// Keep environment-dependent routes outside the exported object so Git
+// preflight defers their evaluation to the build-time config compiler.
+const rewrites = [
+  { source: "/api/v1/:path*", destination: `${api.origin}/api/v1/:path*` },
+  { source: "/(.*)", destination: "/index.html" },
+];
+
 export const config = {
   installCommand:
     "HUSKY=0 npm ci --include=dev --workspaces --include-workspace-root",
   buildCommand: "npm run build -w @sari/contracts && npm run build",
-  rewrites: [
-    { source: "/api/v1/:path*", destination: `${api.origin}/api/v1/:path*` },
-    { source: "/(.*)", destination: "/index.html" },
-  ],
+  rewrites,
 };
