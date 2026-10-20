@@ -122,7 +122,10 @@ test("barcode not found preserves manual entry and records no product link", asy
   await dialog.getByRole("button", { name: "Scan or enter barcode" }).click();
   await dialog.getByLabel("Barcode number").fill("012345678905");
   await dialog.getByRole("button", { name: "Look up barcode" }).click();
-  await expect(dialog.getByText(/Product not found in USDA/)).toBeVisible();
+  await expect(
+    dialog.getByText("Barcode not found. Enter the item details manually."),
+  ).toBeVisible();
+  await expect(dialog.getByText(/No USDA product linked/)).toHaveCount(0);
   await dialog.getByLabel(/^Food name/).fill("Local cereal");
   await dialog.getByRole("button", { name: "Add item", exact: true }).click();
   await expect(dialog).toHaveCount(0);

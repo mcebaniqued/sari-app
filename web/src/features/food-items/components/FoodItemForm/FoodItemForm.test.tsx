@@ -185,7 +185,7 @@ describe("barcode-assisted pantry form", () => {
           {
             error: {
               code: "PRODUCT_NOT_FOUND",
-              message: "Product not found. Enter details manually.",
+              message: "Product not found in USDA. Enter details manually.",
             },
           },
           { status: 404 },
@@ -194,7 +194,13 @@ describe("barcode-assisted pantry form", () => {
     );
     const onSave = setup();
     typeBarcode();
-    await screen.findByText("Product not found. Enter details manually.");
+    await screen.findByText(
+      "Barcode not found. Enter the item details manually.",
+    );
+    expect(
+      screen.queryByText(/No USDA product linked/),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Barcode:/)).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/^Food name/), {
       target: { value: "Local cereal" },
     });
@@ -210,6 +216,59 @@ describe("barcode-assisted pantry form", () => {
         }),
       );
     });
+  });
+  it("replaces a failed lookup message with one invalid-barcode prompt", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        Response.json(
+          {
+            error: {
+              code: "PRODUCT_NOT_FOUND",
+              message: "Product not found in USDA.",
+            },
+          },
+          { status: 404 },
+        ),
+      ),
+    );
+    setup();
+    typeBarcode();
+    await screen.findByText(
+      "Barcode not found. Enter the item details manually.",
+    );
+    fireEvent.change(screen.getByLabelText("Barcode number"), {
+      target: { value: "123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Look up barcode" }));
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Invalid barcode. Enter the item details manually.",
+    );
+    expect(screen.queryByText(/Barcode not found/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Barcode:/)).not.toBeInTheDocument();
+  });
+  it("keeps service failures distinct from an unknown barcode", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        Response.json(
+          {
+            error: {
+              code: "LOOKUP_UNAVAILABLE",
+              message: "USDA upstream failure.",
+            },
+          },
+          { status: 503 },
+        ),
+      ),
+    );
+    setup();
+    typeBarcode();
+    await screen.findByText(
+      "Could not look up the barcode. Enter the item details manually.",
+    );
+    expect(screen.queryByText(/Barcode not found/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/USDA upstream failure/)).not.toBeInTheDocument();
   });
   it("ignores a result after the barcode input changes", async () => {
     let complete: ((response: Response) => void) | undefined;
