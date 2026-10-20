@@ -1,3 +1,4 @@
 # Deferred work
 
 - [ ] Investigate the frontend bundle-size warning. The production build currently emits a JavaScript chunk above Vite's 500 kB warning threshold. Review route-level lazy loading and dependency splitting in `web/src/App.tsx` and the pantry table imports; verify behavior and build output in a separate performance branch.
+- [ ] Investigate intermittent local Playwright API availability in the default eight-worker run. During barcode MVP verification, three authentication scenarios failed with Vite proxy `ECONNREFUSED` to port 3101; all five isolated auth scenarios and all 29 scenarios with four workers subsequently passed. Reproduce with server diagnostics and inspect test-server startup/watch lifecycle and readiness in `playwright.config.ts` in a separate test-infrastructure branch. Preserve the failure evidence rather than treating lower concurrency as a confirmed root-cause fix.
