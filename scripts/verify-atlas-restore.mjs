@@ -9,7 +9,7 @@ for await (const chunk of process.stdin) {
   uri += chunk;
 }
 const client = new MongoClient(uri.trim(), { serverSelectionTimeoutMS: 10000 });
-const source = client.db("sari_mvp1");
+const source = client.db("sari_prod");
 const target = client.db("sari_restore_verify");
 
 async function digest(collection) {

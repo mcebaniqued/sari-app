@@ -25,29 +25,29 @@ try {
 } finally {
   [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer)
 }
-if ($connection -notmatch '^mongodb\+srv://[^/]+/sari_mvp1(?:\?|$)') {
-  throw 'Backup source must be the sari_mvp1 production database.'
+if ($connection -notmatch '^mongodb\+srv://[^/]+/sari_prod(?:\?|$)') {
+  throw 'Backup source must be the sari_prod production database.'
 }
 
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 $timestamp = [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ')
-$archive = Join-Path $OutputDirectory "sari_mvp1-$timestamp.archive.gz"
+$archive = Join-Path $OutputDirectory "sari_prod-$timestamp.archive.gz"
 $configPath = [IO.Path]::GetTempFileName()
 try {
   # Credentials remain off the command line. Delete the temporary config on every exit.
   $jsonConnection = ConvertTo-Json -InputObject $connection -Compress
   [IO.File]::WriteAllText($configPath, "uri: $jsonConnection`n")
-  & $dumpTool --config $configPath --db sari_mvp1 "--archive=$archive" --gzip
+  & $dumpTool --config $configPath --db sari_prod "--archive=$archive" --gzip
   if ($LASTEXITCODE -ne 0) { throw 'mongodump failed; the archive is incomplete.' }
   if ($VerifyRestore) {
     # Only this disposable database is writable by the backup user.
-    & $restoreTool --config $configPath "--archive=$archive" --gzip '--nsFrom=sari_mvp1.*' '--nsTo=sari_restore_verify.*' --drop
+    & $restoreTool --config $configPath "--archive=$archive" --gzip '--nsFrom=sari_prod.*' '--nsTo=sari_restore_verify.*' --drop
     if ($LASTEXITCODE -ne 0) { throw 'mongorestore failed in the disposable verification database.' }
     $connection | & node (Join-Path $PSScriptRoot 'verify-atlas-restore.mjs')
     if ($LASTEXITCODE -ne 0) { throw 'Restore verification or cleanup failed; see the verification output.' }
   }
   $manifest = [ordered]@{
-    database = 'sari_mvp1'
+    database = 'sari_prod'
     createdUtc = [DateTime]::UtcNow.ToString('o')
     archive = [IO.Path]::GetFileName($archive)
     sha256 = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
