@@ -25,3 +25,10 @@
   --shadow-modal: 0 24px 80px #0d241c30;
   --font-sans: "Segoe UI", system-ui, sans-serif;
 }
+
+/* Use root-relative form text with a 16px floor to prevent iOS focus zoom. */
+input:not([type="checkbox"], [type="radio"]),
+select,
+textarea {
+  font-size: max(16px, 1rem);
+}

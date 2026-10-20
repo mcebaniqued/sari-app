@@ -64,7 +64,7 @@ export default function FoodItemFields({ values, onChange }: Props) {
             onChange={(event) => {
               onChange("unit", event.target.value);
             }}
-            className="w-full rounded-control border border-border-control bg-surface px-3 py-2.5 text-sm text-content focus:outline-2 focus:outline-offset-1 focus:outline-brand disabled:opacity-50"
+            className="w-full rounded-control border border-border-control bg-surface px-3 py-2.5 text-base text-content focus:outline-2 focus:outline-offset-1 focus:outline-brand disabled:opacity-50"
           >
             {foodUnitSchema.options.map((unit) => (
               <option key={unit} value={unit}>
