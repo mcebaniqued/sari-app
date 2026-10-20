@@ -12,8 +12,11 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@better-auth/mongo-adapter": "^1.7.11",
     "@sari/contracts": "*",
+    "better-auth": "^1.7.11",
     "express": "^5.3.0",
+    "mongodb": "^7.7.0",
     "mongoose": "^9.11.2"
   },
   "devDependencies": {
