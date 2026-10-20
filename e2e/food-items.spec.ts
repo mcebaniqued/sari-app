@@ -71,13 +71,14 @@ test("barcode suggestions are reviewed, privately renamed, saved, and unlinked",
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Add item", exact: true });
   await expect(dialog.getByLabel(/^Food name/)).toBeFocused();
-  await dialog.getByRole("button", { name: "Scan or enter barcode" }).click();
+  await dialog.getByRole("button", { name: "Barcode", exact: true }).click();
   await dialog.getByLabel("Barcode number").fill("012345678905");
-  await dialog.getByRole("button", { name: "Look up barcode" }).click();
-  await expect(dialog.getByText("Linked product: USDA oats")).toBeVisible();
+  await dialog.getByRole("button", { name: "Find item", exact: true }).click();
+  await expect(dialog.getByText("USDA oats", { exact: true })).toBeVisible();
+  await expect(dialog.getByLabel("Barcode number")).toHaveCount(0);
   await expect(dialog.getByLabel(/^Quantity/)).toHaveValue("500");
   await dialog.getByLabel(/^Food name/).fill("My breakfast oats");
-  await expect(dialog.getByText("Linked product: USDA oats")).toBeVisible();
+  await expect(dialog.getByText("USDA oats", { exact: true })).toBeVisible();
   const accessibility = await new AxeBuilder({ page }).analyze();
   expect(accessibility.violations).toEqual([]);
   await dialog.getByRole("button", { name: "Add item", exact: true }).click();
@@ -88,7 +89,7 @@ test("barcode suggestions are reviewed, privately renamed, saved, and unlinked",
     .getByRole("button", { name: "Edit My breakfast oats", exact: true })
     .click();
   const edit = page.getByRole("dialog", { name: "Edit item", exact: true });
-  await expect(edit.getByText("Linked product: USDA oats")).toBeVisible();
+  await expect(edit.getByText("USDA oats", { exact: true })).toBeVisible();
   await edit.getByRole("button", { name: "Remove product link" }).click();
   await expect(edit.getByLabel(/^Food name/)).toHaveValue("My breakfast oats");
   await expect(edit.getByLabel(/^Quantity/)).toHaveValue("500");
@@ -119,17 +120,74 @@ test("barcode not found preserves manual entry and records no product link", asy
   await page.goto("/");
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Add item", exact: true });
-  await dialog.getByRole("button", { name: "Scan or enter barcode" }).click();
+  await dialog.getByRole("button", { name: "Barcode", exact: true }).click();
   await dialog.getByLabel("Barcode number").fill("012345678905");
-  await dialog.getByRole("button", { name: "Look up barcode" }).click();
+  await dialog.getByRole("button", { name: "Find item", exact: true }).click();
   await expect(
     dialog.getByText("Barcode not found. Enter the item details manually."),
   ).toBeVisible();
   await expect(dialog.getByText(/No USDA product linked/)).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Enter details manually" }).click();
+  await expect(dialog.getByLabel(/^Food name/)).toBeFocused();
   await dialog.getByLabel(/^Food name/).fill("Local cereal");
   await dialog.getByRole("button", { name: "Add item", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await expect(nameCells(page)).toHaveText(["Local cereal"]);
+});
+
+test("barcode entry preserves drafts and fits a phone screen", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await foodApi(page, []);
+  await page.route("**/api/v1/food-products/barcode/*", (route) =>
+    route.fulfill({ json: { product: usdaOats, stale: false } }),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Add item", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Add item", exact: true });
+  await dialog.getByLabel(/^Food name/).fill("My breakfast");
+  await dialog.getByLabel(/Expiration date/).fill("2028-02-29");
+  await dialog.getByRole("button", { name: "Barcode", exact: true }).click();
+  await expect(dialog.getByLabel("Barcode number")).toBeFocused();
+  await expect(dialog.getByLabel(/^Food name/)).toHaveCount(0);
+  await expect(
+    dialog.getByRole("button", { name: "Add item", exact: true }),
+  ).toHaveCount(0);
+  await dialog.getByLabel("Barcode number").fill("012345678905");
+  await page.screenshot({
+    path: testInfo.outputPath("barcode-phone.png"),
+    fullPage: true,
+  });
+  await expect(dialog).toHaveJSProperty(
+    "scrollWidth",
+    await dialog.evaluate((element) => element.clientWidth),
+  );
+  await dialog
+    .getByRole("button", { name: "Manual entry", exact: true })
+    .click();
+  await expect(dialog.getByLabel(/^Food name/)).toHaveValue("My breakfast");
+  await expect(dialog.getByLabel(/Expiration date/)).toHaveValue("2028-02-29");
+  await dialog.getByRole("button", { name: "Barcode", exact: true }).click();
+  await expect(dialog.getByLabel("Barcode number")).toHaveValue("012345678905");
+  await dialog.getByLabel("Barcode number").press("Enter");
+  await expect(dialog.getByText("USDA oats", { exact: true })).toBeVisible();
+  await expect(dialog.getByLabel(/^Food name/)).toHaveValue("My breakfast");
+  await expect(dialog.getByLabel(/^Quantity/)).toHaveValue("500");
+  await dialog.getByRole("button", { name: "Keep my entries" }).click();
+  await expect(dialog.getByText(/^Barcode:/)).toBeHidden();
+  await page.screenshot({
+    path: testInfo.outputPath("matched-product-phone.png"),
+    fullPage: true,
+  });
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  expect(accessibility.violations).toEqual([]);
+  await expect(dialog).toHaveJSProperty(
+    "scrollWidth",
+    await dialog.evaluate((element) => element.clientWidth),
+  );
+  await dialog.getByText("More product details", { exact: true }).click();
+  await expect(dialog.getByText(`Barcode: ${usdaOats.barcode}`)).toBeVisible();
 });
 
 async function foodApi(page: Page, initial: FoodItem[], failOnceId?: string) {
@@ -247,6 +305,14 @@ test("add and row edit use accessible modals and changes survive refresh", async
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   let dialog = page.getByRole("dialog", { name: "Add item", exact: true });
   await expect(dialog.getByLabel(/^Food name/)).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(
+    dialog.getByRole("button", { name: "Barcode", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(
+    dialog.getByRole("button", { name: "Manual entry", exact: true }),
+  ).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(
     dialog.getByRole("button", { name: "Close modal" }),

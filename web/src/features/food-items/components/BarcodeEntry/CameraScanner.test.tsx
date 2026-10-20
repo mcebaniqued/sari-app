@@ -27,6 +27,7 @@ afterEach(() => {
 
 describe("camera scanning lifecycle", () => {
   function camera() {
+    vi.stubGlobal("isSecureContext", true);
     const trackStop = vi.fn();
     const stream = { getTracks: () => [{ stop: trackStop }] };
     const getUserMedia = vi.fn().mockResolvedValue(stream);
@@ -87,9 +88,7 @@ describe("camera scanning lifecycle", () => {
     );
     const onType = vi.fn();
     render(<CameraScanner onDetected={vi.fn()} onType={onType} />);
-    expect(
-      await screen.findByText(/Camera access is unavailable/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Allow camera access/)).toBeInTheDocument();
     fireEvent.click(
       screen.getByRole("button", { name: "Enter barcode manually" }),
     );
@@ -107,7 +106,7 @@ describe("camera scanning lifecycle", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10_000);
     });
-    expect(screen.getByText(/Having trouble/)).toBeInTheDocument();
+    expect(screen.getByText(/Try brighter light/)).toBeInTheDocument();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(15_000);
     });
@@ -116,5 +115,26 @@ describe("camera scanning lifecycle", () => {
     ).toBeInTheDocument();
     view.unmount();
     expect(trackStop).toHaveBeenCalled();
+  });
+  it("explains insecure connections without requesting camera permission", async () => {
+    const { getUserMedia } = camera();
+    vi.stubGlobal("isSecureContext", false);
+    render(<CameraScanner onDetected={vi.fn()} onType={vi.fn()} />);
+    expect(
+      await screen.findByText(/Camera scanning needs a secure connection/),
+    ).toBeInTheDocument();
+    expect(getUserMedia).not.toHaveBeenCalled();
+    expect(decode).not.toHaveBeenCalled();
+  });
+  it("offers typed entry when the device has no camera", async () => {
+    const { getUserMedia } = camera();
+    getUserMedia.mockRejectedValue(
+      new DOMException("No device", "NotFoundError"),
+    );
+    render(<CameraScanner onDetected={vi.fn()} onType={vi.fn()} />);
+    expect(await screen.findByText(/No camera was found/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Enter barcode manually" }),
+    ).toBeEnabled();
   });
 });

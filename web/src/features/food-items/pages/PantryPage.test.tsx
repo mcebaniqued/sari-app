@@ -164,7 +164,7 @@ describe("pantry modals and persistence", () => {
     });
     fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
     expect(await dialog.findByRole("alert")).toHaveTextContent(
-      "Please try again shortly.",
+      "Could not save this item. Try again.",
     );
     expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
     expect(fetch).toHaveBeenLastCalledWith(
@@ -199,7 +199,7 @@ describe("pantry modals and persistence", () => {
     });
     fireEvent.click(dialog.getByRole("button", { name: "Add item" }));
     expect(await dialog.findByRole("alert")).toHaveTextContent(
-      "Enter a food name.",
+      "Enter a food name with 120 characters or fewer.",
     );
     expect(fetch).not.toHaveBeenCalled();
   });
