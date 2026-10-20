@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 
-import { getApiErrorMessage } from "@/utils/apiError";
+import { ApiError } from "@/api/apiFetch";
 
 import { getFoodProduct, lookupBarcode } from "../api/foodProductsApi";
 
@@ -146,10 +146,11 @@ export function useBarcodeProduct(
     } catch (error) {
       if (!controller.signal.aborted) {
         setMessage(
-          getApiErrorMessage(
-            error,
-            "Lookup could not finish. Enter item details manually or try again.",
-          ),
+          error instanceof ApiError && error.code === "INVALID_BARCODE"
+            ? "Invalid barcode. Enter the item details manually."
+            : error instanceof ApiError && error.code === "PRODUCT_NOT_FOUND"
+              ? "Barcode not found. Enter the item details manually."
+              : "Could not look up the barcode. Enter the item details manually.",
         );
       }
     } finally {

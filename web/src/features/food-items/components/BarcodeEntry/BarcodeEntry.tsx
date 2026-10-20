@@ -29,7 +29,8 @@ export default function BarcodeEntry({
   function lookup(input: string) {
     const result = barcodeSchema.safeParse(input);
     if (!result.success) {
-      setError("Check the barcode number and try again.");
+      onChange();
+      setError("Invalid barcode. Enter the item details manually.");
       return;
     }
     setError("");

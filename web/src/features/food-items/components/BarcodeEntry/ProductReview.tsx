@@ -91,12 +91,6 @@ export default function ProductReview({
           </button>
         </div>
       )}
-      {!productId && barcode && (
-        <p className="break-all text-content-muted">
-          Barcode: {barcode} · No USDA product linked. You can enter details
-          manually.
-        </p>
-      )}
     </div>
   );
 }
