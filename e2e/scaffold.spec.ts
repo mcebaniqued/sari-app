@@ -1,14 +1,16 @@
 import { expect, test } from "@playwright/test";
 
+import { signedIn } from "./authFixture";
+
 test("frontend loads and its same-origin proxy reaches the API", async ({
   page,
   request,
 }) => {
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "My Pantry", exact: true }),
+    page.getByRole("heading", { name: "Log in", exact: true }),
   ).toBeVisible();
-  await expect(page).toHaveURL(/\/pantry$/);
+  await expect(page).toHaveURL(/\/login$/);
 
   const response = await request.get("/api/v1/health");
   expect(response.status()).toBe(200);
@@ -18,6 +20,7 @@ test("frontend loads and its same-origin proxy reaches the API", async ({
 test("a direct visit to an unknown SPA route can navigate home", async ({
   page,
 }) => {
+  await signedIn(page);
   await page.goto("/missing");
   await expect(
     page.getByRole("heading", { name: "Page not found" }),
