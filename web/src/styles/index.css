@@ -32,3 +32,9 @@ select,
 textarea {
   font-size: max(16px, 1rem);
 }
+
+/* Safari's native date value otherwise centers and can collapse when empty. */
+input[type="date"]::-webkit-date-and-time-value {
+  min-height: 1.5em;
+  text-align: left;
+}

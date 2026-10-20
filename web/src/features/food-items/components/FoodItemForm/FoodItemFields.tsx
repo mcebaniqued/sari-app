@@ -1,4 +1,5 @@
 import { foodUnitSchema } from "@sari/contracts";
+import { LuChevronDown } from "react-icons/lu";
 
 import Input from "@/components/Input/Input";
 
@@ -31,7 +32,7 @@ export default function FoodItemFields({ values, onChange }: Props) {
         />
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <div>
+        <div className="min-w-0">
           <label
             htmlFor="food-quantity"
             className="mb-2 block text-sm font-medium"
@@ -53,25 +54,31 @@ export default function FoodItemFields({ values, onChange }: Props) {
             }}
           />
         </div>
-        <div>
+        <div className="min-w-0">
           <label htmlFor="food-unit" className="mb-2 block text-sm font-medium">
             Unit
           </label>
-          <select
-            id="food-unit"
-            name="unit"
-            value={values.unit}
-            onChange={(event) => {
-              onChange("unit", event.target.value);
-            }}
-            className="w-full rounded-control border border-border-control bg-surface px-3 py-2.5 text-base text-content focus:outline-2 focus:outline-offset-1 focus:outline-brand disabled:opacity-50"
-          >
-            {foodUnitSchema.options.map((unit) => (
-              <option key={unit} value={unit}>
-                {foodUnitLabels[unit]}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <select
+              id="food-unit"
+              name="unit"
+              value={values.unit}
+              onChange={(event) => {
+                onChange("unit", event.target.value);
+              }}
+              className="min-h-[2.875rem] w-full min-w-0 appearance-none rounded-control border border-border-control bg-surface py-2.5 pr-10 pl-3 text-base text-content focus:border-brand focus:outline-2 focus:outline-offset-1 focus:outline-brand disabled:opacity-50"
+            >
+              {foodUnitSchema.options.map((unit) => (
+                <option key={unit} value={unit}>
+                  {foodUnitLabels[unit]}
+                </option>
+              ))}
+            </select>
+            <LuChevronDown
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-content-muted"
+            />
+          </div>
         </div>
         <p
           id="quantity-hint"
