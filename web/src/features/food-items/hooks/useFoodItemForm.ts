@@ -1,9 +1,7 @@
 import { type CreateFoodItem, createFoodItemSchema } from "@sari/contracts";
 import { type SubmitEvent, useRef, useState } from "react";
 
-import { notify } from "@/components/Toast/notifications";
 import { useAccessDenied } from "@/hooks/useAccessDenied";
-import { getApiErrorMessage } from "@/utils/apiError";
 
 import type { FoodItemDraft } from "./useFoodItemDraft";
 
@@ -38,7 +36,18 @@ export function useFoodItemForm({
     });
     setError("");
     if (!result.success) {
-      setError(result.error.issues[0]?.message ?? "Check your food details.");
+      const field = result.error.issues[0]?.path[0];
+      setError(
+        field === "name"
+          ? "Enter a food name with 120 characters or fewer."
+          : field === "quantity"
+            ? "Enter a quantity greater than zero and no more than 1,000,000."
+            : field === "unit"
+              ? "Choose a unit."
+              : field === "expiresOn"
+                ? "Enter a valid expiration date."
+                : "Check the item details and try again.",
+      );
       return;
     }
     savingRef.current = true;
@@ -49,11 +58,10 @@ export function useFoodItemForm({
       if (handleAccessDenied(error)) {
         return;
       }
-      const message = getApiErrorMessage(
-        error,
-        "Could not reach your pantry. Check your connection and try again.",
-      );
-      notify("error", message, "pantry-save-error");
+      const message =
+        error instanceof TypeError
+          ? "Could not reach your pantry. Check your connection and try again."
+          : "Could not save this item. Try again.";
       setError(message);
     } finally {
       savingRef.current = false;
