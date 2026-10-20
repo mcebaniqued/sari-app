@@ -57,6 +57,95 @@ const usdaOats: FoodProduct = {
   checkedAt: "2026-10-20T00:00:00Z",
 };
 
+test("camera decodes a UPC from video and looks up the item once", async ({
+  page,
+}) => {
+  // UPC-A 853807005033: left digit patterns, center guard, then inverted
+  // right digit patterns. A canvas stream exercises the actual ZXing decoder.
+  const patterns = [
+    "0001101",
+    "0011001",
+    "0010011",
+    "0111101",
+    "0100011",
+    "0110001",
+    "0101111",
+    "0111011",
+    "0110111",
+    "0001011",
+  ];
+  const upc = "853807005033";
+  const left = [...upc.slice(0, 6)]
+    .map((digit) => patterns[Number(digit)])
+    .join("");
+  const right = [...upc.slice(6)]
+    .map((digit) => patterns[Number(digit)])
+    .join("")
+    .replace(/[01]/g, (bit) => (bit === "0" ? "1" : "0"));
+  const bars = `101${left}01010${right}101`;
+  await page.addInitScript((bars) => {
+    Object.defineProperty(navigator.mediaDevices, "getUserMedia", {
+      value: async () => {
+        const canvas = document.createElement("canvas");
+        canvas.id = "test-camera-source";
+        canvas.hidden = true;
+        canvas.width = 640;
+        canvas.height = 360;
+        const context = canvas.getContext("2d")!;
+        context.fillStyle = "white";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.fillStyle = "black";
+        [...bars].forEach((bar, index) => {
+          if (bar === "1") {
+            context.fillRect(130 + index * 4, 60, 4, 240);
+          }
+        });
+        document.body.append(canvas);
+        const stream = canvas.captureStream(10);
+        Object.defineProperty(canvas, "cameraStream", { value: stream });
+        return stream;
+      },
+    });
+  }, bars);
+  await foodApi(page, []);
+  const lookups: string[] = [];
+  await page.route("**/api/v1/food-products/barcode/*", (route) => {
+    lookups.push(new URL(route.request().url()).pathname);
+    return route.fulfill({
+      json: {
+        product: {
+          ...usdaOats,
+          barcode: "00853807005033",
+          name: "Test cooking oil",
+        },
+        stale: false,
+      },
+    });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Add item", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Add item", exact: true });
+  await dialog.getByRole("button", { name: "Input barcode instead" }).click();
+  await dialog.getByRole("button", { name: "Scan with camera" }).click();
+  await expect(dialog.getByLabel(/^Food name/)).toHaveValue("Test cooking oil");
+  expect(lookups).toEqual(["/api/v1/food-products/barcode/00853807005033"]);
+  await expect(dialog.getByLabel("Barcode camera preview")).toHaveCount(0);
+  expect(
+    await page
+      .locator("#test-camera-source")
+      .evaluate((canvas) =>
+        (
+          canvas as HTMLCanvasElement & { cameraStream: MediaStream }
+        ).cameraStream
+          .getTracks()
+          .every((track) => track.readyState === "ended"),
+      ),
+  ).toBe(true);
+  await expect(
+    dialog.getByRole("button", { name: "Add item", exact: true }),
+  ).toBeEnabled();
+});
+
 test("barcode suggestions are reviewed, privately renamed, saved, and unlinked", async ({
   page,
 }) => {
