@@ -12,6 +12,7 @@ import {
 
 import app from "../app.js";
 import { connectDatabase } from "../db.js";
+import { FoodItemModel } from "../food-items/model.js";
 import {
   BarcodeLookupModel,
   FoodProductModel,
@@ -31,6 +32,7 @@ const raw = {
   foodNutrients: [{ nutrient: { name: "Protein" }, amount: 12 }],
 };
 const agent = request.agent(app).set("Origin", "http://127.0.0.1:5173");
+const otherAgent = request.agent(app).set("Origin", "http://127.0.0.1:5173");
 
 describe.skipIf(!testUri)("USDA lookup persistence", () => {
   beforeAll(async () => {
@@ -52,6 +54,7 @@ describe.skipIf(!testUri)("USDA lookup persistence", () => {
       FoodProductModel.init(),
       BarcodeLookupModel.init(),
       UsdaBudgetModel.init(),
+      FoodItemModel.init(),
     ]);
     const registered = await agent.post("/api/v1/auth/sign-up/email").send({
       firstName: "Barcode",
@@ -61,6 +64,17 @@ describe.skipIf(!testUri)("USDA lookup persistence", () => {
       password: "a long barcode test password",
     });
     expect(registered.status).toBe(200);
+    expect(
+      (
+        await otherAgent.post("/api/v1/auth/sign-up/email").send({
+          firstName: "Other",
+          lastName: "Tester",
+          name: "Other Tester",
+          email: `other-${new mongoose.Types.ObjectId().toHexString()}@example.com`,
+          password: "another long barcode test password",
+        })
+      ).status,
+    ).toBe(200);
   }, 20_000);
   afterEach(async () => {
     vi.unstubAllGlobals();
@@ -68,6 +82,7 @@ describe.skipIf(!testUri)("USDA lookup persistence", () => {
       FoodProductModel.deleteMany({}),
       BarcodeLookupModel.deleteMany({}),
       UsdaBudgetModel.deleteMany({}),
+      FoodItemModel.deleteMany({}),
     ]);
   });
   afterAll(async () => {
@@ -175,5 +190,83 @@ describe.skipIf(!testUri)("USDA lookup persistence", () => {
       400,
     );
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("keeps names private, validates links, and unlinks without losing pantry values", async () => {
+    provider();
+    const lookup = await agent.get(`/api/v1/food-products/barcode/${barcode}`);
+    const productId = (lookup.body as { product: { id: string } }).product.id;
+    const first = await agent
+      .post("/api/v1/food-items")
+      .send({ name: "My oats", quantity: 250, unit: "g", productId, barcode });
+    const second = await otherAgent
+      .post("/api/v1/food-items")
+      .send({ name: "Breakfast cereal", productId, barcode });
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    const id = (first.body as { id: string }).id;
+    expect(
+      (
+        await otherAgent
+          .patch(`/api/v1/food-items/${id}`)
+          .send({ name: "Changed by another user" })
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await agent
+          .patch(`/api/v1/food-items/${id}`)
+          .send({ barcode: "96385074" })
+      ).status,
+    ).toBe(400);
+    const unlinked = await agent
+      .patch(`/api/v1/food-items/${id}`)
+      .send({ productId: null });
+    expect(unlinked.body).toMatchObject({
+      productId: null,
+      name: "My oats",
+      quantity: 250,
+      unit: "g",
+    });
+    expect((await FoodProductModel.findById(productId).lean())?.name).toBe(
+      "USDA oats",
+    );
+    expect((await agent.get("/api/v1/food-items")).body).not.toHaveProperty(
+      "items.1",
+    );
+    expect((await otherAgent.get("/api/v1/food-items")).body).toMatchObject({
+      items: [{ name: "Breakfast cereal" }],
+    });
+  });
+
+  it("deduplicates same-operation concurrent saves but allows intentional repeats", async () => {
+    const input = { name: "Manual oats", barcode };
+    const key = "barcode-test-operation-123456";
+    const responses = await Promise.all([
+      agent.post("/api/v1/food-items").set("Idempotency-Key", key).send(input),
+      agent.post("/api/v1/food-items").set("Idempotency-Key", key).send(input),
+    ]);
+    expect(responses.map((r) => r.status)).toEqual([201, 201]);
+    expect(responses[0].body).toEqual(responses[1].body);
+    expect(await FoodItemModel.countDocuments()).toBe(1);
+    expect(responses[0].body).not.toHaveProperty("creationFingerprint");
+    expect(
+      (
+        await agent
+          .post("/api/v1/food-items")
+          .set("Idempotency-Key", key)
+          .send({ name: "Different values" })
+      ).status,
+    ).toBe(409);
+    expect(
+      (
+        await agent
+          .post("/api/v1/food-items")
+          .set("Idempotency-Key", "another-operation-123456")
+          .send(input)
+      ).status,
+    ).toBe(201);
+    expect(await FoodItemModel.countDocuments()).toBe(2);
+    expect(await FoodProductModel.countDocuments()).toBe(0);
   });
 });
