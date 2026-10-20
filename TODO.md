@@ -1,6 +1,11 @@
 # Deferred work
 
 - [ ] Set the pantry document title after authentication navigation. Production verification observed `Log in | Sari` or `Create an account | Sari` remaining in the browser title after the page changed to `/pantry`; refreshing restores the generic app title. Add route-specific title handling and verify registration, login, and direct pantry navigation in a separate UI branch.
+- [ ] Verify Vercel client-IP handling before increasing traffic. Authentication uses Express `req.ip` without an explicit trusted-proxy policy; confirm the actual frontend-to-API header chain and ensure unrelated users cannot share a login rate-limit bucket. Preserve spoofing protections when making a platform-specific fix.
+- [ ] Confirm Better Auth's required production indexes, including email and session-token uniqueness. The first Atlas backup contained only default indexes on authentication collections. Inspect the installed adapter's index lifecycle, reconcile the documented behavior, and add a migration and concurrency coverage if needed.
+- [ ] Connect the Vercel projects to GitHub and define coordinated API/frontend releases. Both projects currently require manual deployment; preserve environment isolation and gate releases on CI.
+- [ ] Align the API function region with Atlas (`US_WEST_2`); the API currently runs in `iad1`. Measure authentication and pantry latency before and after the change in a separate deployment-performance scope.
+- [ ] Choose private off-machine backup storage, a retention period, and a recurring schedule. The verified `mongodump`/`mongorestore` workflow in `docs/database-operations.md` currently runs locally on demand.
 
 - [ ] Add an imperial/metric user preference for barcode autofill. Select the user's preferred printed measurement, define conversion and rounding for labels that only supply another system, and preserve private edits and existing pantry amounts. For now, consistent dual-unit labels prefer the printed U.S. customary measurement; metric-only labels retain their printed size.
 

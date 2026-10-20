@@ -213,23 +213,13 @@ Use two Vercel projects connected to this repository:
 
 Allow access to files outside each root directory, because the workspace lockfile, shared TypeScript configuration, and contracts package are outside the application directories. Build commands must compile the contracts package before the application so runtime imports and declaration files are available. Use Node 24.x in both projects. The API's default-exported `src/app.ts` is its Vercel entry point; `src/server.ts` is for conventional local/server hosting.
 
-Each application's `vercel.json` records its install and build commands. Include development dependencies because the build requires TypeScript and Vite, and the root prepare script invokes Husky. `HUSKY=0` disables Git hooks in the deployment environment.
+`api/vercel.json` and `web/vercel.mjs` record the install and build commands. Include development dependencies because the build requires TypeScript and Vite, and the root prepare script invokes Husky. `HUSKY=0` disables Git hooks in the deployment environment.
 
 The root `.vercelignore` excludes local environment files and test artifacts from CLI uploads. Production credentials belong in Vercel environment variables, not uploaded source files.
 
-`web/vercel.json` routes API requests to the API production domain **before** the SPA fallback. If the API hostname changes, update this destination:
+`web/vercel.mjs` routes API requests **before** the SPA fallback. Production defaults to `https://sari-api.vercel.app`. Preview builds require `SARI_API_ORIGIN=https://sari-api-preview.vercel.app` and fail if it is missing or explicitly points to the production API.
 
-```json
-{
-  "rewrites": [
-    {
-      "source": "/api/v1/:path*",
-      "destination": "https://sari-api.vercel.app/api/v1/:path*"
-    },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}
-```
+Production, local development, and previews use separate databases and users: `sari_mvp1`, `sari_dev`, and `sari_preview`. The stable protected preview is `https://sari-web-preview.vercel.app`. See [database operations](docs/database-operations.md) for credential boundaries, preview deployment commands, and the verified backup/restore workflow.
 
 Keep `VITE_API_BASE_URL=/api/v1` so browser requests remain same-origin. Set the API project's production `BETTER_AUTH_URL` to `https://sari-web.vercel.app`, use a dedicated production `BETTER_AUTH_SECRET`, and configure `MONGODB_URI` and optional `USDA_API_KEY` as backend secrets. Do not give preview deployments production database credentials.
 
