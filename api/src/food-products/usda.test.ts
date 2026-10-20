@@ -59,6 +59,11 @@ describe("USDA mapping", () => {
     });
     expect(mapped).not.toHaveProperty("servingSize");
   });
+  it("maps the ONZ weight code returned by the live USDA Cheerios record", () => {
+    expect(
+      mapUsdaFood({ ...food, packageWeight: "18 ONZ" }, barcode),
+    ).toMatchObject({ packageQuantity: 18, packageUnit: "oz" });
+  });
   it.each([
     undefined,
     "6 x 30 g",

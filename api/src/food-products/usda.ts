@@ -100,7 +100,7 @@ export function selectUsdaFood(raw: unknown, barcode: string): string {
 /** Conservative: never turn a serving or an ambiguous multipack into package contents. */
 function packageSize(description: string | null) {
   const match = description?.match(
-    /^\s*(\d+(?:\.\d+)?)\s*(g|grams?|kg|kilograms?|ml|millilit(?:er|re)s?|l|lit(?:er|re)s?|oz|ounces?|lb|lbs|pounds?|fl\s*oz)\s*$/i,
+    /^\s*(\d+(?:\.\d+)?)\s*(g|grams?|kg|kilograms?|ml|millilit(?:er|re)s?|l|lit(?:er|re)s?|oz|onz|ounces?|lb|lbs|pounds?|fl\s*oz)\s*$/i,
   );
   if (!match) {
     return { packageQuantity: null, packageUnit: null };
@@ -119,7 +119,9 @@ function packageSize(description: string | null) {
           ? "fl oz"
           : unit.startsWith("lb") || unit.startsWith("pound")
             ? "lb"
-            : unit.startsWith("oz") || unit.startsWith("ounce")
+            : unit.startsWith("oz") ||
+                unit === "onz" ||
+                unit.startsWith("ounce")
               ? "oz"
               : unit.startsWith("g")
                 ? "g"
@@ -137,7 +139,11 @@ export function mapUsdaFood(
     food.dataType !== "Branded" ||
     typeof food.gtinUpc !== "string" ||
     normalizeBarcode(food.gtinUpc) !== barcode ||
-    !Number.isSafeInteger(food.fdcId)
+    !Number.isSafeInteger(food.fdcId) ||
+    Number(food.fdcId) <= 0 ||
+    Boolean(text(food.discontinuedDate)) ||
+    (Boolean(text(food.marketCountry)) &&
+      !/^(united states|canada|mexico)$/i.test(text(food.marketCountry) ?? ""))
   ) {
     throw new LookupError(
       "LOOKUP_UNAVAILABLE",
