@@ -4,6 +4,7 @@ coverage/
 test-results/
 playwright-report/
 .vercel/
+.backups/
 .env
 .env.*
 !.env.example
