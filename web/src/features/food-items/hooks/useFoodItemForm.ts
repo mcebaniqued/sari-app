@@ -5,14 +5,18 @@ import { notify } from "@/components/Toast/notifications";
 import { useAccessDenied } from "@/hooks/useAccessDenied";
 import { getApiErrorMessage } from "@/utils/apiError";
 
+import type { FoodItemDraft } from "./useFoodItemDraft";
+
 interface FoodItemFormOptions {
   disabled: boolean;
   onSave: (values: CreateFoodItem) => Promise<void>;
+  values: FoodItemDraft;
   linkage?: { productId: string | null; barcode: string | null };
 }
 export function useFoodItemForm({
   disabled,
   onSave,
+  values,
   linkage,
 }: FoodItemFormOptions) {
   const [saving, setSaving] = useState(false);
@@ -25,13 +29,11 @@ export function useFoodItemForm({
     if (savingRef.current || disabled) {
       return;
     }
-    const data = new FormData(event.currentTarget);
-    const expiration = data.get("expiresOn");
     const result = createFoodItemSchema.safeParse({
-      name: data.get("name"),
-      quantity: Number(data.get("quantity")),
-      unit: data.get("unit"),
-      expiresOn: expiration === "" ? null : expiration,
+      name: values.name,
+      quantity: Number(values.quantity),
+      unit: values.unit,
+      expiresOn: values.expiresOn || null,
       ...(linkage ?? {}),
     });
     setError("");

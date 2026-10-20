@@ -3,12 +3,12 @@ import {
   type FoodItem,
   foodUnitSchema,
 } from "@sari/contracts";
-import { useRef } from "react";
 import { LuCheck, LuPlus } from "react-icons/lu";
 
 import Input from "@/components/Input/Input";
 
 import { useBarcodeProduct } from "../../hooks/useBarcodeProduct";
+import { useFoodItemDraft } from "../../hooks/useFoodItemDraft";
 import { useFoodItemForm } from "../../hooks/useFoodItemForm";
 import { foodUnitLabels } from "../../utils/foodUnits";
 import BarcodeEntry from "../BarcodeEntry/BarcodeEntry";
@@ -27,8 +27,8 @@ export default function FoodItemForm({
   onSave,
   onCancel,
 }: FoodItemFormProps) {
-  const formRef = useRef<HTMLFormElement>(null);
-  const barcode = useBarcodeProduct(item, formRef);
+  const draft = useFoodItemDraft(item);
+  const barcode = useBarcodeProduct(item, draft);
   const linked =
     barcode.productId !== null ||
     barcode.barcode !== null ||
@@ -36,14 +36,13 @@ export default function FoodItemForm({
   const { saving, error, handleSubmit } = useFoodItemForm({
     disabled,
     onSave,
+    values: draft.values,
     ...(linked
       ? { linkage: { productId: barcode.productId, barcode: barcode.barcode } }
       : {}),
   });
   return (
     <form
-      ref={formRef}
-      onChange={barcode.onFormChange}
       onSubmit={(event) => {
         barcode.cancelLookup();
         void handleSubmit(event);
@@ -61,7 +60,10 @@ export default function FoodItemForm({
             name="name"
             required
             maxLength={120}
-            defaultValue={item?.name ?? ""}
+            value={draft.values.name}
+            onChange={(event) => {
+              draft.edit("name", event.target.value);
+            }}
             placeholder="e.g. Eggs, rice, or milk"
           />
         </div>
@@ -118,7 +120,10 @@ export default function FoodItemForm({
               min="0"
               max="1000000"
               step="any"
-              defaultValue={item?.quantity ?? 1}
+              value={draft.values.quantity}
+              onChange={(event) => {
+                draft.edit("quantity", event.target.value);
+              }}
             />
           </div>
           <div>
@@ -131,7 +136,10 @@ export default function FoodItemForm({
             <select
               id="food-unit"
               name="unit"
-              defaultValue={item?.unit ?? "item"}
+              value={draft.values.unit}
+              onChange={(event) => {
+                draft.edit("unit", event.target.value);
+              }}
               className="w-full rounded-control border border-border-control bg-surface px-3 py-2.5 text-sm text-content focus:outline-2 focus:outline-offset-1 focus:outline-brand disabled:opacity-50"
             >
               {foodUnitSchema.options.map((unit) => (
@@ -157,7 +165,10 @@ export default function FoodItemForm({
             min="0001-01-01"
             max="9999-12-31"
             aria-describedby="expiration-hint"
-            defaultValue={item?.expiresOn ?? ""}
+            value={draft.values.expiresOn}
+            onChange={(event) => {
+              draft.edit("expiresOn", event.target.value);
+            }}
           />
           <p
             id="expiration-hint"

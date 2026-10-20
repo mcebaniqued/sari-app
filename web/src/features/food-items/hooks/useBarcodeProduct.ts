@@ -1,19 +1,14 @@
 import { type FoodItem, type FoodProduct } from "@sari/contracts";
-import {
-  type ChangeEvent,
-  type RefObject,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ApiError } from "@/api/apiFetch";
 
 import { getFoodProduct, lookupBarcode } from "../api/foodProductsApi";
+import type { useFoodItemDraft } from "./useFoodItemDraft";
 
 export function useBarcodeProduct(
   item: FoodItem | null,
-  formRef: RefObject<HTMLFormElement | null>,
+  draft: ReturnType<typeof useFoodItemDraft>,
 ) {
   const [productId, setProductId] = useState(item?.productId ?? null);
   const [barcode, setBarcode] = useState(item?.barcode ?? null);
@@ -22,8 +17,6 @@ export function useBarcodeProduct(
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [replace, setReplace] = useState<FoodProduct | null>(null);
-  const dirty = useRef(new Set<string>());
-  const automatic = useRef(new Map<string, string>());
   const request = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -49,33 +42,12 @@ export function useBarcodeProduct(
     request.current?.abort();
     request.current = null;
     setLoading(false);
-    setReplace(null);
   }
 
   function resetSearch(keepValues = false) {
     cancelLookup();
-    for (const [name, value] of automatic.current) {
-      const field = formRef.current?.elements.namedItem(name);
-      if (
-        field instanceof HTMLInputElement ||
-        field instanceof HTMLSelectElement
-      ) {
-        if (keepValues) {
-          dirty.current.add(name);
-        } else if (
-          !dirty.current.has(name) &&
-          field.value === value &&
-          !(
-            (name === "quantity" || name === "unit") &&
-            (dirty.current.has("quantity") || dirty.current.has("unit"))
-          )
-        ) {
-          field.value =
-            name === "quantity" ? "1" : name === "unit" ? "item" : "";
-        }
-      }
-    }
-    automatic.current.clear();
+    draft.resetSuggestions(keepValues);
+    setReplace(null);
     setProduct(null);
     setProductId(null);
     setBarcode(null);
@@ -83,36 +55,7 @@ export function useBarcodeProduct(
   }
 
   function apply(suggestion: FoodProduct, overwrite: boolean) {
-    const proposals = {
-      name: suggestion.name,
-      quantity: suggestion.packageQuantity?.toString(),
-      unit: suggestion.packageUnit ?? undefined,
-    };
-    let conflict = false;
-    for (const [name, value] of Object.entries(proposals)) {
-      if (!value) {
-        continue;
-      }
-      const field = formRef.current?.elements.namedItem(name);
-      if (!(
-        field instanceof HTMLInputElement || field instanceof HTMLSelectElement
-      )) {
-        continue;
-      }
-      const amountEdited =
-        (name === "quantity" || name === "unit") &&
-        (dirty.current.has("quantity") || dirty.current.has("unit"));
-      if (
-        overwrite ||
-        (!amountEdited &&
-          (!field.value.trim() || (!item && !dirty.current.has(name))))
-      ) {
-        field.value = value;
-        automatic.current.set(name, value);
-      } else if (field.value !== value) {
-        conflict = true;
-      }
-    }
+    const conflict = draft.applyProduct(suggestion, overwrite);
     setReplace(conflict && !overwrite ? suggestion : null);
   }
 
@@ -132,7 +75,7 @@ export function useBarcodeProduct(
     try {
       const result = await lookupBarcode(value, controller.signal);
       if (controller.signal.aborted) {
-        return;
+        return false;
       }
       setProduct(result.product);
       setProductId(result.product.id);
@@ -143,6 +86,7 @@ export function useBarcodeProduct(
           : "USDA match found. Review the suggested details before saving.",
       );
       apply(result.product, false);
+      return true;
     } catch (error) {
       if (!controller.signal.aborted) {
         setMessage(
@@ -153,20 +97,11 @@ export function useBarcodeProduct(
               : "Could not look up the barcode. Enter the item details manually.",
         );
       }
+      return false;
     } finally {
       if (!controller.signal.aborted) {
         setLoading(false);
       }
-    }
-  }
-
-  function onFormChange(event: ChangeEvent<HTMLFormElement>) {
-    const field = event.target;
-    if (
-      field instanceof HTMLInputElement ||
-      field instanceof HTMLSelectElement
-    ) {
-      dirty.current.add(field.name);
     }
   }
 
@@ -190,7 +125,6 @@ export function useBarcodeProduct(
     lookup,
     resetSearch,
     cancelLookup,
-    onFormChange,
     unlink,
     keepValues: () => {
       setReplace(null);
