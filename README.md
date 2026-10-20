@@ -140,7 +140,7 @@ Tailwind v4 semantic tokens in `web/src/styles/index.css` define page/surface ba
 
 Add item opens a blank form in the same reusable modal. Cancel discards the draft. The modal traps keyboard focus, supports Escape and backdrop dismissal, restores focus when closed, and prevents dismissal during a pending request. Failed saves preserve the entered values.
 
-Add item also offers optional **Scan or enter barcode**. Camera decoding stays on-device; typed barcode entry is always available. USDA FoodData Central is the sole lookup provider. Configure a free registered `USDA_API_KEY` in `api/.env` and restart the API. Review and edit matched product details before saving; missing or unavailable lookups allow manual completion. See [barcode setup and acceptance checks](docs/barcode-testing.md).
+Add item also offers optional **Input barcode instead**, with **Scan with camera** available below the barcode number field. Camera decoding stays on-device; typed barcode entry is always available. USDA FoodData Central is the sole lookup provider. Configure a free registered `USDA_API_KEY` in `api/.env` and restart the API. Review and edit matched product details before saving; missing or unavailable lookups allow manual completion. See [barcode setup and acceptance checks](docs/barcode-testing.md).
 
 Shared `FoodProduct` records cache USDA details separately from private pantry `FoodItem` values. Optional `productId` and `barcode` fields associate an entry with a product; an unmatched manual barcode has no product reference. Personal names, quantities, units, and expiration dates are preserved across product refreshes. Remove product link keeps these pantry values intact. Original provider payloads stay server-side; nutrition and product images are deferred.
 
