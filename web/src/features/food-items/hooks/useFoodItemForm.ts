@@ -1,15 +1,22 @@
 import { type CreateFoodItem, createFoodItemSchema } from "@sari/contracts";
 import { type SubmitEvent, useRef, useState } from "react";
 
-import { notify } from "@/components/Toast/notifications";
 import { useAccessDenied } from "@/hooks/useAccessDenied";
-import { getApiErrorMessage } from "@/utils/apiError";
+
+import type { FoodItemDraft } from "./useFoodItemDraft";
 
 interface FoodItemFormOptions {
   disabled: boolean;
   onSave: (values: CreateFoodItem) => Promise<void>;
+  values: FoodItemDraft;
+  linkage?: { productId: string | null; barcode: string | null };
 }
-export function useFoodItemForm({ disabled, onSave }: FoodItemFormOptions) {
+export function useFoodItemForm({
+  disabled,
+  onSave,
+  values,
+  linkage,
+}: FoodItemFormOptions) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const savingRef = useRef(false);
@@ -20,17 +27,27 @@ export function useFoodItemForm({ disabled, onSave }: FoodItemFormOptions) {
     if (savingRef.current || disabled) {
       return;
     }
-    const data = new FormData(event.currentTarget);
-    const expiration = data.get("expiresOn");
     const result = createFoodItemSchema.safeParse({
-      name: data.get("name"),
-      quantity: Number(data.get("quantity")),
-      unit: data.get("unit"),
-      expiresOn: expiration === "" ? null : expiration,
+      name: values.name,
+      quantity: Number(values.quantity),
+      unit: values.unit,
+      expiresOn: values.expiresOn || null,
+      ...(linkage ?? {}),
     });
     setError("");
     if (!result.success) {
-      setError(result.error.issues[0]?.message ?? "Check your food details.");
+      const field = result.error.issues[0]?.path[0];
+      setError(
+        field === "name"
+          ? "Enter a food name with 120 characters or fewer."
+          : field === "quantity"
+            ? "Enter a quantity greater than zero and no more than 1,000,000."
+            : field === "unit"
+              ? "Choose a unit."
+              : field === "expiresOn"
+                ? "Enter a valid expiration date."
+                : "Check the item details and try again.",
+      );
       return;
     }
     savingRef.current = true;
@@ -41,11 +58,10 @@ export function useFoodItemForm({ disabled, onSave }: FoodItemFormOptions) {
       if (handleAccessDenied(error)) {
         return;
       }
-      const message = getApiErrorMessage(
-        error,
-        "Could not reach your pantry. Check your connection and try again.",
-      );
-      notify("error", message, "pantry-save-error");
+      const message =
+        error instanceof TypeError
+          ? "Could not reach your pantry. Check your connection and try again."
+          : "Could not save this item. Try again.";
       setError(message);
     } finally {
       savingRef.current = false;

@@ -140,6 +140,12 @@ Tailwind v4 semantic tokens in `web/src/styles/index.css` define page/surface ba
 
 Add item opens a blank form in the same reusable modal. Cancel discards the draft. The modal traps keyboard focus, supports Escape and backdrop dismissal, restores focus when closed, and prevents dismissal during a pending request. Failed saves preserve the entered values.
 
+Add item also offers optional **Input barcode instead**, with **Scan with camera** available below the barcode number field. Camera decoding stays on-device; typed barcode entry is always available. USDA FoodData Central is the sole lookup provider. Configure a free registered `USDA_API_KEY` in `api/.env` and restart the API. Review and edit matched product details before saving; missing or unavailable lookups allow manual completion. See [barcode setup and acceptance checks](docs/barcode-testing.md).
+
+Shared `FoodProduct` records cache USDA details separately from private pantry `FoodItem` values. Optional `productId` and `barcode` fields associate an entry with a product; an unmatched manual barcode has no product reference. Personal names, quantities, units, and expiration dates are preserved across product refreshes. Remove product link keeps these pantry values intact. Original provider payloads stay server-side; nutrition and product images are deferred.
+
+Authenticated `GET /api/v1/food-products/barcode/:barcode` validates EAN-8/UPC-A/EAN-13/GTIN-14 check digits, verifies exact USDA matches, and returns `{ product, stale }`. `GET /api/v1/food-products/:id` returns source details for an existing link. Matches are rechecked after 30 days on next use; genuine misses last 24 hours, and transient failure cooldowns are separate. Concurrent requests reuse shared cache records. Pantry creation accepts an optional `Idempotency-Key` header so retries of the same save do not create duplicate entries; the frontend retains it for an unchanged draft after a failed save. Intentional repeated pantry entries remain allowed.
+
 Select rows to reveal Delete selected. The header checkbox selects only the currently loaded page. Changing the page, search, filter, or sort clears selection. Bulk deletion uses the existing item DELETE endpoint with at most ten concurrent requests. Successfully deleted rows are removed immediately after the batch completes; failed rows remain in the confirmation for retry. Already missing rows are treated as removed, and a retry never repeats successful deletions.
 
 `POST /api/v1/food-items` accepts a JSON object:
@@ -159,6 +165,8 @@ Select rows to reveal Delete selected. The header checkbox selects only the curr
 | `quantity`  | Positive number up to 1,000,000; defaults to `1`                                                               |
 | `unit`      | `item`, `g`, `kg`, `ml`, `l`, `oz`, `lb`, `fl oz`, `tsp`, `tbsp`, `cup`, `pt`, `qt`, `gal`; defaults to `item` |
 | `expiresOn` | Optional valid `YYYY-MM-DD` calendar date; defaults to `null`                                                  |
+| `productId` | Optional nullable product ID; the backend validates the referenced USDA product and barcode association        |
+| `barcode`   | Optional nullable validated retail barcode; stored in canonical GTIN-14 format, including leading zeros        |
 
 Non-metric volume units use US customary measures and are labeled as US in the form. `oz` means weight; `fl oz` means volume. Quantity and unit are stored as entered without automatic conversion.
 

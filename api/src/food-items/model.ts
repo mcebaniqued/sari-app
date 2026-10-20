@@ -13,6 +13,14 @@ const foodItemSchema = new Schema(
     },
     unit: { type: String, required: true, enum: foodUnitSchema.options },
     expiresOn: { type: String, default: null },
+    productId: {
+      type: Schema.Types.ObjectId,
+      ref: "FoodProduct",
+      default: null,
+    },
+    barcode: { type: String, default: null },
+    creationKey: { type: String, immutable: true, select: false },
+    creationFingerprint: { type: String, immutable: true, select: false },
   },
   {
     timestamps: true,
@@ -23,6 +31,13 @@ const foodItemSchema = new Schema(
 );
 
 foodItemSchema.index({ userId: 1, createdAt: -1, _id: -1 });
+foodItemSchema.index(
+  { userId: 1, creationKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { creationKey: { $type: "string" } },
+  },
+);
 foodItemSchema.index(
   { userId: 1, name: 1, _id: -1 },
   { collation: { locale: "en", strength: 2 } },

@@ -10,6 +10,7 @@ import { requireSession } from "./auth/requireSession.js";
 import { authRouter } from "./auth/routes.js";
 import { connectDatabase } from "./db.js";
 import { foodItemsRouter } from "./food-items/routes.js";
+import { foodProductsRouter } from "./food-products/routes.js";
 
 const app = express();
 app.disable("x-powered-by");
@@ -35,6 +36,7 @@ app.get(
 );
 
 app.use("/api/v1/food-items", requireSession, foodItemsRouter);
+app.use("/api/v1/food-products", requireSession, foodProductsRouter);
 
 app.use((_req, res: Response<ApiErrorResponse>) => {
   res

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { barcodeSchema } from "./barcodes.js";
+
 // Volume units outside the metric system use US customary measures.
 export const foodUnitSchema = z.enum([
   "item",
@@ -27,6 +29,12 @@ const foodItemFields = {
   unit: foodUnitSchema,
   // A package date is a calendar date, not a timestamp in a timezone.
   expiresOn: z.iso.date().nullable(),
+  productId: z
+    .string()
+    .regex(/^[a-f0-9]{24}$/)
+    .nullable()
+    .optional(),
+  barcode: barcodeSchema.nullable().optional(),
 };
 
 export const createFoodItemSchema = z.strictObject({

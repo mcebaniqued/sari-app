@@ -21,6 +21,14 @@ export {
   type UpdateFoodItem,
   updateFoodItemSchema,
 } from "./food-items.js";
+export {
+  type BarcodeLookup,
+  barcodeLookupSchema,
+  barcodeSchema,
+  type FoodProduct,
+  foodProductSchema,
+  normalizeBarcode,
+} from "./food-products.js";
 
 export const healthResponseSchema = z.object({
   status: z.literal("ok"),

@@ -18,6 +18,7 @@ export function usePantryItems() {
   const [deleteError, setDeleteError] = useState("");
   const [busy, setBusy] = useState(false);
   const mutationRef = useRef(false);
+  const createOperation = useRef<{ body: string; key: string } | null>(null);
   const handleAccessDenied = useAccessDenied();
 
   const startEdit = useCallback((item: FoodItem) => {
@@ -36,9 +37,13 @@ export function usePantryItems() {
     setBusy(true);
     const original = editor?.item;
     try {
+      const body = JSON.stringify(values);
+      if (!original && createOperation.current?.body !== body) {
+        createOperation.current = { body, key: crypto.randomUUID() };
+      }
       const saved = original
         ? await updateFoodItem(original.id, values)
-        : await createFoodItem(values);
+        : await createFoodItem(values, createOperation.current?.key);
       setRevision((value) => value + 1);
       notify(
         "success",
@@ -97,6 +102,7 @@ export function usePantryItems() {
   }
 
   const startAdd = useCallback(() => {
+    createOperation.current = null;
     setEditor({ item: null });
   }, []);
   const closeEditor = useCallback(() => {

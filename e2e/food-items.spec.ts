@@ -4,6 +4,7 @@ import {
   createFoodItemSchema,
   type FoodItem,
   foodItemQuerySchema,
+  type FoodProduct,
 } from "@sari/contracts";
 import type { AxeResults } from "axe-core";
 
@@ -38,6 +39,154 @@ const bananas: FoodItem = {
   unit: "item",
   expiresOn: null,
 };
+
+const usdaOats: FoodProduct = {
+  id: "412345678901234567890123",
+  barcode: "00012345678905",
+  name: "USDA oats",
+  brand: "Oat brand",
+  packageDescription: "500 g",
+  packageQuantity: 500,
+  packageUnit: "g",
+  provider: "usda",
+  externalId: "12345",
+  marketCountry: "United States",
+  sourceUrl: "https://fdc.nal.usda.gov/food-details/12345/nutrients",
+  sourceModifiedAt: null,
+  sourcePublishedAt: "2026-01-01",
+  checkedAt: "2026-10-20T00:00:00Z",
+};
+
+test("barcode suggestions are reviewed, privately renamed, saved, and unlinked", async ({
+  page,
+}) => {
+  await foodApi(page, []);
+  await page.route("**/api/v1/food-products/barcode/*", (route) =>
+    route.fulfill({ json: { product: usdaOats, stale: false } }),
+  );
+  await page.route(`**/api/v1/food-products/${usdaOats.id}`, (route) =>
+    route.fulfill({ json: usdaOats }),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Add item", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Add item", exact: true });
+  await expect(dialog.getByLabel(/^Food name/)).toBeFocused();
+  await dialog.getByRole("button", { name: "Input barcode instead" }).click();
+  await dialog.getByLabel("Barcode number").fill("012345678905");
+  await dialog.getByRole("button", { name: "Find item", exact: true }).click();
+  await expect(dialog.getByText("USDA oats", { exact: true })).toBeVisible();
+  await expect(dialog.getByLabel("Barcode number")).toHaveCount(0);
+  await expect(dialog.getByLabel(/^Quantity/)).toHaveValue("500");
+  await dialog.getByLabel(/^Food name/).fill("My breakfast oats");
+  await expect(dialog.getByText("USDA oats", { exact: true })).toBeVisible();
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  expect(accessibility.violations).toEqual([]);
+  await dialog.getByRole("button", { name: "Add item", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(nameCells(page)).toHaveText(["My breakfast oats"]);
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Edit My breakfast oats", exact: true })
+    .click();
+  const edit = page.getByRole("dialog", { name: "Edit item", exact: true });
+  await expect(edit.getByText("USDA oats", { exact: true })).toBeVisible();
+  await edit.getByRole("button", { name: "Remove product link" }).click();
+  await expect(edit.getByLabel(/^Food name/)).toHaveValue("My breakfast oats");
+  await expect(edit.getByLabel(/^Quantity/)).toHaveValue("500");
+  await edit.getByRole("button", { name: "Save changes" }).click();
+  await page
+    .getByRole("button", { name: "Edit My breakfast oats", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Remove product link" }),
+  ).toHaveCount(0);
+});
+
+test("barcode not found preserves manual entry and records no product link", async ({
+  page,
+}) => {
+  await foodApi(page, []);
+  await page.route("**/api/v1/food-products/barcode/*", (route) =>
+    route.fulfill({
+      status: 404,
+      json: {
+        error: {
+          code: "PRODUCT_NOT_FOUND",
+          message: "Product not found in USDA. Enter details manually.",
+        },
+      },
+    }),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Add item", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Add item", exact: true });
+  await dialog.getByRole("button", { name: "Input barcode instead" }).click();
+  await dialog.getByLabel("Barcode number").fill("012345678905");
+  await dialog.getByRole("button", { name: "Find item", exact: true }).click();
+  await expect(
+    dialog.getByText("Barcode not found. Enter the item details manually."),
+  ).toBeVisible();
+  await expect(dialog.getByText(/No USDA product linked/)).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Enter details manually" }).click();
+  await expect(dialog.getByLabel(/^Food name/)).toBeFocused();
+  await dialog.getByLabel(/^Food name/).fill("Local cereal");
+  await dialog.getByRole("button", { name: "Add item", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(nameCells(page)).toHaveText(["Local cereal"]);
+});
+
+test("barcode entry preserves drafts and fits a phone screen", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await foodApi(page, []);
+  await page.route("**/api/v1/food-products/barcode/*", (route) =>
+    route.fulfill({ json: { product: usdaOats, stale: false } }),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Add item", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Add item", exact: true });
+  await dialog.getByLabel(/^Food name/).fill("My breakfast");
+  await dialog.getByLabel(/Expiration date/).fill("2028-02-29");
+  await dialog.getByRole("button", { name: "Input barcode instead" }).click();
+  await expect(dialog.getByLabel("Barcode number")).toBeFocused();
+  await expect(dialog.getByLabel(/^Food name/)).toHaveCount(0);
+  await expect(
+    dialog.getByRole("button", { name: "Add item", exact: true }),
+  ).toHaveCount(0);
+  await dialog.getByLabel("Barcode number").fill("012345678905");
+  await page.screenshot({
+    path: testInfo.outputPath("barcode-phone.png"),
+    fullPage: true,
+  });
+  await expect(dialog).toHaveJSProperty(
+    "scrollWidth",
+    await dialog.evaluate((element) => element.clientWidth),
+  );
+  await dialog.getByRole("button", { name: "Enter details manually" }).click();
+  await expect(dialog.getByLabel(/^Food name/)).toHaveValue("My breakfast");
+  await expect(dialog.getByLabel(/Expiration date/)).toHaveValue("2028-02-29");
+  await dialog.getByRole("button", { name: "Input barcode instead" }).click();
+  await expect(dialog.getByLabel("Barcode number")).toHaveValue("012345678905");
+  await dialog.getByLabel("Barcode number").press("Enter");
+  await expect(dialog.getByText("USDA oats", { exact: true })).toBeVisible();
+  await expect(dialog.getByLabel(/^Food name/)).toHaveValue("My breakfast");
+  await expect(dialog.getByLabel(/^Quantity/)).toHaveValue("500");
+  await dialog.getByRole("button", { name: "Keep my entries" }).click();
+  await expect(dialog.getByText(/^Barcode:/)).toBeHidden();
+  await page.screenshot({
+    path: testInfo.outputPath("matched-product-phone.png"),
+    fullPage: true,
+  });
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  expect(accessibility.violations).toEqual([]);
+  await expect(dialog).toHaveJSProperty(
+    "scrollWidth",
+    await dialog.evaluate((element) => element.clientWidth),
+  );
+  await dialog.getByText("More product details", { exact: true }).click();
+  await expect(dialog.getByText(`Barcode: ${usdaOats.barcode}`)).toBeVisible();
+});
 
 async function foodApi(page: Page, initial: FoodItem[], failOnceId?: string) {
   let items = initial.map((item) => ({ ...item }));
