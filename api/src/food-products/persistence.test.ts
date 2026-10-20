@@ -18,6 +18,7 @@ import {
   FoodProductModel,
   UsdaBudgetModel,
 } from "./model.js";
+import { mapUsdaFood } from "./usda.js";
 
 const testUri = process.env.TEST_MONGODB_URI;
 const barcode = "00012345678905";
@@ -143,6 +144,62 @@ describe.skipIf(!testUri)("USDA lookup persistence", () => {
     expect(responses.map((r) => r.status)).toEqual([200, 200]);
     expect(fetcher).toHaveBeenCalledTimes(2);
     expect(await FoodProductModel.countDocuments()).toBe(1);
+  });
+  it("fills legacy cached dual-unit sizes without provider calls or changing pantry values", async () => {
+    const checkedAt = new Date("2026-01-01T00:00:00Z");
+    const refreshAfter = new Date(Date.now() + 86_400_000);
+    const legacyRaw = { ...raw, packageWeight: "296 mL / 10 fl oz" };
+    const product = await FoodProductModel.create({
+      ...mapUsdaFood(legacyRaw, barcode, checkedAt),
+      packageQuantity: null,
+      packageUnit: null,
+      providerRaw: legacyRaw,
+    });
+    await BarcodeLookupModel.create({
+      barcode,
+      productId: product._id,
+      checkedAt,
+      refreshAfter,
+    });
+    const saved = await agent.post("/api/v1/food-items").send({
+      name: "My sauce",
+      quantity: 296,
+      unit: "ml",
+      productId: product.id,
+      barcode,
+    });
+    expect(saved.status).toBe(201);
+    const fetcher = vi
+      .fn()
+      .mockRejectedValue(new Error("Provider must not be called"));
+    vi.stubGlobal("fetch", fetcher);
+    const result = await agent.get(`/api/v1/food-products/barcode/${barcode}`);
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({
+      stale: false,
+      product: {
+        packageQuantity: 10,
+        packageUnit: "fl oz",
+        checkedAt: checkedAt.toISOString(),
+      },
+    });
+    const details = await agent.get(`/api/v1/food-products/${product.id}`);
+    expect(details.status).toBe(200);
+    expect(details.body).toMatchObject({
+      packageQuantity: 10,
+      packageUnit: "fl oz",
+    });
+    expect(details.body).not.toHaveProperty("providerRaw");
+    expect(
+      (await BarcodeLookupModel.findOne({ barcode }).lean())?.refreshAfter,
+    ).toEqual(refreshAfter);
+    expect(
+      (await FoodProductModel.findById(product.id).lean())?.checkedAt,
+    ).toEqual(checkedAt);
+    expect(
+      await FoodItemModel.findOne({ name: "My sauce" }).lean(),
+    ).toMatchObject({ quantity: 296, unit: "ml" });
+    expect(fetcher).not.toHaveBeenCalled();
   });
   it("caches actual misses, but does not label provider outages not found", async () => {
     const fetcher = vi

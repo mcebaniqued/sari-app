@@ -65,12 +65,41 @@ describe("USDA mapping", () => {
     ).toMatchObject({ packageQuantity: 18, packageUnit: "oz" });
   });
   it.each([
+    ["10 fl oz/296 mL", 10, "fl oz"],
+    ["296 mL / 10 fl oz", 10, "fl oz"],
+    ["10 fl oz (296 mL)", 10, "fl oz"],
+    ["296 mL (10 fl oz)", 10, "fl oz"],
+    ["16 oz (454g)", 16, "oz"],
+    ["454 g / 16 ONZ", 16, "oz"],
+    ["1 kg / 2.2 lb", 2.2, "lb"],
+    ["1 fl oz / 30 mL", 1, "fl oz"],
+  ])(
+    "prefers the printed imperial size in %s",
+    (packageWeight, packageQuantity, packageUnit) => {
+      expect(mapUsdaFood({ ...food, packageWeight }, barcode)).toMatchObject({
+        packageQuantity,
+        packageUnit,
+      });
+    },
+  );
+  it("keeps metric-only sizes as printed until conversion preferences are supported", () => {
+    expect(
+      mapUsdaFood({ ...food, packageWeight: "296 mL" }, barcode),
+    ).toMatchObject({ packageQuantity: 296, packageUnit: "ml" });
+  });
+  it.each([
     undefined,
     "6 x 30 g",
-    "16 oz (454g)",
     "0 g",
     "3 cups",
     "16 fl. oz",
+    "10 fl oz/100 mL",
+    "20 fl oz/1 L",
+    "10 oz/296 mL",
+    "5 oz/6 oz",
+    "10 fl oz/0 mL",
+    "6 x 10 fl oz/1776 mL",
+    "10 fl oz/296 mL/another size",
   ])("does not guess package size from %s", (packageWeight) => {
     expect(mapUsdaFood({ ...food, packageWeight }, barcode)).toMatchObject({
       packageQuantity: null,
