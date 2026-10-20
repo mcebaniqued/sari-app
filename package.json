@@ -30,6 +30,7 @@
     "test:coverage": "npm run test:coverage --workspaces --if-present",
     "pretest:e2e": "npm run contracts:build",
     "test:e2e": "playwright test",
+    "test:integration": "node scripts/test-integration.mjs",
     "knip": "knip",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run knip && npm run test && npm run build",
     "prepare": "husky"
