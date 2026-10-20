@@ -30,6 +30,12 @@ export default function CameraScanner({ onDetected, onType }: Props) {
     };
     async function start() {
       try {
+        if (!globalThis.isSecureContext) {
+          setError(
+            "Camera scanning needs a secure connection. You can enter the barcode number instead.",
+          );
+          return;
+        }
         const media = (navigator as { mediaDevices?: MediaDevices })
           .mediaDevices;
         if (!media || !video) {
@@ -87,11 +93,15 @@ export default function CameraScanner({ onDetected, onType }: Props) {
         if (controller.signal.aborted || accepted) {
           stop();
         }
-      } catch {
+      } catch (error) {
         stop();
         if (!controller.signal.aborted) {
           setError(
-            "Camera access is unavailable. Check permission or enter the barcode number manually.",
+            error instanceof DOMException && error.name === "NotAllowedError"
+              ? "Allow camera access in your browser settings, or enter the barcode number instead."
+              : error instanceof DOMException && error.name === "NotFoundError"
+                ? "No camera was found. Enter the barcode number instead."
+                : "Camera scanning isn't available here. Enter the barcode number instead.",
           );
         }
       }
@@ -123,14 +133,16 @@ export default function CameraScanner({ onDetected, onType }: Props) {
       )}
       <p role="status" className="text-sm text-content-muted">
         {error ||
-          (guidance
-            ? "Having trouble? Improve the lighting, move the barcode into focus, or enter the number manually."
-            : "Place one barcode inside the frame. Camera images stay on your device.")}
+          (guidance === 2
+            ? "Still no scan? You can enter the barcode number instead."
+            : guidance === 1
+              ? "Try brighter light and hold the package steady."
+              : "Place one barcode inside the frame. Camera images stay on your device.")}
       </p>
       <button
         type="button"
         onClick={onType}
-        className={`rounded-control border border-border-default px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-brand ${guidance === 2 || error ? "bg-brand text-content-inverse" : "bg-surface text-content"}`}
+        className={`min-h-11 rounded-control px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-brand ${guidance === 2 || error ? "bg-brand text-content-inverse" : "text-brand hover:bg-surface-hover"}`}
       >
         Enter barcode manually
       </button>
@@ -140,7 +152,7 @@ export default function CameraScanner({ onDetected, onType }: Props) {
           onClick={() => {
             setGuidance(0);
           }}
-          className="ml-2 text-sm text-brand"
+          className="ml-2 min-h-11 rounded-control px-3 py-2 text-sm text-brand hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-brand"
         >
           Keep scanning
         </button>
