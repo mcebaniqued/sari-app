@@ -1,5 +1,18 @@
 import { z } from "zod";
 
+export { type FoodItemQuery, foodItemQuerySchema } from "./food-item-query.js";
+export {
+  type CreateFoodItem,
+  createFoodItemSchema,
+  type FoodItem,
+  foodItemIdSchema,
+  foodItemListSchema,
+  foodItemSchema,
+  foodUnitSchema,
+  type UpdateFoodItem,
+  updateFoodItemSchema,
+} from "./food-items.js";
+
 export const healthResponseSchema = z.object({
   status: z.literal("ok"),
 });

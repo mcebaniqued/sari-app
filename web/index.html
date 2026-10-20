@@ -10,7 +10,9 @@
     />
     <title>Sari — Your kitchen, a little clearer</title>
   </head>
-  <body>
+  <body
+    class="[&_:is(a[href],button,input,select,textarea,summary,label[for],[role=button],[role=link],[role=combobox],[role=checkbox],[role=radio],[role=tab],[role=option],[role=menuitem],[role=switch]):not(:disabled,[aria-disabled=true])]:cursor-pointer [&_:is(:disabled,[aria-disabled=true],[inert])]:cursor-not-allowed! [&_:is([aria-disabled=true],[inert])_*]:cursor-not-allowed!"
+  >
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

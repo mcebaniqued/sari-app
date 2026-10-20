@@ -6,8 +6,9 @@ test("frontend loads and its same-origin proxy reaches the API", async ({
 }) => {
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: /your kitchen, a little clearer/i }),
+    page.getByRole("heading", { name: "My Pantry", exact: true }),
   ).toBeVisible();
+  await expect(page).toHaveURL(/\/pantry$/);
 
   const response = await request.get("/api/v1/health");
   expect(response.status()).toBe(200);
@@ -21,8 +22,8 @@ test("a direct visit to an unknown SPA route can navigate home", async ({
   await expect(
     page.getByRole("heading", { name: "Page not found" }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Back to Sari" }).click();
+  await page.getByRole("link", { name: "Back to pantry" }).click();
   await expect(
-    page.getByRole("heading", { name: /your kitchen, a little clearer/i }),
+    page.getByRole("heading", { name: "My Pantry", exact: true }),
   ).toBeVisible();
 });
