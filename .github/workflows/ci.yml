@@ -14,7 +14,9 @@ concurrency:
 
 jobs:
   validate:
-    runs-on: ubuntu-24.04
+    # MongoDB 8.0 rejects the newer hosted kernel (SERVER-125742).
+    # Revisit this pin when mongo:8.0 includes the kernel compatibility fix.
+    runs-on: ubuntu-22.04
     services:
       mongodb:
         image: mongo:8.0
