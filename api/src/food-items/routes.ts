@@ -72,7 +72,10 @@ foodItemsRouter.post("/", async (req, res) => {
   if (!(await databaseAvailable(res))) {
     return;
   }
-  const document = await FoodItemModel.create(result.data);
+  const document = await FoodItemModel.create({
+    ...result.data,
+    userId: res.locals.userId,
+  });
   res.status(201).json(toDto(document));
 });
 
@@ -91,7 +94,8 @@ foodItemsRouter.get("/", async (req, res) => {
     return;
   }
   const { start, limit } = result.data;
-  const { filter, sort } = foodMongoQuery(result.data);
+  const { filter: queryFilter, sort } = foodMongoQuery(result.data);
+  const filter = { ...queryFilter, userId: res.locals.userId };
   const [documents, total] = await Promise.all([
     FoodItemModel.find(filter)
       .collation({ locale: "en", strength: 2 })
@@ -108,7 +112,10 @@ foodItemsRouter.get("/:id", async (req, res) => {
   if (!(await databaseAvailable(res))) {
     return;
   }
-  const document = await FoodItemModel.findById(req.params.id);
+  const document = await FoodItemModel.findOne({
+    _id: req.params.id,
+    userId: res.locals.userId,
+  });
   if (!document) {
     itemNotFound(res);
     return;
@@ -130,8 +137,8 @@ foodItemsRouter.patch("/:id", async (req, res) => {
   if (!(await databaseAvailable(res))) {
     return;
   }
-  const document = await FoodItemModel.findByIdAndUpdate(
-    req.params.id,
+  const document = await FoodItemModel.findOneAndUpdate(
+    { _id: req.params.id, userId: res.locals.userId },
     { $set: result.data },
     { returnDocument: "after", runValidators: true },
   );
@@ -146,7 +153,10 @@ foodItemsRouter.delete("/:id", async (req, res) => {
   if (!(await databaseAvailable(res))) {
     return;
   }
-  const document = await FoodItemModel.findByIdAndDelete(req.params.id);
+  const document = await FoodItemModel.findOneAndDelete({
+    _id: req.params.id,
+    userId: res.locals.userId,
+  });
   if (!document) {
     itemNotFound(res);
     return;

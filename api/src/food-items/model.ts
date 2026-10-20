@@ -3,6 +3,7 @@ import { model, Schema } from "mongoose";
 
 const foodItemSchema = new Schema(
   {
+    userId: { type: String, required: true, immutable: true },
     name: { type: String, required: true, trim: true, maxlength: 120 },
     quantity: {
       type: Number,
@@ -21,9 +22,9 @@ const foodItemSchema = new Schema(
   },
 );
 
-foodItemSchema.index({ createdAt: -1, _id: -1 });
+foodItemSchema.index({ userId: 1, createdAt: -1, _id: -1 });
 foodItemSchema.index(
-  { name: 1, _id: -1 },
+  { userId: 1, name: 1, _id: -1 },
   { collation: { locale: "en", strength: 2 } },
 );
 

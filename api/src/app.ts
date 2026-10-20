@@ -6,11 +6,14 @@ import type {
 } from "@sari/contracts";
 import express, { type ErrorRequestHandler, type Response } from "express";
 
+import { requireSession } from "./auth/requireSession.js";
+import { authRouter } from "./auth/routes.js";
 import { connectDatabase } from "./db.js";
 import { foodItemsRouter } from "./food-items/routes.js";
 
 const app = express();
 app.disable("x-powered-by");
+app.use("/api/v1/auth", authRouter);
 app.use(express.json({ limit: "16kb" }));
 
 // Liveness is independent of database availability.
@@ -31,7 +34,7 @@ app.get(
   },
 );
 
-app.use("/api/v1/food-items", foodItemsRouter);
+app.use("/api/v1/food-items", requireSession, foodItemsRouter);
 
 app.use((_req, res: Response<ApiErrorResponse>) => {
   res
