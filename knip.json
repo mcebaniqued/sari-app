@@ -1,7 +1,9 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
-    ".": {},
+    ".": {
+      "entry": ["scripts/verify-atlas-restore.mjs"]
+    },
     "packages/contracts": {
       "project": ["src/**/*.ts"]
     },

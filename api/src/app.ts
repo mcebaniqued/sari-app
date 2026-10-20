@@ -14,6 +14,27 @@ import { foodProductsRouter } from "./food-products/routes.js";
 
 const app = express();
 app.disable("x-powered-by");
+// Freeze reads and writes before authentication or database work during a migration.
+app.use((req, res, next) => {
+  if (
+    process.env.MAINTENANCE_MODE !== "true" ||
+    req.path === "/api/v1/health"
+  ) {
+    next();
+    return;
+  }
+  res.set({ "Cache-Control": "no-store", "Retry-After": "60" });
+  if (req.path === "/api/v1/ready") {
+    res.status(503).json({ status: "not_ready" } satisfies NotReadyResponse);
+    return;
+  }
+  res.status(503).json({
+    error: {
+      code: "MAINTENANCE",
+      message: "Sari is undergoing maintenance. Please try again shortly.",
+    },
+  } satisfies ApiErrorResponse);
+});
 app.use("/api/v1/auth", authRouter);
 app.use(express.json({ limit: "16kb" }));
 
