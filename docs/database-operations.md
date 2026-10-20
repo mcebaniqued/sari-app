@@ -22,13 +22,13 @@ Export the frozen database to a protected archive, restore into a new database u
 
 ## Preview deployments
 
-The stable preview frontend is `https://sari-web-preview.vercel.app`, backed by `https://sari-api-preview.vercel.app`. The preview API uses a separate authentication secret and sets `BETTER_AUTH_URL` to the preview frontend origin. Preview accounts, sessions, pantry entries, and product caches stay in the existing `sari_preview` database. The Git branch, Vercel project suffixes, and database environment name all use **preview**; no database migration is needed.
+The stable preview frontend is `https://sari-web-preview.vercel.app`, backed by `https://sari-api-preview.vercel.app`. The preview API uses a separate authentication secret and sets `BETTER_AUTH_URL` to the preview frontend origin. Preview accounts, sessions, pantry entries, and product caches stay in the existing `sari_preview` database. The Git branch is `staging`; Vercel project suffixes and the database environment name remain **preview**.
 
 `web/vercel.mjs` selects the API origin at configuration time. Production defaults to `https://sari-api.vercel.app`. The `sari-web-preview` Production and Preview environments set `SARI_API_ORIGIN=https://sari-api-preview.vercel.app`; the original `sari-web` Preview environment retains the same setting. A preview build fails if the origin is missing or explicitly points to the production API. Keep this value server-side; browsers continue using `/api/v1`. Environment-dependent rewrites are constructed outside the exported config object so Git preflight leaves them to the build-time compiler rather than partially extracting an invalid rewrite.
 
-Use the stable preview URL for account flows. Arbitrary branch/deployment URLs are not automatically trusted authentication origins. Add an exact origin to the preview API's `AUTH_TRUSTED_ORIGINS` only when that URL needs its own account flow; do not add preview origins to production. Pushes to `preview` automatically deploy both projects. The preview API project's Production branch is `preview`; the preview frontend's `preview` Preview branch owns its stable domain. Both projects skip builds for other branches. Wait for both deployments and CI to pass before testing. API/frontend rollout is independent, so contract changes must remain compatible during deployment.
+Use the stable preview URL for account flows. Arbitrary branch/deployment URLs are not automatically trusted authentication origins. Add an exact origin to the preview API's `AUTH_TRUSTED_ORIGINS` only when that URL needs its own account flow; do not add preview origins to production. Pushes to `staging` automatically deploy both projects. The preview API project's Production branch is `staging`; the preview frontend's `staging` Preview branch owns its stable domain. Both projects skip builds for other branches. Wait for both deployments and CI to pass before testing. API/frontend rollout is independent, so contract changes must remain compatible during deployment.
 
-Manual fallback from the repository root, after checking out the intended preview revision:
+Manual fallback from the repository root, after checking out the intended `staging` revision:
 
 ```powershell
 npx vercel deploy . --project sari-api-preview --scope miguels-projects-51fb4258 --prod
