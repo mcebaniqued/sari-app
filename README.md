@@ -68,10 +68,10 @@ Create `api/.env` with your local configuration. For a local MongoDB server:
 
 ```dotenv
 PORT=3001
-MONGODB_URI=mongodb://127.0.0.1:27017/sari_mvp1
+MONGODB_URI=mongodb://127.0.0.1:27017/sari_dev
 ```
 
-Set `MONGODB_URI` in that file. Use a fresh database such as `sari_mvp1`, either in Atlas or on a local MongoDB server. For Atlas, resume the cluster, configure a database user and network access, and use its driver connection string with `/sari_mvp1` as the database name. URL-encode any special characters in credentials.
+Set `MONGODB_URI` in that file. Use a development database such as `sari_dev`, either in Atlas or on a local MongoDB server. For Atlas, resume the cluster, configure a database user and network access, and use its driver connection string with `/sari_dev` as the database name. URL-encode any special characters in credentials.
 
 Restart the API after changing its environment file, then request `/api/v1/ready`. A 200 response with `{"status":"ready"}` confirms a working connection. No collections or food records are created by these infrastructure endpoints.
 
@@ -219,7 +219,7 @@ The root `.vercelignore` excludes local environment files and test artifacts fro
 
 `web/vercel.mjs` routes API requests **before** the SPA fallback. Production defaults to `https://sari-api.vercel.app`. Preview builds require `SARI_API_ORIGIN=https://sari-api-preview.vercel.app` and fail if it is missing or explicitly points to the production API.
 
-Production, local development, and previews use separate databases and users: `sari_mvp1`, `sari_dev`, and `sari_preview`. The stable protected preview is `https://sari-web-preview.vercel.app`. See [database operations](docs/database-operations.md) for credential boundaries, preview deployment commands, and the verified backup/restore workflow.
+Production, local development, and previews use separate databases and users: `sari_prod`, `sari_dev`, and `sari_preview`. The stable protected preview is `https://sari-web-preview.vercel.app`. See [database operations](docs/database-operations.md) for credential boundaries, preview deployment commands, and the verified backup/restore workflow.
 
 Keep `VITE_API_BASE_URL=/api/v1` so browser requests remain same-origin. Set the API project's production `BETTER_AUTH_URL` to `https://sari-web.vercel.app`, use a dedicated production `BETTER_AUTH_SECRET`, and configure `MONGODB_URI` and optional `USDA_API_KEY` as backend secrets. Do not give preview deployments production database credentials.
 

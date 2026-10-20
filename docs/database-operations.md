@@ -4,7 +4,7 @@ The Atlas project is **Sari App**, cluster `sariapp-dev`. The cluster name is hi
 
 | Environment       | Database       | Application user | Configuration                                       |
 | ----------------- | -------------- | ---------------- | --------------------------------------------------- |
-| Production        | `sari_mvp1`    | `sari_prod`      | `sari-api`, Production secrets                      |
+| Production        | `sari_prod`    | `sari_prod`      | `sari-api`, Production secrets                      |
 | Local development | `sari_dev`     | `sari_dev`       | Ignored `api/.env`                                  |
 | Preview           | `sari_preview` | `sari_preview`   | `sari-api-preview`, plus `sari-api` Preview secrets |
 
@@ -12,7 +12,13 @@ Each application user has `readWrite` access only to its own database, restricte
 
 The old `sariapp_dev`, `sariapp_vercel`, and `sari_vercel_prod` database users have been revoked. Historical API deployments can still contain their old connection secrets. If a rollback is needed, redeploy the desired source revision using current Production environment variables rather than promoting a historical deployment that used a revoked account.
 
-The retired `sariapp_dev` database contained `users` and `pantryentries` and has been removed. The abandoned empty `sari_mvp1_test` database has also been removed; automated integration tests use their own disposable MongoDB and do not need Atlas.
+The retired `sariapp_dev` database contained `users` and `pantryentries` and has been removed. The abandoned empty `sari_mvp1_test` database has also been removed; automated integration tests use their own disposable MongoDB and do not need Atlas. Production was migrated from the historical `sari_mvp1` name to `sari_prod`, preserving documents, BSON types, collection options, and indexes. The former database was removed after live verification and a verified backup of `sari_prod`; a protected migration archive remains available locally for recovery.
+
+## Controlled database migrations
+
+Set `MAINTENANCE_MODE=true` in the production API project and deploy the current source before copying production. Confirm both the direct API and frontend proxy return `503` for authenticated routes and mutations, then allow in-flight requests to finish. Liveness remains available; readiness returns `503`. The guard runs before authentication and database access and sends `Cache-Control: no-store` and `Retry-After: 60`.
+
+Export the frozen database to a protected archive, restore into a new database using temporary scoped credentials, and compare every document, BSON type, collection option, and index. Update the production database user's scope and the API's Secret `MONGODB_URI`, preserving `BETTER_AUTH_SECRET`. Set `MAINTENANCE_MODE=false`, redeploy, and verify readiness, authentication, and persisted pantry writes before deleting the former database. Update the backup account and protected connection, run a verified backup of the new database, and revoke temporary migration credentials. Retain the source archive and checksum for recovery.
 
 ## Preview deployments
 
@@ -38,7 +44,7 @@ Preview barcode lookups require a separate `USDA_API_KEY` in the preview API pro
 
 Native backups are currently off, and the Atlas console does not offer them on this shared-tier cluster. The local workflow uses MongoDB's official `mongodump` and `mongorestore`, preserving BSON types, collection metadata, and indexes. It does not copy production data into development or preview.
 
-The `sari_backup` user can read `sari_mvp1` and read/write only the disposable `sari_restore_verify` database. It cannot modify production. Its connection is stored as a Windows-protected SecureString in `.backups/backup-connection.xml`, usable only by the Windows user who created it. The `.backups` folder has restricted Windows permissions and is excluded from Git and Vercel uploads.
+The `sari_backup` user can read `sari_prod` and read/write only the disposable `sari_restore_verify` database. It cannot modify production. Its connection is stored as a Windows-protected SecureString in `.backups/backup-connection.xml`, usable only by the Windows user who created it. The `.backups` folder has restricted Windows permissions and is excluded from Git and Vercel uploads.
 
 MongoDB Database Tools 100.19.1 are installed locally under `.backups/tools`. To reinstall, download the Windows x86-64 ZIP from MongoDB's official Database Tools download page. The verified ZIP SHA-256 is `527738a0f9ab2d80ea40cb8fc7a68f8e28664a2fd4e3b63626c2d4629aeb7f37`.
 
