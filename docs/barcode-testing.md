@@ -14,18 +14,20 @@ For phone camera testing, serve the frontend over HTTPS with an allowed auth ori
 
 ## Manual acceptance checks
 
-- Open Add item: food name is focused; no camera permission is requested. Save a normal manual entry.
-- Choose Scan or enter barcode. Type `016000275287`, then Look up barcode. A live USDA smoke check identified this as Cheerios Cereal with an `18 ONZ` package, mapped to `18 oz`; provider data can change.
-- Check name, brand, package description, USDA source, and editable suggestions. Saving requires Add item; expiration remains manual.
-- Enter a custom name before lookup, or while a lookup is pending. Confirm it survives. Try Keep my entries and explicit Replace entered fields.
-- Change the barcode while a request is pending; the old result must not fill the form. Try invalid input, a valid unmatched grocery barcode, offline lookup, and missing provider configuration. Complete an unmatched item manually.
-- Change package quantity to the amount you actually have. A serving is never used as the package quantity. Ambiguous package descriptions remain manual with the initial `1 item` fallback.
-- Rename a linked item, save, reload, and edit it. Its personal name remains separate from Linked product. Remove product link, save, and reload; name/amount/unit/expiration remain intact.
+- Open Add item: Manual entry is selected and food name is focused. Barcode fields and camera permission are absent. Save a normal manual entry.
+- Choose Barcode. Only barcode entry is shown; Add item is absent. A small guide highlights every printed digit. Switch back and forth: name, quantity, unit, expiration, and typed barcode must survive.
+- Type `016000275287`, then Find item (or press Enter). A match returns directly to the prefilled manual form with Item found; it never saves automatically. A live USDA smoke check identified this as Cheerios Cereal with an `18 ONZ` package, mapped to `18 oz`; provider data can change.
+- Review name, brand, listed size, and editable suggestions. Expand More product details for the package label, barcode, USDA source link, and last-checked date. Saving requires Add item; expiration remains manual.
+- Enter a custom name or amount before lookup. Confirm it survives and quantity/unit stay together. Try Keep my entries and explicit Replace entered fields. Expiration is never filled from product data.
+- Change the barcode while a request is pending, or switch to Manual entry and type something new: the old result must not fill the form or switch views. Try invalid input, an unmatched barcode, offline lookup, and missing provider configuration. Each failure has one plain message and Enter details manually; that action returns focus to food name and preserves the draft.
+- Change quantity to the amount you actually have. A serving is never used as the package quantity. Ambiguous package descriptions remain manual with the initial `1 item` fallback. A provider's listed size may describe one container in a multipack; verify the amount yourself. Multipack totals need separate work in #26 (see TODO.md).
+- Rename a linked item, save, reload, and edit it. Its personal name stays separate from the matched product. Remove product link, save, and reload; name/amount/unit/expiration remain intact. Editing does not introduce the Add item entry-method switch.
 - Add the same product deliberately a second time with a different expiration. Both entries are allowed. Repeated clicks or a retry of the same failed save must not create accidental duplicates.
 - Use two accounts: the same shared product can have different private names and quantities. Neither account can see or change the other's pantry data.
-- Choose Use camera: verify permission handling, readable UPC-A/EAN-13/EAN-8/GTIN-14 codes, positioning, rear-camera preference where available, and a single accepted detection.
+- Choose the Scan with camera ghost button at the bottom of barcode entry: the number field is replaced by the scanner. Verify permission handling, readable UPC-A/EAN-13/EAN-8/GTIN-14 codes, positioning, rear-camera preference where available, and a single accepted detection. After a match the camera stops and the editable manual form is shown.
 - Leave scanning unsuccessful for about 10 seconds, then 25 seconds. Guidance should suggest typing, with Keep scanning still available.
-- Deny camera permission, switch to typing, close the barcode panel, cancel the form, save, and navigate away. Camera tracks must stop; delayed permissions/detections must not reopen or alter a closed form.
+- Deny camera permission, use an insecure phone connection, and try a device without a camera: each should explain its own problem and offer typed barcode entry. HTTP LAN access cannot trigger a permission prompt; use trusted HTTPS for a real phone camera test.
+- Switch to typing or Manual entry, cancel the modal, or navigate away during scanning. Camera tracks must stop; delayed permissions/detections must not reopen or alter a closed form. Enter barcode manually returns focus to the number field.
 - Check phone layout and keyboard navigation. The decoded number is sent for lookup; camera images remain on the device.
 
 UPC-E, store-specific variable-weight labels, GS1 application-identifier parsing, multipack arithmetic, and automatic mass/volume conversions are not supported in this iteration.
@@ -44,4 +46,8 @@ The API validates exact barcode matches, handles historical/ambiguous USDA recor
 - `npm run test:integration`: disposable MongoDB API/persistence tests plus Playwright. Never uses personal database credentials.
 - Provider fixtures cover matching, missing and ambiguous data, cache lifecycle, ownership, and idempotent saves. Browser fixtures cover typed lookup/review/save/unlink and manual fallback. Camera lifecycle tests use controlled streams; real-device camera decoding still needs the manual checks above.
 
-Verification on this branch passed `npm run check`, all 113 API tests with disposable MongoDB, 78 frontend tests, and all 29 Playwright scenarios with four workers. An initial default eight-worker run had three auth failures caused by loss of connectivity to its test API; the follow-up investigation is recorded in `TODO.md`. A separate live public-demo-key smoke check resolved Cheerios to `18 oz`, persisted one shared product in disposable MongoDB, and served the second lookup without additional provider calls. No personal database or credentials were used for these checks.
+The current modal adds component coverage for mutually exclusive views, preserved drafts, explicit replacement, late lookup cancellation, singular failure prompts, and save retries. Camera tests cover permission denial, insecure connections, missing hardware, elapsed guidance, and stream cleanup. Browser coverage checks lookup/review/save/unlink, manual fallback, keyboard focus, accessibility, and a 390 px phone layout. Real-device camera decoding still needs manual verification.
+
+Verification for this modal update passed `npm run check` and `npm run test:integration`: all 113 API tests with disposable MongoDB, 87 frontend tests, and all 30 Playwright scenarios at the default eight workers. The full check required local-network access for API test servers. No personal database was used. The existing production bundle-size warning remains tracked separately in `TODO.md`.
+
+The earlier default eight-worker integration run intermittently lost connectivity to its test API; the follow-up investigation is recorded in `TODO.md`. UPC `049000042559` and EAN `0049000042559` normalize to the same identity and produced no USDA search result during a direct check. UPC `049000042849` resolved to record 2596995 (stored by USDA as EAN `0049000042849`). Not found is a coverage outcome, not an invalid-barcode error. Provider coverage can change.
