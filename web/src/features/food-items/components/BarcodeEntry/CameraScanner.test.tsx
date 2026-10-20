@@ -110,11 +110,40 @@ describe("camera scanning lifecycle", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(15_000);
     });
+    expect(screen.getByRole("button", { name: "Type barcode" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Keep scanning" }));
     expect(
-      screen.getByRole("button", { name: "Keep scanning" }),
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: "Keep scanning" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Enter barcode manually" }),
+    ).toBeEnabled();
+    expect(decode).toHaveBeenCalledOnce();
+    expect(trackStop).not.toHaveBeenCalled();
     view.unmount();
     expect(trackStop).toHaveBeenCalled();
+  });
+  it("lets the user choose typed entry after a slow scan", async () => {
+    vi.useFakeTimers();
+    camera();
+    const onType = vi.fn();
+    const onDetected = vi.fn();
+    render(<CameraScanner onDetected={onDetected} onType={onType} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(
+      screen.getByRole("button", { name: "Enter barcode manually" }),
+    ).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "Keep scanning" }),
+    ).not.toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(25_000);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Type barcode" }));
+    expect(onType).toHaveBeenCalledOnce();
+    expect(onDetected).not.toHaveBeenCalled();
   });
   it("explains insecure connections without requesting camera permission", async () => {
     const { getUserMedia } = camera();
@@ -125,6 +154,9 @@ describe("camera scanning lifecycle", () => {
     ).toBeInTheDocument();
     expect(getUserMedia).not.toHaveBeenCalled();
     expect(decode).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("button", { name: "Keep scanning" }),
+    ).not.toBeInTheDocument();
   });
   it("offers typed entry when the device has no camera", async () => {
     const { getUserMedia } = camera();
