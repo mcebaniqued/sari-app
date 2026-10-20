@@ -10,6 +10,7 @@ export default function CameraScanner({ onDetected, onType }: Props) {
   const [guidance, setGuidance] = useState(0);
   const [error, setError] = useState("");
   const detected = useEffectEvent(onDetected);
+  const slowScan = guidance === 2 && !error;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -139,24 +140,26 @@ export default function CameraScanner({ onDetected, onType }: Props) {
               ? "Try brighter light and hold the package steady."
               : "Place one barcode inside the frame. Camera images stay on your device.")}
       </p>
-      <button
-        type="button"
-        onClick={onType}
-        className={`inline-flex min-h-11 w-full items-center justify-center rounded-control px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-brand ${guidance === 2 || error ? "bg-brand text-content-inverse" : "text-brand hover:bg-surface-hover"}`}
-      >
-        Enter barcode manually
-      </button>
-      {guidance === 2 && !error && (
+      <div className={`grid gap-3 ${slowScan ? "grid-cols-2" : "grid-cols-1"}`}>
         <button
           type="button"
-          onClick={() => {
-            setGuidance(0);
-          }}
-          className="ml-2 min-h-11 rounded-control px-3 py-2 text-sm text-brand hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-brand"
+          onClick={onType}
+          className={`inline-flex min-h-11 w-full items-center justify-center rounded-control px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-brand ${slowScan || error ? "bg-brand text-content-inverse" : "text-brand hover:bg-surface-hover"}`}
         >
-          Keep scanning
+          {slowScan ? "Type barcode" : "Enter barcode manually"}
         </button>
-      )}
+        {slowScan && (
+          <button
+            type="button"
+            onClick={() => {
+              setGuidance(0);
+            }}
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-control px-3 py-2 text-sm text-brand hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-brand"
+          >
+            Keep scanning
+          </button>
+        )}
+      </div>
     </div>
   );
 }
