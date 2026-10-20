@@ -1,18 +1,13 @@
-import {
-  type CreateFoodItem,
-  type FoodItem,
-  foodUnitSchema,
-} from "@sari/contracts";
+import type { CreateFoodItem, FoodItem } from "@sari/contracts";
+import { useEffect, useRef, useState } from "react";
 import { LuCheck, LuPlus } from "react-icons/lu";
-
-import Input from "@/components/Input/Input";
 
 import { useBarcodeProduct } from "../../hooks/useBarcodeProduct";
 import { useFoodItemDraft } from "../../hooks/useFoodItemDraft";
 import { useFoodItemForm } from "../../hooks/useFoodItemForm";
-import { foodUnitLabels } from "../../utils/foodUnits";
 import BarcodeEntry from "../BarcodeEntry/BarcodeEntry";
 import ProductReview from "../BarcodeEntry/ProductReview";
+import FoodItemFields from "./FoodItemFields";
 
 interface FoodItemFormProps {
   item: FoodItem | null;
@@ -27,6 +22,9 @@ export default function FoodItemForm({
   onSave,
   onCancel,
 }: FoodItemFormProps) {
+  const [mode, setMode] = useState<"manual" | "barcode">("manual");
+  const [barcodeValue, setBarcodeValue] = useState("");
+  const entryRef = useRef<HTMLDivElement>(null);
   const draft = useFoodItemDraft(item);
   const barcode = useBarcodeProduct(item, draft);
   const linked =
@@ -41,173 +39,120 @@ export default function FoodItemForm({
       ? { linkage: { productId: barcode.productId, barcode: barcode.barcode } }
       : {}),
   });
+
+  useEffect(() => {
+    entryRef.current
+      ?.querySelector<HTMLInputElement>("[data-autofocus]")
+      ?.focus();
+  }, [mode]);
+
+  function switchMode(next: "manual" | "barcode") {
+    barcode.cancelLookup();
+    setMode(next);
+  }
+
   return (
-    <form
-      onSubmit={(event) => {
-        barcode.cancelLookup();
-        void handleSubmit(event);
-      }}
-      aria-busy={saving}
-    >
-      <fieldset disabled={disabled || saving} className="space-y-5 px-6 py-6">
-        <div>
-          <label htmlFor="food-name" className="mb-2 block text-sm font-medium">
-            Food name <span className="text-brand">*</span>
-          </label>
-          <Input
-            data-autofocus
-            id="food-name"
-            name="name"
-            required
-            maxLength={120}
-            value={draft.values.name}
-            onChange={(event) => {
-              draft.edit("name", event.target.value);
-            }}
-            placeholder="e.g. Eggs, rice, or milk"
-          />
-        </div>
-        {!item &&
-          !saving &&
-          !disabled &&
-          (barcode.open ? (
-            <BarcodeEntry
-              loading={barcode.loading}
-              onLookup={(value) => {
-                void barcode.lookup(value);
-              }}
-              onChange={barcode.resetSearch}
-              onCamera={barcode.cancelLookup}
-              onClose={() => {
-                barcode.cancelLookup();
-                barcode.setOpen(false);
-              }}
-            />
-          ) : (
+    <div ref={entryRef} aria-busy={saving}>
+      {!item && (
+        <div
+          role="group"
+          aria-label="Item entry method"
+          className="mx-6 mt-5 grid grid-cols-2 gap-1 rounded-control bg-surface-subtle p-1"
+        >
+          {(["manual", "barcode"] as const).map((value) => (
             <button
+              key={value}
               type="button"
+              aria-pressed={mode === value}
+              disabled={disabled || saving}
               onClick={() => {
-                barcode.setOpen(true);
+                switchMode(value);
               }}
-              className="text-sm font-medium text-brand underline"
+              className={`min-h-11 rounded-control px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50 ${mode === value ? "bg-brand text-content-inverse" : "text-content hover:bg-surface-hover"}`}
             >
-              Scan or enter barcode
+              {value === "manual" ? "Manual entry" : "Barcode"}
             </button>
           ))}
-        <ProductReview
-          product={barcode.product}
-          productId={barcode.productId}
-          barcode={barcode.barcode}
-          message={barcode.message}
-          replacing={Boolean(barcode.replace)}
-          onReplace={barcode.replaceValues}
-          onKeep={barcode.keepValues}
-          onUnlink={barcode.unlink}
+        </div>
+      )}
+      {mode === "barcode" ? (
+        <BarcodeEntry
+          disabled={disabled}
+          loading={barcode.loading}
+          value={barcodeValue}
+          message={barcode.productId ? "" : barcode.message}
+          onLookup={(value) => {
+            void barcode.lookup(value).then((found) => {
+              if (found) {
+                setMode("manual");
+              }
+            });
+          }}
+          onChange={(value) => {
+            setBarcodeValue(value);
+            barcode.resetSearch();
+          }}
+          onCamera={barcode.cancelLookup}
+          onManual={() => {
+            switchMode("manual");
+          }}
+          onCancel={onCancel}
         />
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label
-              htmlFor="food-quantity"
-              className="mb-2 block text-sm font-medium"
-            >
-              Quantity <span className="text-brand">*</span>
-            </label>
-            <Input
-              id="food-quantity"
-              name="quantity"
-              type="number"
-              required
-              min="0"
-              max="1000000"
-              step="any"
-              value={draft.values.quantity}
-              onChange={(event) => {
-                draft.edit("quantity", event.target.value);
-              }}
+      ) : (
+        <form
+          onSubmit={(event) => {
+            barcode.cancelLookup();
+            void handleSubmit(event);
+          }}
+        >
+          <fieldset
+            disabled={disabled || saving}
+            className="space-y-5 px-6 py-6"
+          >
+            <ProductReview
+              product={barcode.product}
+              productId={barcode.productId}
+              barcode={barcode.barcode}
+              message={barcode.productId ? barcode.message : ""}
+              replacing={Boolean(barcode.replace)}
+              onReplace={barcode.replaceValues}
+              onKeep={barcode.keepValues}
+              onUnlink={barcode.unlink}
             />
-          </div>
-          <div>
-            <label
-              htmlFor="food-unit"
-              className="mb-2 block text-sm font-medium"
+            <FoodItemFields values={draft.values} onChange={draft.edit} />
+            {error && (
+              <p
+                role="alert"
+                className="rounded-lg bg-danger-subtle p-3 text-sm text-danger"
+              >
+                {error} Your entries have been kept.
+              </p>
+            )}
+          </fieldset>
+          <div className="flex items-center justify-end gap-3 border-t border-border-default bg-surface-subtle/60 px-6 py-4">
+            <button
+              type="button"
+              disabled={disabled || saving}
+              onClick={onCancel}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-control border border-border-default bg-surface px-3 py-2 text-sm font-medium text-content hover:bg-surface-hover disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
             >
-              Unit
-            </label>
-            <select
-              id="food-unit"
-              name="unit"
-              value={draft.values.unit}
-              onChange={(event) => {
-                draft.edit("unit", event.target.value);
-              }}
-              className="w-full rounded-control border border-border-control bg-surface px-3 py-2.5 text-sm text-content focus:outline-2 focus:outline-offset-1 focus:outline-brand disabled:opacity-50"
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={disabled || saving}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-brand px-4 py-2.5 text-sm font-semibold text-content-inverse hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
             >
-              {foodUnitSchema.options.map((unit) => (
-                <option key={unit} value={unit}>
-                  {foodUnitLabels[unit]}
-                </option>
-              ))}
-            </select>
+              {item ? (
+                <LuCheck aria-hidden="true" />
+              ) : (
+                <LuPlus aria-hidden="true" />
+              )}
+              {saving ? "Saving…" : item ? "Save changes" : "Add item"}
+            </button>
           </div>
-        </div>
-        <div>
-          <label
-            htmlFor="food-expiration"
-            className="mb-2 block text-sm font-medium"
-          >
-            Expiration date{" "}
-            <span className="font-normal text-content-muted">(optional)</span>
-          </label>
-          <Input
-            id="food-expiration"
-            name="expiresOn"
-            type="date"
-            min="0001-01-01"
-            max="9999-12-31"
-            aria-describedby="expiration-hint"
-            value={draft.values.expiresOn}
-            onChange={(event) => {
-              draft.edit("expiresOn", event.target.value);
-            }}
-          />
-          <p
-            id="expiration-hint"
-            className="mt-2 text-xs leading-relaxed text-content-muted"
-          >
-            Leave blank if unknown.
-          </p>
-        </div>
-        {error && (
-          <p
-            role="alert"
-            className="rounded-lg bg-danger-subtle p-3 text-sm text-danger"
-          >
-            {error} Your entries have been kept.
-          </p>
-        )}
-      </fieldset>
-      <div className="flex items-center justify-end gap-3 border-t border-border-default bg-surface-subtle/60 px-6 py-4">
-        <button
-          type="button"
-          disabled={disabled || saving}
-          onClick={onCancel}
-          className="inline-flex items-center justify-center gap-2 rounded-control border border-border-default bg-surface px-3 py-2 text-sm font-medium text-content hover:bg-surface-hover disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={disabled || saving}
-          className="inline-flex items-center justify-center gap-2 rounded-control bg-brand px-4 py-2.5 text-sm font-semibold text-content-inverse hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-        >
-          {item ? (
-            <LuCheck aria-hidden="true" />
-          ) : (
-            <LuPlus aria-hidden="true" />
-          )}
-          {saving ? "Saving…" : item ? "Save changes" : "Add item"}
-        </button>
-      </div>
-    </form>
+        </form>
+      )}
+    </div>
   );
 }

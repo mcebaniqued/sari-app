@@ -1,5 +1,6 @@
 import { barcodeSchema } from "@sari/contracts";
 import { useRef, useState } from "react";
+import { LuCamera } from "react-icons/lu";
 
 import Input from "@/components/Input/Input";
 
@@ -7,29 +8,39 @@ import BarcodeNumberGuide from "./BarcodeNumberGuide";
 import CameraScanner from "./CameraScanner";
 
 interface Props {
+  disabled: boolean;
   loading: boolean;
+  value: string;
+  message: string;
   onLookup: (barcode: string) => void;
-  onChange: () => void;
+  onChange: (value: string) => void;
   onCamera: () => void;
-  onClose: () => void;
+  onManual: () => void;
+  onCancel: () => void;
 }
 
 export default function BarcodeEntry({
+  disabled,
   loading,
+  value,
+  message,
   onLookup,
   onChange,
   onCamera,
-  onClose,
+  onManual,
+  onCancel,
 }: Props) {
   const [camera, setCamera] = useState(false);
-  const [value, setValue] = useState("");
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   function lookup(input: string) {
+    if (loading || disabled) {
+      return;
+    }
     const result = barcodeSchema.safeParse(input);
     if (!result.success) {
-      onChange();
+      onChange(input);
       setError("Invalid barcode. Enter the item details manually.");
       return;
     }
@@ -38,86 +49,114 @@ export default function BarcodeEntry({
   }
 
   return (
-    <div className="space-y-3 rounded-control border border-border-default bg-surface-subtle p-3">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-sm font-medium">Find product by barcode</span>
-        <button type="button" onClick={onClose} className="text-sm text-brand">
-          Close barcode input
-        </button>
-      </div>
-      {camera ? (
-        <CameraScanner
-          onDetected={(barcode) => {
-            setCamera(false);
-            setValue(barcode);
-            lookup(barcode);
-          }}
-          onType={() => {
-            setCamera(false);
-            requestAnimationFrame(() => inputRef.current?.focus());
-          }}
-        />
-      ) : (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!camera) {
+          lookup(value);
+        }
+      }}
+      aria-busy={loading}
+    >
+      <fieldset disabled={disabled} className="space-y-5 px-6 py-6">
+        {camera ? (
+          <CameraScanner
+            onDetected={(barcode) => {
+              setCamera(false);
+              onChange(barcode);
+              lookup(barcode);
+            }}
+            onType={() => {
+              setCamera(false);
+              requestAnimationFrame(() => inputRef.current?.focus());
+            }}
+          />
+        ) : (
+          <>
+            <BarcodeNumberGuide />
+            <div>
+              <label
+                htmlFor="barcode-number"
+                className="mb-2 block text-sm font-medium"
+              >
+                Barcode number
+              </label>
+              <Input
+                data-autofocus
+                ref={inputRef}
+                id="barcode-number"
+                value={value}
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={14}
+                aria-describedby={
+                  error || message
+                    ? "barcode-hint barcode-error"
+                    : "barcode-hint"
+                }
+                aria-invalid={Boolean(error)}
+                onChange={(event) => {
+                  setError("");
+                  onChange(event.target.value);
+                }}
+              />
+              <p id="barcode-hint" className="mt-2 text-xs text-content-muted">
+                Enter all the numbers below the barcode, including those at both
+                ends.
+              </p>
+            </div>
+            {(error || message) && (
+              <div className="space-y-2">
+                <p
+                  id="barcode-error"
+                  role="alert"
+                  className="text-sm text-danger"
+                >
+                  {error || message}
+                </p>
+                <button
+                  type="button"
+                  onClick={onManual}
+                  className="min-h-11 text-sm font-medium text-brand underline focus-visible:outline-2 focus-visible:outline-brand"
+                >
+                  Enter details manually
+                </button>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                onCamera();
+                setError("");
+                setCamera(true);
+              }}
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control px-3 py-2 text-sm font-medium text-brand hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-brand"
+            >
+              <LuCamera aria-hidden="true" className="size-4" />
+              Scan with camera
+            </button>
+          </>
+        )}
+      </fieldset>
+      <div className="flex items-center justify-end gap-3 border-t border-border-default bg-surface-subtle/60 px-6 py-4">
         <button
           type="button"
-          onClick={() => {
-            onCamera();
-            setCamera(true);
-          }}
-          className="rounded-control border border-border-default bg-surface px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-brand"
+          disabled={disabled}
+          onClick={onCancel}
+          className="min-h-11 rounded-control border border-border-default bg-surface px-3 py-2 text-sm font-medium text-content hover:bg-surface-hover disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-brand"
         >
-          Use camera
+          Cancel
         </button>
-      )}
-      {!camera && <BarcodeNumberGuide />}
-      <div>
-        <label
-          htmlFor="barcode-number"
-          className="mb-2 block text-sm font-medium"
-        >
-          Barcode number
-        </label>
-        <Input
-          ref={inputRef}
-          id="barcode-number"
-          value={value}
-          inputMode="numeric"
-          autoComplete="off"
-          maxLength={14}
-          aria-describedby="barcode-hint"
-          onChange={(event) => {
-            setValue(event.target.value);
-            setError("");
-            onChange();
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              setCamera(false);
-              lookup(value);
-            }
-          }}
-        />
-        <p id="barcode-hint" className="mt-1 text-xs text-content-muted">
-          Enter all the numbers below the barcode, including those at both ends.
-        </p>
+        {!camera && (
+          <button
+            type="submit"
+            disabled={disabled || loading}
+            className="min-h-11 rounded-control bg-brand px-4 py-2.5 text-sm font-semibold text-content-inverse hover:bg-brand-hover disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-brand"
+          >
+            {loading ? "Finding item…" : "Find item"}
+          </button>
+        )}
       </div>
-      {error && (
-        <p role="alert" className="text-sm text-danger">
-          {error}
-        </p>
-      )}
-      <button
-        type="button"
-        disabled={loading}
-        onClick={() => {
-          setCamera(false);
-          lookup(value);
-        }}
-        className="rounded-control bg-brand px-3 py-2 text-sm font-medium text-content-inverse disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-brand"
-      >
-        {loading ? "Looking up…" : "Look up barcode"}
-      </button>
-    </div>
+    </form>
   );
 }

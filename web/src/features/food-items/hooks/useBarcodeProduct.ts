@@ -13,7 +13,6 @@ export function useBarcodeProduct(
   const [productId, setProductId] = useState(item?.productId ?? null);
   const [barcode, setBarcode] = useState(item?.barcode ?? null);
   const [product, setProduct] = useState<FoodProduct | null>(null);
-  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [replace, setReplace] = useState<FoodProduct | null>(null);
@@ -107,7 +106,6 @@ export function useBarcodeProduct(
 
   function unlink() {
     resetSearch(true);
-    setOpen(false);
     setMessage(
       "Product link removed. Your entered item details have been kept.",
     );
@@ -117,8 +115,6 @@ export function useBarcodeProduct(
     productId,
     barcode,
     product,
-    open,
-    setOpen,
     loading,
     message,
     replace,
