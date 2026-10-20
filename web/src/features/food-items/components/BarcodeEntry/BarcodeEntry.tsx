@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 
 import Input from "@/components/Input/Input";
 
+import BarcodeNumberGuide from "./BarcodeNumberGuide";
 import CameraScanner from "./CameraScanner";
 
 interface Props {
@@ -28,7 +29,7 @@ export default function BarcodeEntry({
   function lookup(input: string) {
     const result = barcodeSchema.safeParse(input);
     if (!result.success) {
-      setError(result.error.issues[0]?.message ?? "Invalid barcode.");
+      setError("Check the barcode number and try again.");
       return;
     }
     setError("");
@@ -67,6 +68,7 @@ export default function BarcodeEntry({
           Use camera
         </button>
       )}
+      {!camera && <BarcodeNumberGuide />}
       <div>
         <label
           htmlFor="barcode-number"
@@ -96,7 +98,7 @@ export default function BarcodeEntry({
           }}
         />
         <p id="barcode-hint" className="mt-1 text-xs text-content-muted">
-          Type or paste an EAN-8, UPC-A, EAN-13, or GTIN-14 number.
+          Enter all the numbers below the barcode, including those at both ends.
         </p>
       </div>
       {error && (
