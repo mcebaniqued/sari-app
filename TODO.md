@@ -1,5 +1,7 @@
 # Deferred work
 
+- [ ] Add an imperial/metric user preference for barcode autofill. Select the user's preferred printed measurement, define conversion and rounding for labels that only supply another system, and preserve private edits and existing pantry amounts. For now, consistent dual-unit labels prefer the printed U.S. customary measurement; metric-only labels retain their printed size.
+
 - [ ] Clarify multipack quantity suggestions in [#26](https://github.com/mcebaniqued/sari-app/issues/26). USDA record 2596995 names a 24-pack but supplies `packageWeight: 12 fl oz`, which currently maps to a single can's amount. Distinguish per-container size from total package contents, define handling for existing cached records, and add a regression fixture before supporting pack totals. The Add item form labels this as the listed size and asks users to enter the amount they have; automatic multipack arithmetic remains out of scope.
 
 - [ ] Investigate the frontend bundle-size warning. The production build currently emits a JavaScript chunk above Vite's 500 kB warning threshold. Review route-level lazy loading and dependency splitting in `web/src/App.tsx` and the pantry table imports; verify behavior and build output in a separate performance branch.
