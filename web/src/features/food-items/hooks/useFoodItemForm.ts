@@ -8,8 +8,13 @@ import { getApiErrorMessage } from "@/utils/apiError";
 interface FoodItemFormOptions {
   disabled: boolean;
   onSave: (values: CreateFoodItem) => Promise<void>;
+  linkage?: { productId: string | null; barcode: string | null };
 }
-export function useFoodItemForm({ disabled, onSave }: FoodItemFormOptions) {
+export function useFoodItemForm({
+  disabled,
+  onSave,
+  linkage,
+}: FoodItemFormOptions) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const savingRef = useRef(false);
@@ -27,6 +32,7 @@ export function useFoodItemForm({ disabled, onSave }: FoodItemFormOptions) {
       quantity: Number(data.get("quantity")),
       unit: data.get("unit"),
       expiresOn: expiration === "" ? null : expiration,
+      ...(linkage ?? {}),
     });
     setError("");
     if (!result.success) {

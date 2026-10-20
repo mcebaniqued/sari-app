@@ -3,12 +3,16 @@ import {
   type FoodItem,
   foodUnitSchema,
 } from "@sari/contracts";
+import { useRef } from "react";
 import { LuCheck, LuPlus } from "react-icons/lu";
 
 import Input from "@/components/Input/Input";
 
+import { useBarcodeProduct } from "../../hooks/useBarcodeProduct";
 import { useFoodItemForm } from "../../hooks/useFoodItemForm";
 import { foodUnitLabels } from "../../utils/foodUnits";
+import BarcodeEntry from "../BarcodeEntry/BarcodeEntry";
+import ProductReview from "../BarcodeEntry/ProductReview";
 
 interface FoodItemFormProps {
   item: FoodItem | null;
@@ -23,10 +27,25 @@ export default function FoodItemForm({
   onSave,
   onCancel,
 }: FoodItemFormProps) {
-  const { saving, error, handleSubmit } = useFoodItemForm({ disabled, onSave });
+  const formRef = useRef<HTMLFormElement>(null);
+  const barcode = useBarcodeProduct(item, formRef);
+  const linked =
+    barcode.productId !== null ||
+    barcode.barcode !== null ||
+    Boolean(item?.productId ?? item?.barcode);
+  const { saving, error, handleSubmit } = useFoodItemForm({
+    disabled,
+    onSave,
+    ...(linked
+      ? { linkage: { productId: barcode.productId, barcode: barcode.barcode } }
+      : {}),
+  });
   return (
     <form
+      ref={formRef}
+      onChange={barcode.onFormChange}
       onSubmit={(event) => {
+        barcode.cancelLookup();
         void handleSubmit(event);
       }}
       aria-busy={saving}
@@ -46,6 +65,43 @@ export default function FoodItemForm({
             placeholder="e.g. Eggs, rice, or milk"
           />
         </div>
+        {!item &&
+          !saving &&
+          !disabled &&
+          (barcode.open ? (
+            <BarcodeEntry
+              loading={barcode.loading}
+              onLookup={(value) => {
+                void barcode.lookup(value);
+              }}
+              onChange={barcode.resetSearch}
+              onCamera={barcode.cancelLookup}
+              onClose={() => {
+                barcode.cancelLookup();
+                barcode.setOpen(false);
+              }}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                barcode.setOpen(true);
+              }}
+              className="text-sm font-medium text-brand underline"
+            >
+              Scan or enter barcode
+            </button>
+          ))}
+        <ProductReview
+          product={barcode.product}
+          productId={barcode.productId}
+          barcode={barcode.barcode}
+          message={barcode.message}
+          replacing={Boolean(barcode.replace)}
+          onReplace={barcode.replaceValues}
+          onKeep={barcode.keepValues}
+          onUnlink={barcode.unlink}
+        />
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label

@@ -1,0 +1,38 @@
+import { z } from "zod";
+
+/** Canonical GTIN-14 identity. UPC-A/EAN-13 padding is identity-preserving. */
+export function normalizeBarcode(value: string): string | null {
+  const digits = value.trim();
+  if (!/^(?:\d{8}|\d{12}|\d{13}|\d{14})$/.test(digits)) {
+    return null;
+  }
+  let sum = 0;
+  for (
+    let i = digits.length - 2, weight = 3;
+    i >= 0;
+    i--, weight = 4 - weight
+  ) {
+    sum += Number(digits[i]) * weight;
+  }
+  if ((10 - (sum % 10)) % 10 !== Number(digits.at(-1))) {
+    return null;
+  }
+  return digits.padStart(14, "0");
+}
+
+export const barcodeSchema = z
+  .string()
+  .trim()
+  .max(14)
+  .transform((value, ctx) => {
+    const normalized = normalizeBarcode(value);
+    if (!normalized) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "Enter a valid EAN-8, UPC-A, EAN-13, or GTIN-14 barcode, including its check digit.",
+      });
+      return z.NEVER;
+    }
+    return normalized;
+  });

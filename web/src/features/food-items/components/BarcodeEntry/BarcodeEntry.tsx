@@ -9,6 +9,7 @@ interface Props {
   loading: boolean;
   onLookup: (barcode: string) => void;
   onChange: () => void;
+  onCamera: () => void;
   onClose: () => void;
 }
 
@@ -16,6 +17,7 @@ export default function BarcodeEntry({
   loading,
   onLookup,
   onChange,
+  onCamera,
   onClose,
 }: Props) {
   const [camera, setCamera] = useState(false);
@@ -57,7 +59,7 @@ export default function BarcodeEntry({
         <button
           type="button"
           onClick={() => {
-            onChange();
+            onCamera();
             setCamera(true);
           }}
           className="rounded-control border border-border-default bg-surface px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-brand"

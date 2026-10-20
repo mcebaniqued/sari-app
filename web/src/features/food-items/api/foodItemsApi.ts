@@ -26,10 +26,16 @@ export async function listFoodItems(
   return foodItemListSchema.parse(response);
 }
 
-export async function createFoodItem(item: CreateFoodItem) {
+export async function createFoodItem(
+  item: CreateFoodItem,
+  operationKey?: string,
+) {
   const response = await apiFetch<unknown>("/food-items", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(operationKey ? { "Idempotency-Key": operationKey } : {}),
+    },
     body: JSON.stringify(item),
   });
   return foodItemSchema.parse(response);
