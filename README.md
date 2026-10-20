@@ -219,7 +219,11 @@ The root `.vercelignore` excludes local environment files and test artifacts fro
 
 `web/vercel.mjs` routes API requests **before** the SPA fallback. Production defaults to `https://sari-api.vercel.app`. Preview builds require `SARI_API_ORIGIN=https://sari-api-preview.vercel.app` and fail if it is missing or explicitly points to the production API.
 
-Production, local development, and previews use separate databases and users: `sari_prod`, `sari_dev`, and `sari_preview`. The stable protected preview is `https://sari-web-preview.vercel.app`. See [database operations](docs/database-operations.md) for credential boundaries, preview deployment commands, and the verified backup/restore workflow.
+Production, local development, and previews use separate databases and users: `sari_prod`, `sari_dev`, and `sari_preview`. Open `https://sari-web-staging.vercel.app` on your phone to test staging; sign in to Vercel first, then use a separate Sari preview account. See [database operations](docs/database-operations.md) for credential boundaries, deployment details, and the verified backup/restore workflow.
+
+Git deployments are enabled for all four projects. Pushes to `staging` update `sari-api-preview` and the protected `sari-web-staging` frontend. Pushes to `main` update the production `sari-api` and `sari-web` projects. Ignored Build Step settings skip other branches in each project. The staging frontend's domain is assigned to the `staging` Preview branch; the preview API uses its Production target with `staging` as its production branch, while retaining only preview database credentials. Vercel's environment label does not determine which database the API uses.
+
+CI runs on pushes to both branches and on pull requests. Wait for CI and both deployments to succeed before testing a pushed revision. Frontend and API deployments finish independently; there is no atomic deployment or CI gate in Vercel. Keep API changes compatible with the preceding frontend during rollout. Release staging through a separate `staging` → `main` PR: `main` requires a PR, the `validate` check, and resolved conversations, including for administrators. No staging-to-main merge is automated.
 
 Keep `VITE_API_BASE_URL=/api/v1` so browser requests remain same-origin. Set the API project's production `BETTER_AUTH_URL` to `https://sari-web.vercel.app`, use a dedicated production `BETTER_AUTH_SECRET`, and configure `MONGODB_URI` and optional `USDA_API_KEY` as backend secrets. Do not give preview deployments production database credentials.
 
@@ -230,7 +234,7 @@ npx vercel deploy . --project sari-api --scope miguels-projects-51fb4258 --prod
 npx vercel deploy . --project sari-web --scope miguels-projects-51fb4258 --prod
 ```
 
-Verify `/api/v1/health` and `/api/v1/ready` through the frontend domain, then check registration, login, pantry persistence, and a direct refresh of `/pantry`. Automatic Git deployments require the Vercel GitHub integration to have access to this repository; connecting the Codex GitHub app alone does not grant that access.
+Verify `/api/v1/health` and `/api/v1/ready` through the frontend domain, then check registration, login, pantry persistence, and a direct refresh of `/pantry`. Automatic Git deployments require the Vercel GitHub integration and the Vercel account's GitHub authentication to retain access to this repository.
 
 ## Previous implementation
 
