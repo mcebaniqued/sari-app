@@ -44,10 +44,14 @@ function setup() {
   return onSave;
 }
 function manual() {
-  fireEvent.click(screen.getByRole("button", { name: "Manual entry" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Enter details manually" }),
+  );
 }
 function barcode() {
-  fireEvent.click(screen.getByRole("button", { name: "Barcode" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Input barcode instead" }),
+  );
 }
 function search(value = "012345678905") {
   barcode();
