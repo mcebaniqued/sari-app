@@ -1,5 +1,7 @@
 # Deferred work
 
+- [ ] Set the pantry document title after authentication navigation. Production verification observed `Log in | Sari` or `Create an account | Sari` remaining in the browser title after the page changed to `/pantry`; refreshing restores the generic app title. Add route-specific title handling and verify registration, login, and direct pantry navigation in a separate UI branch.
+
 - [ ] Add an imperial/metric user preference for barcode autofill. Select the user's preferred printed measurement, define conversion and rounding for labels that only supply another system, and preserve private edits and existing pantry amounts. For now, consistent dual-unit labels prefer the printed U.S. customary measurement; metric-only labels retain their printed size.
 
 - [ ] Clarify multipack quantity suggestions in [#26](https://github.com/mcebaniqued/sari-app/issues/26). USDA record 2596995 names a 24-pack but supplies `packageWeight: 12 fl oz`, which currently maps to a single can's amount. Distinguish per-container size from total package contents, define handling for existing cached records, and add a regression fixture before supporting pack totals. The Add item form shows the original package label in product metadata and asks users to enter the amount they have; automatic multipack arithmetic remains out of scope.
