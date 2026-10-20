@@ -5,14 +5,21 @@ import {
   FoodProductModel,
   UsdaBudgetModel,
 } from "./model.js";
+import { parsePackageSize } from "./packageSize.js";
 import { LookupError, mapUsdaFood, selectUsdaFood } from "./usda.js";
 
 const day = 86_400_000;
 const pending = new Map<string, Promise<BarcodeLookup>>();
 
 export function productDto(product: InstanceType<typeof FoodProductModel>) {
+  // Older cached products can have an unrecognized label but no parsed size.
+  // Derive missing suggestions without refreshing USDA or changing source dates.
+  const hasSize =
+    typeof product.packageQuantity === "number" &&
+    typeof product.packageUnit === "string";
   return foodProductSchema.parse({
     ...product.toObject(),
+    ...(!hasSize ? parsePackageSize(product.packageDescription) : {}),
     id: product._id.toHexString(),
     checkedAt: product.checkedAt.toISOString(),
   });
