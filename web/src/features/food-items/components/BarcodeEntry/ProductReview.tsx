@@ -24,10 +24,6 @@ export default function ProductReview({
   if (!productId) {
     return null;
   }
-  const size =
-    product?.packageQuantity && product.packageUnit
-      ? `${String(product.packageQuantity)} ${product.packageUnit}`
-      : null;
   return (
     <section
       aria-label="Matched product"
@@ -40,7 +36,7 @@ export default function ProductReview({
       )}
       <p className="font-medium">{product?.name ?? "Saved product"}</p>
       {product?.brand && <p className="text-content-muted">{product.brand}</p>}
-      {product && !size && (
+      {product && (!product.packageQuantity || !product.packageUnit) && (
         <p className="text-content-muted">
           Check the package size and enter the amount you have.
         </p>
@@ -83,7 +79,6 @@ export default function ProductReview({
               </a>
             )}
             {barcode && <p className="break-all">Barcode: {barcode}</p>}
-            {size && <p>Listed size: {size}</p>}
             {product?.packageDescription && (
               <p>Package label: {product.packageDescription}</p>
             )}
