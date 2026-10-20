@@ -69,7 +69,10 @@ export async function deleteFoodItems(ids: string[]) {
     results.forEach((result, index) => {
       if (result.status === "rejected") {
         const error: unknown = result.reason;
-        if (error instanceof ApiError && error.status === 403) {
+        if (
+          error instanceof ApiError &&
+          (error.status === 401 || error.status === 403)
+        ) {
           accessDenied = error;
         }
       }

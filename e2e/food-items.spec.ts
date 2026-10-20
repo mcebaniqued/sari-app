@@ -7,6 +7,12 @@ import {
 } from "@sari/contracts";
 import type { AxeResults } from "axe-core";
 
+import { signedIn } from "./authFixture";
+
+test.beforeEach(async ({ page }) => {
+  await signedIn(page);
+});
+
 const milk: FoodItem = {
   id: "012345678901234567890123",
   name: "Milk",
@@ -572,7 +578,12 @@ test("empty pantry prompts creation and filtered results explain no matches", as
     page.getByRole("heading", { name: "My Pantry", exact: true }),
   ).toBeVisible();
   await expect(page.locator("h1 svg")).toBeVisible();
-  await expect(page.getByRole("navigation")).toHaveCount(0);
+  await expect(
+    page.getByRole("navigation", { name: "User navigation" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "Main navigation" }),
+  ).toHaveCount(0);
   const empty = page.getByRole("region", {
     name: "No items found",
     exact: true,

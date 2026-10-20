@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+export {
+  authSessionSchema,
+  type AuthUser,
+  authUserSchema,
+  type LoginInput,
+  loginSchema,
+  type RegisterInput,
+  registerSchema,
+} from "./auth.js";
 export { type FoodItemQuery, foodItemQuerySchema } from "./food-item-query.js";
 export {
   type CreateFoodItem,

@@ -97,6 +97,7 @@ export async function apiFetch<T>(
   const { retry, ...init } = options;
   const { maxRetries, baseDelayMs, maxDelayMs } = retryPolicy(retry);
   const method = (init.method ?? "GET").toUpperCase();
+  const isAuthRequest = path.replace(/^\//, "").startsWith("auth/");
   const retries =
     safeMethods.has(method) && (init.body === null || init.body === undefined)
       ? maxRetries
@@ -139,6 +140,9 @@ export async function apiFetch<T>(
       }
     }
     if (!response.ok) {
+      if (response.status === 401 && !isAuthRequest) {
+        window.dispatchEvent(new Event("sari:unauthorized"));
+      }
       const body: unknown = await response.json().catch((error: unknown) => {
         init.signal?.throwIfAborted();
         if (error instanceof DOMException && error.name === "AbortError") {
@@ -147,7 +151,15 @@ export async function apiFetch<T>(
         return undefined;
       });
       init.signal?.throwIfAborted();
-      const result = apiErrorResponseSchema.safeParse(body);
+      // Better Auth returns { code, message }; the rest of the API wraps it in { error }.
+      const result = apiErrorResponseSchema.safeParse(
+        isAuthRequest &&
+          typeof body === "object" &&
+          body !== null &&
+          !("error" in body)
+          ? { error: body }
+          : body,
+      );
       throw new ApiError(
         result.success
           ? result.data.error.message

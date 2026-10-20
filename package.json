@@ -30,6 +30,7 @@
     "test:coverage": "npm run test:coverage --workspaces --if-present",
     "pretest:e2e": "npm run contracts:build",
     "test:e2e": "playwright test",
+    "test:integration": "node scripts/test-integration.mjs",
     "knip": "knip",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run knip && npm run test && npm run build",
     "prepare": "husky"
@@ -53,6 +54,8 @@
     "husky": "^9.1.7",
     "knip": "^6.42.0",
     "lint-staged": "^17.6.0",
+    "mongodb": "^7.7.0",
+    "mongodb-memory-server": "^11.3.0",
     "prettier": "^3.9.10",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.71.2",

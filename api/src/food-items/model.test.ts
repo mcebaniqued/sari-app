@@ -11,7 +11,7 @@ describe("food units across contracts and storage", () => {
       const created = createFoodItemSchema.parse(input);
       expect(created).toMatchObject(input);
       expect(updateFoodItemSchema.parse({ unit })).toEqual({ unit });
-      const model = new FoodItemModel(created);
+      const model = new FoodItemModel({ ...created, userId: "unit-test-user" });
       await expect(model.validate()).resolves.toBeUndefined();
       expect(model.toObject()).toMatchObject(input);
     },

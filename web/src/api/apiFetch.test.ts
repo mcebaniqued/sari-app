@@ -62,6 +62,27 @@ describe("API transport", () => {
     });
   });
 
+  it("preserves Better Auth's flat error code and message", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json(
+            { code: "INVALID_ORIGIN", message: "Invalid origin" },
+            { status: 403 },
+          ),
+        ),
+    );
+    await expect(
+      apiFetch("/auth/sign-up/email", { method: "POST" }),
+    ).rejects.toMatchObject({
+      status: 403,
+      code: "INVALID_ORIGIN",
+      message: "Invalid origin",
+    });
+  });
+
   it.each([204, 205])("handles empty status %s", async (status) => {
     vi.stubGlobal(
       "fetch",

@@ -1,9 +1,12 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 
 import AppHeader from "@/components/AppHeader/AppHeader";
 import ToastViewport from "@/components/Toast/ToastViewport";
+import { useAuth } from "@/features/auth/context/AuthContext";
 
 export default function AppLayout() {
+  const { user, logout } = useAuth();
+  const location = useLocation();
   return (
     <div className="min-h-dvh bg-page text-content">
       <a
@@ -12,7 +15,12 @@ export default function AppLayout() {
       >
         Skip to content
       </a>
-      <AppHeader />
+      <AppHeader
+        firstName={
+          location.pathname === "/pantry" ? user?.firstName : undefined
+        }
+        onLogout={logout}
+      />
       <main
         id="main-content"
         tabIndex={-1}

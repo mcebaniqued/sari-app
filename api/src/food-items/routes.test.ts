@@ -1,8 +1,17 @@
 import { apiErrorResponseSchema } from "@sari/contracts";
+import type { RequestHandler } from "express";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import app from "../app.js";
+
+// These tests isolate request validation. Authentication is exercised separately.
+vi.mock("../auth/requireSession.js", () => ({
+  requireSession: ((_req, res, next) => {
+    res.locals.userId = "validation-user";
+    next();
+  }) satisfies RequestHandler,
+}));
 
 afterEach(() => vi.unstubAllEnvs());
 

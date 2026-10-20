@@ -2,6 +2,8 @@
 
 A small pantry app. Add, view, edit, and delete food items saved in MongoDB.
 
+Email/password accounts use Better Auth with MongoDB-backed sessions. Each user has one private pantry.
+
 ## Stack and layout
 
 React, TypeScript, Vite, React Router, Tailwind CSS v4, and React Icons on the frontend. Node.js, TypeScript, Express 5, and Mongoose on the backend. Shared Zod schemas define public API DTOs. npm workspaces manage the applications and contracts with one lockfile.
@@ -79,15 +81,16 @@ Only backend environment variables may contain secrets. `VITE_` variables are bu
 
 ## Commands
 
-| Command                   | Purpose                                                        |
-| ------------------------- | -------------------------------------------------------------- |
-| `npm run dev`             | Start frontend and API together                                |
-| `npm run check`           | Formatting, lint, types, unused code, tests, production builds |
-| `npm run test:coverage`   | API and frontend tests with V8 coverage                        |
-| `npm run contracts:build` | Build shared schemas and TypeScript declarations               |
-| `npm run format`          | Format source and configuration                                |
-| `npm run build`           | Build API and frontend                                         |
-| `npm start`               | Run the compiled API                                           |
+| Command                    | Purpose                                                        |
+| -------------------------- | -------------------------------------------------------------- |
+| `npm run dev`              | Start frontend and API together                                |
+| `npm run check`            | Formatting, lint, types, unused code, tests, production builds |
+| `npm run test:integration` | API and browser tests using a disposable MongoDB               |
+| `npm run test:coverage`    | API and frontend tests with V8 coverage                        |
+| `npm run contracts:build`  | Build shared schemas and TypeScript declarations               |
+| `npm run format`           | Format source and configuration                                |
+| `npm run build`            | Build API and frontend                                         |
+| `npm start`                | Run the compiled API                                           |
 
 Install the browser once before running browser tests:
 
@@ -111,9 +114,27 @@ Husky runs lint-staged before commits. GitHub Actions runs the validation comman
 - Successful response generics provide compile-time types. Callers must parse successful payloads with the corresponding schema when runtime validation is required. Future food endpoints must validate incoming requests on the server before persistence.
 - Endpoint tests validate real health and error responses against the shared schemas. Route paths and HTTP status codes remain explicit in Express and their tests.
 
+## Authentication
+
+`/login` is the signed-out landing page and accepts email and password. `/register` accepts first name, last name, email, and password. Registration signs the user in immediately. The root route, login, and registration lead signed-in users to `/pantry`. Signed-out visits to all other pages redirect to login, preserving an internal return destination for successful login. The app checks the server session before rendering protected content. Failed session checks offer a retry. An expired session during a pantry request returns to login.
+
+The pantry header shows a user icon and first name with a keyboard-accessible dropdown containing Log out. Logout revokes the server session, clears the cookie, discards pantry state and drafts, and returns to login. Failed logout keeps the session and offers an inline retry. Settings, email verification, password reset, social login, and MFA are not included.
+
+Names are required, trimmed, and limited to 80 characters each. Email addresses are trimmed, lowercased, validated, limited to 254 characters, and unique. Passwords require 12–128 characters, preserve spaces exactly, and are salted and hashed server-side using Better Auth's scrypt implementation. Password hashes never appear in public responses. Registration errors distinguish duplicate email, invalid input, blocked website origin, and rate limiting. The frontend preserves Better Auth error codes and displays approved user-facing messages; internal server details remain hidden. Login errors do not disclose whether an account exists.
+
+Add `BETTER_AUTH_SECRET` (at least 32 random characters) and `BETTER_AUTH_URL` (the frontend origin) to `api/.env`; see `api/.env.example` for generation instructions. Local development defaults to `http://127.0.0.1:5173`. During local development, both `localhost` and `127.0.0.1` are accepted on the configured port. Other hostnames require an exact origin in `AUTH_TRUSTED_ORIGINS`, comma-separated. Production accepts only explicitly configured origins. Secrets must stay out of `VITE_` variables and source control. Production requires a stable secret and an HTTPS frontend URL. Session cookies are HttpOnly, SameSite=Lax, Secure in production, and valid for seven days without sliding refresh. Protected requests check MongoDB; cookie caching is disabled so revocation and expiration take effect immediately.
+
+Authentication endpoints live under `/api/v1/auth`: `POST /sign-up/email`, `POST /sign-in/email`, `GET /get-session`, and `POST /sign-out`. Other Better Auth HTTP endpoints are not exposed. Better Auth mounts before Express's JSON parser and manages password hashing, cookies, CSRF checks, and database-backed rate limiting (10 login attempts and 5 registration attempts per minute per client IP). The server overwrites its internal IP header with Express's socket-derived address. If deployed behind a proxy, configure a trusted proxy/IP policy for that platform before enabling forwarded client IPs. The MongoDB adapter automatically creates authentication collections and required unique indexes and supports standalone local MongoDB without transactions.
+
+All food-item endpoints require a session and return `401` when missing or expired. Cookie-authenticated writes also require an allowed `Origin` header. Authentication and pantry responses use `Cache-Control: no-store`. Health and readiness remain public. Authenticated `403` responses still open the access-denied page.
+
+Food items store the owner's user ID internally. Every list, count, read, update, and delete is scoped to that user; other users' IDs return `404`. Browser-supplied ownership is rejected. Existing ownerless records are preserved but hidden from every user. New accounts start empty, with no automatic ownership migration or separate pantry collection.
+
+`npm run test:integration` starts an isolated MongoDB using `mongodb-memory-server`, runs the API/component and Playwright suites, and stops MongoDB. The first install downloads a MongoDB binary. This command never loads personal database credentials. Existing `TEST_MONGODB_URI` runs still require a database ending in `_test`; API suites use separate `_auth_test` and `_pantry_test` databases and clean up their records. Playwright explicitly overrides the API database configuration so ordinary browser tests cannot reach `api/.env`'s database. Real browser authentication tests run when `TEST_MONGODB_URI` is set, including in CI and the disposable runner.
+
 ## Food items (MVP 1)
 
-The `/` route redirects to `/pantry`. The persistent header contains the Sari brand link, and the page heading reads My Pantry with a small icon. `/access-denied` shows an access-denied page, and unmatched routes show a not-found page; both share a responsive error layout with semantic colors, page titles, automatic heading focus, and working recovery actions. Back to pantry always returns to `/pantry`; Go back uses the previous app history entry, falling back to the pantry on direct visits. A single toolbar above the table contains a debounced search on the left and selection/bulk-delete actions and Add item on the right. A shared Input primitive underpins the SearchBar. AG Grid Community uses its Infinite Row Model with 20-row pages, a three-page cache, and server-backed search, column-header filtering, and sorting. After loading confirms zero results, an empty-state prompt opens the add-item modal. Searches and filters with no matches show guidance to adjust the query. New records appear first until a sort is applied. The Actions column stays pinned to the right and opens a prefilled edit modal or a delete confirmation.
+The `/` route redirects signed-in users to `/pantry` and signed-out visitors to `/login`. The persistent header contains the Sari brand link, and the page heading reads My Pantry with a small icon. `/access-denied` shows an access-denied page, and unmatched routes show a not-found page; both share a responsive error layout with semantic colors, page titles, automatic heading focus, and working recovery actions. Back to pantry always returns to `/pantry`; Go back uses the previous app history entry, falling back to the pantry on direct visits. A single toolbar above the table contains a debounced search on the left and selection/bulk-delete actions and Add item on the right. A shared Input primitive underpins the SearchBar. AG Grid Community uses its Infinite Row Model with 20-row pages, a three-page cache, and server-backed search, column-header filtering, and sorting. After loading confirms zero results, an empty-state prompt opens the add-item modal. Searches and filters with no matches show guidance to adjust the query. New records appear first until a sort is applied. The Actions column stays pinned to the right and opens a prefilled edit modal or a delete confirmation.
 
 Tailwind v4 semantic tokens in `web/src/styles/index.css` define page/surface backgrounds, content colors, borders, brand and danger states, radii, and modal shadow. Components use those roles in Tailwind utilities instead of palette shades or custom CSS classes. AG Grid's theme references the same CSS variables. Global Tailwind cursor utilities cover native and ARIA controls, including portals: interactive controls use a pointer, and disabled or inert controls use not-allowed. Numeric values remain right-aligned while all column filter buttons stay on the right. Breadcrumbs, summary cards, floating filter rows, and decorative subtitles are omitted. Table dates use `MMM DD, YYYY` (e.g. Oct 01, 2026); form and filter controls use native date inputs, whose appearance follows the browser's locale. Dates sent to the API remain ISO. Timestamps are displayed in UTC until date/time settings exist. Infinite-grid placeholder rows remain invisible until real records arrive, keeping blank checkboxes and cell borders out of the loading state.
 
@@ -153,7 +174,7 @@ A reusable React Toastify notification component reports create, update, delete,
 
 ESLint uses strict TypeScript type-aware rules, React Hooks checks, JSX accessibility checks, import sorting, unused import detection, and Playwright rules, with zero warnings allowed. The maintained `@htmlacademy/eslint-plugin-jsx-a11y` fork supports the project’s ESLint 10 version.
 
-The frontend routes HTTP 403 responses from pantry reads and writes to `/access-denied`, replacing the rejected route in history. Bulk deletion stops scheduling additional batches after a forbidden response and retains completed outcomes. Other errors stay with their form or recovery control. There is no user ownership or authentication yet; actual permission enforcement belongs to the backend. This milestone is for local development; deployment remains deferred.
+The frontend routes HTTP 403 responses from pantry reads and writes to `/access-denied`, replacing the rejected route in history. Bulk deletion stops scheduling additional batches after a forbidden response and retains completed outcomes. Other errors stay with their form or recovery control. Authentication and ownership are enforced by the backend as described above. This milestone is for local development; deployment remains deferred.
 
 ### Persistence tests
 
@@ -171,13 +192,13 @@ Integration tests never load `api/.env` and delete only the records they create.
 
 Use two Vercel projects connected to this repository:
 
-| Setting          | API project                                         | Frontend project                                    |
-| ---------------- | --------------------------------------------------- | --------------------------------------------------- |
-| Root directory   | `api`                                               | `web`                                               |
-| Framework        | Express                                             | Vite                                                |
-| Build command    | `npm run build -w @sari/contracts && npm run build` | `npm run build -w @sari/contracts && npm run build` |
-| Output directory | Leave the Express preset default                    | `dist`                                              |
-| Environment      | `MONGODB_URI`                                       | Relative API base path is the default               |
+| Setting          | API project                                            | Frontend project                                    |
+| ---------------- | ------------------------------------------------------ | --------------------------------------------------- |
+| Root directory   | `api`                                                  | `web`                                               |
+| Framework        | Express                                                | Vite                                                |
+| Build command    | `npm run build -w @sari/contracts && npm run build`    | `npm run build -w @sari/contracts && npm run build` |
+| Output directory | Leave the Express preset default                       | `dist`                                              |
+| Environment      | `MONGODB_URI`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` | Relative API base path is the default               |
 
 Allow access to files outside each root directory, because the workspace lockfile, shared TypeScript configuration, and contracts package are outside the application directories. Build commands must compile the contracts package before the application so runtime imports and declaration files are available. Use Node 24.x in both projects. The API's default-exported `src/app.ts` is its Vercel entry point; `src/server.ts` is for conventional local/server hosting.
 

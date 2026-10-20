@@ -1,5 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const testDatabase = process.env.TEST_MONGODB_URI;
+if (testDatabase && !/\/_?[\w-]+_test(?:\?|$)/.test(testDatabase)) {
+  throw new Error(
+    "TEST_MONGODB_URI must explicitly name a database ending in _test.",
+  );
+}
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -15,7 +22,14 @@ export default defineConfig({
   webServer: [
     {
       command: "npm run dev -w @sari/api",
-      env: { PORT: "3101" },
+      env: {
+        PORT: "3101",
+        // Explicitly override .env so browser tests cannot use a personal database.
+        MONGODB_URI: testDatabase ?? "",
+        BETTER_AUTH_SECRET: "browser-test-only-secret-at-least-32-characters",
+        BETTER_AUTH_URL: "http://127.0.0.1:5273",
+        AUTH_TRUSTED_ORIGINS: "",
+      },
       url: "http://127.0.0.1:3101/api/v1/health",
       reuseExistingServer: false,
     },
