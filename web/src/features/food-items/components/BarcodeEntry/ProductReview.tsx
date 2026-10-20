@@ -39,13 +39,7 @@ export default function ProductReview({
         </p>
       )}
       <p className="font-medium">{product?.name ?? "Saved product"}</p>
-      {(product?.brand ?? size) && (
-        <p className="text-content-muted">
-          {[product?.brand, size ? `Listed size: ${size}` : null]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
-      )}
+      {product?.brand && <p className="text-content-muted">{product.brand}</p>}
       {product && !size && (
         <p className="text-content-muted">
           Check the package size and enter the amount you have.
@@ -89,6 +83,7 @@ export default function ProductReview({
               </a>
             )}
             {barcode && <p className="break-all">Barcode: {barcode}</p>}
+            {size && <p>Listed size: {size}</p>}
             {product?.packageDescription && (
               <p>Package label: {product.packageDescription}</p>
             )}
