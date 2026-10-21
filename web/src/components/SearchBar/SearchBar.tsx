@@ -23,6 +23,7 @@ export default function SearchBar({
   const [value, setValue] = useState("");
 
   const submitted = useRef("");
+  const input = useRef<HTMLInputElement>(null);
   const id = useId();
   const debouncedValue = useDebouncedValue(value.trim(), delayMs);
   useEffect(() => {
@@ -44,6 +45,7 @@ export default function SearchBar({
         className="pointer-events-none absolute top-3 left-3 size-4 text-content-muted"
       />
       <Input
+        ref={input}
         id={id}
         type="search"
         value={value}
@@ -62,6 +64,7 @@ export default function SearchBar({
           disabled={disabled}
           onClick={() => {
             setValue("");
+            input.current?.focus();
           }}
           className="absolute top-1 right-1 inline-flex size-8 items-center justify-center rounded-control text-content-muted hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-brand"
         >

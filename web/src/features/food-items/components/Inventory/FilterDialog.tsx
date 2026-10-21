@@ -157,6 +157,7 @@ interface FilterDialogProps {
   focusField?: LogicalFilterField | undefined;
   onApply: (filters: InventoryFilters) => void;
   onClose: () => void;
+  onRestoreFocusFallback?: () => void;
 }
 
 export default function FilterDialog({
@@ -164,6 +165,7 @@ export default function FilterDialog({
   focusField,
   onApply,
   onClose,
+  onRestoreFocusFallback,
 }: FilterDialogProps) {
   const [editors, setEditors] = useState(() => initialEditors(filters));
   const nextId = useRef(6);
@@ -241,7 +243,11 @@ export default function FilterDialog({
     editors.every((editor) => editorPredicates(editor).error === undefined);
 
   return (
-    <Modal title="Filter items" onClose={onClose}>
+    <Modal
+      title="Filter items"
+      onClose={onClose}
+      onRestoreFocusFallback={onRestoreFocusFallback}
+    >
       <div className="max-h-[calc(100dvh-13rem)] space-y-4 overflow-y-auto px-6 py-5">
         {editors.map((editor, index) => {
           const label =

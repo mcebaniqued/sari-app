@@ -1,5 +1,5 @@
 import type { FoodItemQuery } from "@sari/contracts";
-import { useState } from "react";
+import { type Ref, useState } from "react";
 import { LuArrowDownUp, LuListFilter, LuPlus, LuTrash2 } from "react-icons/lu";
 import SearchBar from "@/components/SearchBar/SearchBar";
 import DesktopSortControl from "./DesktopSortControl";
@@ -13,6 +13,7 @@ interface PantryToolbarProps {
   onSearch: (search: string) => void;
   onSort: (sort: FoodItemQuery["sort"]) => void;
   filterOpen: boolean;
+  filterButtonRef: Ref<HTMLButtonElement>;
   onOpenFilters: () => void;
   onAdd: () => void;
   onClearSelection: () => void;
@@ -29,6 +30,7 @@ export default function PantryToolbar({
   onSearch,
   onSort,
   filterOpen,
+  filterButtonRef,
   onOpenFilters,
   onAdd,
   onClearSelection,
@@ -89,6 +91,7 @@ export default function PantryToolbar({
               <LuArrowDownUp aria-hidden="true" /> Sort
             </button>
             <button
+              ref={filterButtonRef}
               type="button"
               disabled={disabled}
               aria-haspopup="dialog"

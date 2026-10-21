@@ -26,6 +26,7 @@ export default function PantryPage() {
   const desktopScroll = useRef<HTMLDivElement>(null);
   const desktopEnd = useRef<HTMLDivElement>(null);
   const mobileEnd = useRef<HTMLDivElement>(null);
+  const filterButton = useRef<HTMLButtonElement>(null);
   const queryKey = JSON.stringify([inventory.query, pantry.revision]);
   const { hasMore, loading, error, loadMore } = inventory;
 
@@ -147,6 +148,7 @@ export default function PantryPage() {
             inventory.applyQuery({ ...inventory.query, sort });
           }}
           filterOpen={filterEditor !== null}
+          filterButtonRef={filterButton}
           onOpenFilters={() => {
             setFilterEditor({});
           }}
@@ -169,6 +171,9 @@ export default function PantryPage() {
         }}
         onClear={() => {
           inventory.applyQuery({ ...inventory.query, filters: {} });
+        }}
+        onFocusFallback={() => {
+          filterButton.current?.focus();
         }}
       />
       <p role="status" aria-live="polite" className="sr-only">
@@ -214,6 +219,9 @@ export default function PantryPage() {
           focusField={filterEditor.focusField}
           onClose={() => {
             setFilterEditor(null);
+          }}
+          onRestoreFocusFallback={() => {
+            filterButton.current?.focus();
           }}
           onApply={(filters) => {
             inventory.applyQuery({ ...inventory.query, filters });

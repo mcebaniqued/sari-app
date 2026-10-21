@@ -41,12 +41,22 @@ export default function InventoryList({
         openAction.current?.querySelector("button")?.focus();
       }
     };
+    const closeOnFocus = (event: FocusEvent) => {
+      if (
+        event.target instanceof Node &&
+        !openAction.current?.contains(event.target)
+      ) {
+        setOpenId(null);
+      }
+    };
     document.addEventListener("pointerdown", closeOutside);
     document.addEventListener("keydown", closeOnEscape);
+    document.addEventListener("focusin", closeOnFocus);
 
     return () => {
       document.removeEventListener("pointerdown", closeOutside);
       document.removeEventListener("keydown", closeOnEscape);
+      document.removeEventListener("focusin", closeOnFocus);
     };
   }, [openId]);
 
@@ -107,6 +117,7 @@ export default function InventoryList({
               <div className="absolute top-full right-0 z-20 w-40 rounded-panel border border-border-default bg-surface p-1 shadow-modal">
                 <button
                   type="button"
+                  aria-label={`Edit ${item.name}`}
                   className="min-h-11 w-full rounded-control px-3 text-left hover:bg-surface-hover"
                   onClick={() => {
                     setOpenId(null);
@@ -117,6 +128,7 @@ export default function InventoryList({
                 </button>
                 <button
                   type="button"
+                  aria-label={`Delete ${item.name}`}
                   className="min-h-11 w-full rounded-control px-3 text-left text-danger hover:bg-danger-subtle"
                   onClick={() => {
                     setOpenId(null);

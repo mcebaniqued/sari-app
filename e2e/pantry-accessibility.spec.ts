@@ -4,6 +4,7 @@ import {
   foodApi,
   milk,
   nameCells,
+  rice,
   test,
 } from "./fixtures/pantry";
 
@@ -60,7 +61,7 @@ test("mobile list and action menu fit a narrow viewport", async ({ page }) => {
   await expectAccessible(page);
   await page.getByRole("button", { name: /Actions for A pantry item/ }).click();
   await expect(
-    page.getByRole("button", { name: "Edit", exact: true }),
+    page.getByRole("button", { name: /Edit A pantry item/ }),
   ).toBeVisible();
   await expectAccessible(page);
   await page.keyboard.press("Escape");
@@ -280,3 +281,65 @@ for (const { width, sortName, actionOrder } of [
     await expect(search).toBeFocused();
   });
 }
+
+test("filter removal and dialog Apply restore focus to a surviving control", async ({
+  page,
+}) => {
+  await foodApi(page, [milk]);
+  await page.goto("/pantry");
+  await expect(nameCells(page)).toHaveText(["Milk"]);
+  const filter = page.getByRole("button", { name: /^Filter(?: \(\d+\))?$/ });
+  await filter.click();
+  const dialog = page.getByRole("dialog", { name: "Filter items" });
+  const first = dialog.getByRole("group", { name: "Filter 1" });
+  await first.getByLabel("Filter by").selectOption("expiresOn");
+  await first.getByLabel("Condition").selectOption("blank");
+  await dialog.getByRole("button", { name: "Add another filter" }).click();
+  const second = dialog.getByRole("group", { name: "Filter 2" });
+  await second.getByLabel("Filter by").selectOption("amount");
+  await second.getByLabel("Quantity").fill("1");
+  await second.getByLabel("Unit").selectOption("l");
+  await dialog.getByRole("button", { name: "Apply" }).click();
+
+  const chips = page.getByRole("region", { name: "Applied filters" });
+  const amount = chips.getByRole("button", { name: "Edit Amount filter" });
+  const removeExpiration = chips.getByRole("button", {
+    name: "Remove Expiration date filter",
+  });
+  await removeExpiration.focus();
+  await page.keyboard.press("Enter");
+  await expect(amount).toBeFocused();
+
+  await amount.click();
+  await dialog.getByRole("button", { name: "Reset" }).click();
+  await dialog.getByRole("button", { name: "Apply" }).click();
+  await expect(chips).toHaveCount(0);
+  await expect(filter).toBeFocused();
+});
+
+test("mobile row actions close when focus leaves and restore focus on Escape", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 800 });
+  await foodApi(page, [milk, rice]);
+  await page.goto("/pantry");
+  const actions = page.getByRole("button", { name: "Actions for Milk" });
+  const nextActions = page.getByRole("button", { name: "Actions for Rice" });
+  await actions.focus();
+  await page.keyboard.press("Enter");
+  await expect(actions).toHaveAttribute("aria-expanded", "true");
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Edit Milk" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Delete Milk" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(nextActions).toBeFocused();
+  await expect(actions).toHaveAttribute("aria-expanded", "false");
+
+  await actions.focus();
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Escape");
+  await expect(actions).toBeFocused();
+  await expect(actions).toHaveAttribute("aria-expanded", "false");
+});

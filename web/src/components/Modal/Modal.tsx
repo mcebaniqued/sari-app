@@ -1,4 +1,10 @@
-import { type ReactNode, useEffect, useId, useRef } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useEffectEvent,
+  useId,
+  useRef,
+} from "react";
 import { createPortal } from "react-dom";
 import { LuX } from "react-icons/lu";
 
@@ -7,6 +13,7 @@ interface ModalProps {
   description?: string;
   children: ReactNode;
   onClose: () => void;
+  onRestoreFocusFallback?: (() => void) | undefined;
   dismissible?: boolean;
 }
 
@@ -16,11 +23,15 @@ export default function Modal({
   description,
   children,
   onClose,
+  onRestoreFocusFallback,
   dismissible = true,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const descriptionId = useId();
+  const restoreFocusFallback = useEffectEvent(() => {
+    onRestoreFocusFallback?.();
+  });
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -41,6 +52,8 @@ export default function Modal({
       }
       if (previousFocus instanceof HTMLElement && previousFocus.isConnected) {
         previousFocus.focus();
+      } else {
+        restoreFocusFallback();
       }
     };
   }, []);

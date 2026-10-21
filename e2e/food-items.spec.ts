@@ -424,6 +424,7 @@ test("applied chips edit and clear filters without losing search or sort", async
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await chips.getByRole("button", { name: "Clear all" }).click();
   await expect(chips).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Filter" })).toBeFocused();
   await expect.poll(() => api.queries.at(-1)?.get("filters")).toBe("{}");
   expect(api.queries.at(-1)?.get("search")).toBe("a");
   expect(api.queries.at(-1)?.get("sort")).toContain('"name"');
@@ -443,7 +444,7 @@ test("mobile list, selection, item actions, and viewport changes share one resul
     ),
   ).toBe(true);
   await page.getByRole("button", { name: "Actions for Milk" }).click();
-  await list.getByRole("button", { name: "Edit" }).click();
+  await list.getByRole("button", { name: "Edit Milk" }).click();
   await expect(page.getByRole("dialog", { name: "Edit item" })).toBeVisible();
   await page
     .getByRole("dialog", { name: "Edit item" })
