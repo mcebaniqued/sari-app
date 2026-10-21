@@ -226,6 +226,40 @@ describe("camera scanning lifecycle", () => {
     expect(trackStop).toHaveBeenCalled();
     expect(decode).not.toHaveBeenCalled();
   });
+  it("does not clear a newer preview when cancelled permission resolves late", async () => {
+    const { trackStop, getUserMedia, stream } = camera();
+    let resolvePermission: ((value: unknown) => void) | undefined;
+    getUserMedia.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePermission = resolve;
+        }),
+    );
+
+    const view = render(
+      <CameraScanner onDetected={vi.fn()} onType={vi.fn()} />,
+    );
+    const video = screen.getByLabelText<HTMLVideoElement>(
+      "Barcode camera preview",
+    );
+    await waitFor(() => {
+      expect(getUserMedia).toHaveBeenCalledOnce();
+    });
+    view.unmount();
+
+    // Simulate a newer effect taking ownership before the cancelled request settles.
+    const newerStream = {} as MediaStream;
+    video.srcObject = newerStream;
+    await act(async () => {
+      resolvePermission?.(stream);
+      await Promise.resolve();
+    });
+
+    expect(trackStop).toHaveBeenCalled();
+    expect(video.srcObject).toBe(newerStream);
+    expect(decode).not.toHaveBeenCalled();
+  });
+
   it("offers manual input after camera permission failure", async () => {
     const { getUserMedia } = camera();
     getUserMedia.mockRejectedValue(

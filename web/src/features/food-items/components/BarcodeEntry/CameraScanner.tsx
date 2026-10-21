@@ -50,7 +50,9 @@ export default function CameraScanner({ onDetected, onType }: Props) {
         track.stop();
       });
       timers.forEach(clearTimeout);
-      if (video) {
+      // A cancelled Strict Mode startup can finish after a newer effect attaches
+      // its stream to the same element. Only clear the preview owned by this run.
+      if (video && video.srcObject === stream) {
         video.srcObject = null;
       }
     };
