@@ -231,6 +231,43 @@ test("desktop sort supports pointer selection and natural Tab departure", async 
   expect(api.queries).toHaveLength(initialRequests + 1);
 });
 
+test("desktop Sort trigger closes an open menu without reopening or requesting", async ({
+  page,
+}) => {
+  const api = await foodApi(page, [milk]);
+  await page.goto("/pantry");
+  await expect(nameCells(page)).toHaveText(["Milk"]);
+  const initialRequests = api.queries.length;
+  const sort = page.getByRole("button", { name: "Sort: Added: Newest" });
+  const menu = page.getByRole("menu", { name: "Sort pantry items" });
+
+  await sort.click();
+  await expect(menu).toBeVisible();
+  await expect(sort).toHaveAttribute("aria-expanded", "true");
+  await sort.click();
+  await expect(menu).toHaveCount(0);
+  await expect(sort).toHaveAttribute("aria-expanded", "false");
+  await expect(sort).toBeFocused();
+  expect(api.queries).toHaveLength(initialRequests);
+
+  await sort.click();
+  await page.keyboard.press("ArrowDown");
+  await expect(
+    menu.getByRole("menuitemradio", { name: "Added: Oldest" }),
+  ).toBeFocused();
+  await sort.click();
+  await expect(menu).toHaveCount(0);
+  await expect(sort).toHaveAttribute("aria-expanded", "false");
+  expect(api.queries).toHaveLength(initialRequests);
+
+  await sort.click();
+  await expect(menu).toBeVisible();
+  await page.getByRole("heading", { name: "My Pantry" }).click();
+  await expect(menu).toHaveCount(0);
+  await expect(sort).toHaveAttribute("aria-expanded", "false");
+  expect(api.queries).toHaveLength(initialRequests);
+});
+
 for (const { width, sortName, actionOrder } of [
   {
     width: 1280,

@@ -82,11 +82,18 @@ export default function DesktopSortControl({
           tabIndex={-1}
           className="absolute top-full right-0 z-30 mt-2 max-h-[min(28rem,70dvh)] w-72 overflow-y-auto rounded-panel border border-border-default bg-surface p-2 shadow-modal"
           onBlur={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget)) {
+            if (
+              !event.currentTarget.contains(event.relatedTarget) &&
+              event.relatedTarget !== trigger.current
+            ) {
               setOpen(false);
             }
           }}
           onKeyDown={(event) => {
+            if (event.key === "Tab") {
+              setOpen(false);
+              return;
+            }
             if (event.key === "Escape") {
               event.preventDefault();
               setOpen(false);
