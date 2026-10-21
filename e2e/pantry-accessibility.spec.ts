@@ -343,3 +343,39 @@ test("mobile row actions close when focus leaves and restore focus on Escape", a
   await expect(actions).toBeFocused();
   await expect(actions).toHaveAttribute("aria-expanded", "false");
 });
+
+test("keyboard focus has a separated indicator on pantry controls", async ({
+  page,
+}) => {
+  await foodApi(page, [milk]);
+  await page.goto("/pantry");
+  await expect(nameCells(page)).toHaveText(["Milk"]);
+  await page.keyboard.press("Tab");
+
+  async function expectIndicator(locator: ReturnType<typeof page.getByRole>) {
+    await locator.focus();
+    await expect(locator).toHaveCSS("outline-style", "solid");
+    await expect(locator).toHaveCSS("outline-width", "2px");
+    await expect(locator).toHaveCSS("outline-offset", "2px");
+  }
+
+  const logo = page.getByRole("link", { name: "Sari" });
+  await expectIndicator(logo);
+  await expect(logo).toHaveCSS("border-radius", "8px");
+  await expectIndicator(
+    page.getByRole("searchbox", { name: "Search food items" }),
+  );
+  await expectIndicator(page.getByRole("button", { name: "Add item" }));
+  await expectIndicator(
+    page.getByRole("checkbox", { name: "Select all loaded items" }),
+  );
+  await expectIndicator(page.getByRole("button", { name: /Sort:/ }));
+  await expectIndicator(page.getByRole("button", { name: "Filter" }));
+
+  await page.getByRole("button", { name: "Filter" }).click();
+  const dialog = page.getByRole("dialog", { name: "Filter items" });
+  await page.keyboard.press("Tab");
+  await expectIndicator(dialog.getByLabel("Filter by"));
+  await expectIndicator(dialog.getByRole("button", { name: "Reset" }));
+  await expectIndicator(dialog.getByRole("button", { name: "Apply" }));
+});
