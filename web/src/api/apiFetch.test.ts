@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-
 import { apiFetch } from "./apiFetch";
 
 afterEach(() => {
@@ -283,6 +282,7 @@ describe("API transport", () => {
     const response = new Response(null, { status: 400 });
     vi.spyOn(response, "json").mockImplementation(() => {
       controller.abort();
+
       return Promise.reject(new DOMException("Cancelled", "AbortError"));
     });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
@@ -301,6 +301,7 @@ describe("API transport", () => {
       await expect(apiFetch("/health")).rejects.toBe(error);
       expect(fetch).toHaveBeenCalledOnce();
     }
+
     const fetch = vi.fn().mockResolvedValue(new Response("Invalid JSON"));
     vi.stubGlobal("fetch", fetch);
     await expect(apiFetch("/health")).rejects.toBeInstanceOf(SyntaxError);

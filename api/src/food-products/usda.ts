@@ -1,5 +1,4 @@
 import { foodProductSchema, normalizeBarcode } from "@sari/contracts";
-
 import { parsePackageSize } from "./packageSize.js";
 
 export class LookupError extends Error {
@@ -19,6 +18,7 @@ function object(value: unknown): Record<string, unknown> {
       "USDA returned unusable product details. Continue manually or try again.",
     );
   }
+
   return value as Record<string, unknown>;
 }
 
@@ -26,6 +26,7 @@ function text(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+/** Select a current exact GTIN match; reject incomplete searches and ambiguous identities. */
 export function selectUsdaFood(raw: unknown, barcode: string): string {
   const response = object(raw);
   if (!Array.isArray(response.foods)) {
@@ -34,6 +35,7 @@ export function selectUsdaFood(raw: unknown, barcode: string): string {
       "USDA returned an invalid search response.",
     );
   }
+
   const matches = response.foods
     .map(object)
     .filter(
@@ -53,12 +55,14 @@ export function selectUsdaFood(raw: unknown, barcode: string): string {
         422,
       );
     }
+
     throw new LookupError(
       "PRODUCT_NOT_FOUND",
       "Product not found in USDA. Enter the item details manually.",
       404,
     );
   }
+
   // Prefer the target North American market; never choose a known unrelated market.
   const eligible = matches.filter(
     (food) =>
@@ -72,14 +76,17 @@ export function selectUsdaFood(raw: unknown, barcode: string): string {
       422,
     );
   }
+
   const date = (food: Record<string, unknown>) =>
     Date.parse(text(food.publicationDate) ?? text(food.modifiedDate) ?? "") ||
     0;
+
   eligible.sort((a, b) => date(b) - date(a));
   const first = eligible[0];
   if (!first) {
     throw new LookupError("PRODUCT_NOT_FOUND", "Product not found.", 404);
   }
+
   if (
     eligible.some(
       (food) =>
@@ -96,9 +103,11 @@ export function selectUsdaFood(raw: unknown, barcode: string): string {
       422,
     );
   }
+
   return String(first.fdcId);
 }
 
+/** Recheck detail identity before exposing package suggestions; serving size is never a package size. */
 export function mapUsdaFood(
   raw: unknown,
   barcode: string,
@@ -120,6 +129,7 @@ export function mapUsdaFood(
       "USDA details did not match the scanned product. Continue manually.",
     );
   }
+
   const packageDescription = text(food.packageWeight);
   const result = foodProductSchema.omit({ id: true }).safeParse({
     barcode,
@@ -141,5 +151,6 @@ export function mapUsdaFood(
       "USDA product fields could not be used safely. Enter details manually.",
     );
   }
+
   return result.data;
 }

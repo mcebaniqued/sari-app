@@ -16,6 +16,7 @@ export default function ErrorPage({ title, description }: ErrorPageProps) {
     const previousTitle = document.title;
     document.title = `${title} | Sari`;
     heading.current?.focus({ preventScroll: true });
+
     return () => {
       document.title = previousTitle;
     };

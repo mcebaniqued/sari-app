@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-
 import { signedIn } from "./authFixture";
 
 test("frontend loads and its same-origin proxy reaches the API", async ({

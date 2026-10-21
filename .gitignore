@@ -1,14 +1,22 @@
+# Dependencies are restored from package-lock.json rather than committed.
 node_modules/
+# Workspace build output is regenerated from tracked source.
 dist/
+# Coverage and browser-test reports are generated verification artifacts.
 coverage/
 test-results/
 playwright-report/
+# Vercel CLI links and deployment metadata belong to the local checkout.
 .vercel/
+# Local database tools, protected credentials, and production backup archives.
 .backups/
+# Keep real environment values private; commit only the setup examples.
 .env
 .env.*
 !.env.example
+# TypeScript incremental caches and runtime/tool logs are regenerated locally.
 *.tsbuildinfo
 *.log
+# Operating-system metadata is unrelated to application source.
 .DS_Store
 Thumbs.db

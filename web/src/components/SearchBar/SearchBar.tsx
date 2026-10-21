@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { LuSearch, LuX } from "react-icons/lu";
-
 import Input from "@/components/Input/Input";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
@@ -22,6 +21,7 @@ export default function SearchBar({
   delayMs = 300,
 }: SearchBarProps) {
   const [value, setValue] = useState("");
+
   const submitted = useRef("");
   const id = useId();
   const debouncedValue = useDebouncedValue(value.trim(), delayMs);
@@ -29,9 +29,11 @@ export default function SearchBar({
     if (debouncedValue === submitted.current) {
       return;
     }
+
     submitted.current = debouncedValue;
     onSearch(debouncedValue);
   }, [debouncedValue, onSearch]);
+
   return (
     <div role="search" className="relative w-full min-w-0 sm:max-w-80">
       <label htmlFor={id} className="sr-only">

@@ -5,7 +5,6 @@ import {
 } from "@sari/contracts";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
 import app from "./app.js";
 
 afterEach(() => vi.unstubAllEnvs());

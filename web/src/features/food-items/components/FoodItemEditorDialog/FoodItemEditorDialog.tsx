@@ -1,7 +1,5 @@
 import type { CreateFoodItem, FoodItem } from "@sari/contracts";
-
 import Modal from "@/components/Modal/Modal";
-
 import FoodItemForm from "../FoodItemForm/FoodItemForm";
 
 interface FoodItemEditorDialogProps {
@@ -10,6 +8,7 @@ interface FoodItemEditorDialogProps {
   onClose: () => void;
   onSave: (values: CreateFoodItem) => Promise<void>;
 }
+
 export default function FoodItemEditorDialog({
   item,
   busy,

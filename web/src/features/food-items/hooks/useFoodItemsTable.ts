@@ -1,11 +1,9 @@
 import type { FoodItem } from "@sari/contracts";
 import type { AgGridReact } from "ag-grid-react";
 import { useCallback, useMemo, useRef, useState } from "react";
-
 import { notify } from "@/components/Toast/notifications";
 import { useAccessDenied } from "@/hooks/useAccessDenied";
 import { getApiErrorMessage } from "@/utils/apiError";
-
 import { createFoodItemsDatasource } from "../utils/createFoodItemsDatasource";
 
 export function useFoodItemsTable(revision: number) {
@@ -24,6 +22,7 @@ export function useFoodItemsTable(revision: number) {
       if (handleAccessDenied(cause)) {
         return;
       }
+
       const message = getApiErrorMessage(
         cause,
         "Unable to load items. Please try again.",
@@ -33,19 +32,24 @@ export function useFoodItemsTable(revision: number) {
     },
     [handleAccessDenied],
   );
+
   // Rebuilding resets paging and cancels obsolete requests after edits or retries.
   const datasource = useMemo(
     () =>
-      createFoodItemsDatasource(
-        { search, revision, retry },
-        { setLoading, setError, setTotal, onError },
-      ),
+      createFoodItemsDatasource(search, {
+        setLoading,
+        setError,
+        setTotal,
+        onError,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Writes and explicit retries must rebuild the datasource even when the search is unchanged.
     [search, revision, retry, onError],
   );
 
   const retryLoad = useCallback(() => {
     setRetry((value) => value + 1);
   }, []);
+
   return {
     gridRef,
     selected,

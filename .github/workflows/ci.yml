@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  # Pull requests validate feature branches; push checks cover deployment branches.
   push:
     branches: [main, staging]
   pull_request:

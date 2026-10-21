@@ -16,18 +16,23 @@ function getPageNodes(api: GridApi<FoodItem>) {
       nodes.push(node);
     }
   });
+
   return nodes;
 }
 
 export default function SelectPageHeader({ api }: { api: GridApi<FoodItem> }) {
   const input = useRef<HTMLInputElement>(null);
+
   const [selection, setSelection] = useState({ selected: 0, total: 0 });
+
   useEffect(() => {
     let active = true;
+
     const update = () => {
       if (!active || api.isDestroyed()) {
         return;
       }
+
       const nodes = getPageNodes(api);
       const selected = nodes.filter((node) => node.isSelected()).length;
       const total = nodes.length;
@@ -37,10 +42,12 @@ export default function SelectPageHeader({ api }: { api: GridApi<FoodItem> }) {
           : { selected, total },
       );
     };
+
     api.addEventListener("selectionChanged", update);
     api.addEventListener("paginationChanged", update);
     api.addEventListener("modelUpdated", update);
     queueMicrotask(update);
+
     return () => {
       active = false;
       if (!api.isDestroyed()) {
@@ -56,6 +63,7 @@ export default function SelectPageHeader({ api }: { api: GridApi<FoodItem> }) {
         selection.selected > 0 && selection.selected < selection.total;
     }
   }, [selection]);
+
   return (
     <input
       ref={input}

@@ -1,5 +1,4 @@
 import { z } from "zod";
-
 import { barcodeSchema } from "./barcodes.js";
 
 // Volume units outside the metric system use US customary measures.

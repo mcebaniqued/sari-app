@@ -10,9 +10,12 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default defineConfig(
+  // ESLint already ignores node_modules and .git; exclude generated outputs here.
   globalIgnores([
+    // Build tools own emitted code, declarations, and coverage instrumentation.
     "**/dist/**",
     "**/coverage/**",
+    // Playwright owns generated reports, traces, and screenshots.
     "playwright-report/**",
     "test-results/**",
   ]),
@@ -31,11 +34,17 @@ export default defineConfig(
       "unused-imports": unusedImports,
     },
     rules: {
-      "simple-import-sort/imports": "error",
+      // Keep the normal import order, without blank lines between categories.
+      "simple-import-sort/imports": [
+        "error",
+        { groups: [["^\\u0000", "^node:", "^@?\\w", "^", "^\\."]] },
+      ],
       "simple-import-sort/exports": "error",
       "unused-imports/no-unused-imports": "error",
       "@typescript-eslint/no-unused-vars": [
         "error",
+        // Required callback slots (such as Express's fourth error-handler argument)
+        // and intentionally discarded destructured fields use an underscore prefix.
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
       eqeqeq: ["error", "always"],
@@ -51,6 +60,7 @@ export default defineConfig(
   {
     files: [
       "api/src/**/*.ts",
+      "api/test/**/*.ts",
       "packages/contracts/src/**/*.ts",
       "web/src/**/*.{ts,tsx}",
     ],

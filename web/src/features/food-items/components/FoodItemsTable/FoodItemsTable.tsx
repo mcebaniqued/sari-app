@@ -1,6 +1,5 @@
 import type { FoodItem } from "@sari/contracts";
 import { AgGridReact } from "ag-grid-react";
-
 import { useFoodItemColumns } from "../../hooks/useFoodItemColumns";
 import { useFoodItemsTable } from "../../hooks/useFoodItemsTable";
 import type { FoodItemActions } from "../../types/foodItems";
@@ -20,6 +19,7 @@ interface FoodItemsTableProps extends FoodItemActions {
   revision: number;
   onAdd: () => void;
 }
+
 export default function FoodItemsTable({
   revision,
   disabled,
@@ -42,6 +42,7 @@ export default function FoodItemsTable({
     retryLoad,
   } = useFoodItemsTable(revision);
   const columnDefs = useFoodItemColumns({ disabled, onEdit, onDelete });
+
   return (
     <section
       aria-label="Food inventory"

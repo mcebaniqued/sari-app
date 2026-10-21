@@ -49,6 +49,7 @@ function retryPolicy(options: false | RetryOptions | undefined) {
   ) {
     throw new RangeError("Invalid API retry policy.");
   }
+
   return {
     maxRetries: options === false ? 0 : maxRetries,
     baseDelayMs,
@@ -61,10 +62,13 @@ function retryAfterMs(response: Response): number | undefined {
   if (!value) {
     return undefined;
   }
+
   if (/^\d+$/.test(value)) {
     return Number(value) * 1_000;
   }
+
   const date = Date.parse(value);
+
   return Number.isFinite(date) ? Math.max(0, date - Date.now()) : undefined;
 }
 
@@ -74,6 +78,7 @@ function wait(
   signal: AbortSignal | null | undefined,
 ): Promise<void> {
   signal?.throwIfAborted();
+
   return new Promise((resolve, reject) => {
     const onAbort = () => {
       clearTimeout(timer);
@@ -81,6 +86,7 @@ function wait(
       // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- AbortSignal permits arbitrary reasons; preserve its native cancellation semantics.
       reject(signal?.reason);
     };
+
     const timer = setTimeout(() => {
       signal?.removeEventListener("abort", onAbort);
       resolve();
@@ -113,6 +119,7 @@ export async function apiFetch<T>(
       Math.min(maxDelayMs, baseDelayMs * 2 ** attempt) *
       (0.5 + Math.random() * 0.5);
     let response: Response;
+
     try {
       response = await fetch(`${apiBaseUrl}/${path.replace(/^\//, "")}`, {
         ...init,
@@ -126,6 +133,7 @@ export async function apiFetch<T>(
       if (!(error instanceof TypeError) || attempt >= retries) {
         throw error;
       }
+
       await wait(backoff, init.signal);
       continue;
     }
@@ -148,6 +156,7 @@ export async function apiFetch<T>(
         if (error instanceof DOMException && error.name === "AbortError") {
           throw error;
         }
+
         return undefined;
       });
       init.signal?.throwIfAborted();
@@ -168,6 +177,7 @@ export async function apiFetch<T>(
         result.success ? result.data.error.code : undefined,
       );
     }
+
     if (
       method === "HEAD" ||
       response.status === 204 ||
@@ -175,8 +185,10 @@ export async function apiFetch<T>(
     ) {
       return undefined;
     }
+
     const body: unknown = await response.json();
     init.signal?.throwIfAborted();
+
     return body as T;
   }
 }

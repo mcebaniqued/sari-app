@@ -1,5 +1,4 @@
 import { LuPlus, LuTrash2 } from "react-icons/lu";
-
 import SearchBar from "@/components/SearchBar/SearchBar";
 
 const secondaryClass =
@@ -15,6 +14,7 @@ interface FoodItemsToolbarProps {
   onClearSelection: () => void;
   onDeleteSelected: () => void;
 }
+
 export default function FoodItemsToolbar({
   selectedCount,
   hasFilters,

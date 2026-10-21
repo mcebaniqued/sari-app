@@ -1,7 +1,6 @@
 import type { ApiErrorResponse } from "@sari/contracts";
 import { toNodeHandler } from "better-auth/node";
 import { Router } from "express";
-
 import { getAuth, hasSessionCookie } from "./auth.js";
 
 export const authRouter = Router();
@@ -14,12 +13,16 @@ authRouter.use(async (req, res, next) => {
     ["/sign-in/email", "/sign-up/email", "/sign-out"].includes(req.path);
   if (!sessionCheck && !mutation) {
     next();
+
     return;
   }
+
   if (sessionCheck && !hasSessionCookie(req.headers.cookie)) {
     res.json(null);
+
     return;
   }
+
   try {
     const auth = await getAuth();
     req.headers["x-sari-client-ip"] = req.ip ?? "unknown";

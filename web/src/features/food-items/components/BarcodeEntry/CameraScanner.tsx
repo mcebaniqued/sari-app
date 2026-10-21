@@ -1,6 +1,24 @@
 import { normalizeBarcode } from "@sari/contracts";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
+const SCAN_INTERVAL_MS = 250;
+const REQUIRED_MATCHING_READS = 3;
+const MAX_READ_GAP_MS = 1500;
+const LIGHTING_GUIDANCE_DELAY_MS = 10_000;
+const MANUAL_ENTRY_GUIDANCE_DELAY_MS = 25_000;
+
+function cameraErrorMessage(error: unknown) {
+  if (error instanceof DOMException && error.name === "NotAllowedError") {
+    return "Allow camera access in your browser settings, or enter the barcode number instead.";
+  }
+
+  if (error instanceof DOMException && error.name === "NotFoundError") {
+    return "No camera was found. Enter the barcode number instead.";
+  }
+
+  return "Camera scanning isn't available here. Enter the barcode number instead.";
+}
+
 interface Props {
   onDetected: (barcode: string) => void;
   onType: () => void;
@@ -8,8 +26,10 @@ interface Props {
 
 export default function CameraScanner({ onDetected, onType }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
+
   const [guidance, setGuidance] = useState(0);
   const [error, setError] = useState("");
+
   const detected = useEffectEvent(onDetected);
   const slowScan = guidance === 2 && !error;
 
@@ -22,29 +42,37 @@ export default function CameraScanner({ onDetected, onType }: Props) {
     let stopDecoding: (() => void) | undefined;
     const timers: ReturnType<typeof setTimeout>[] = [];
     const video = videoRef.current;
+
+    // Cleanup is safe both during decoding and after a late permission response.
     const stop = () => {
       stopDecoding?.();
       stream?.getTracks().forEach((track) => {
         track.stop();
       });
       timers.forEach(clearTimeout);
-      if (video) {
+      // A cancelled Strict Mode startup can finish after a newer effect attaches
+      // its stream to the same element. Only clear the preview owned by this run.
+      if (video && video.srcObject === stream) {
         video.srcObject = null;
       }
     };
+
     async function start() {
       try {
         if (!globalThis.isSecureContext) {
           setError(
             "Camera scanning needs a secure connection. You can enter the barcode number instead.",
           );
+
           return;
         }
+
         const media = (navigator as { mediaDevices?: MediaDevices })
           .mediaDevices;
         if (!media || !video) {
           throw new Error("Camera unavailable");
         }
+
         const [
           { BrowserMultiFormatReader },
           { BarcodeFormat, DecodeHintType },
@@ -61,10 +89,10 @@ export default function CameraScanner({ onDetected, onType }: Props) {
         timers.push(
           setTimeout(() => {
             setGuidance(1);
-          }, 10_000),
+          }, LIGHTING_GUIDANCE_DELAY_MS),
           setTimeout(() => {
             setGuidance(2);
-          }, 25_000),
+          }, MANUAL_ENTRY_GUIDANCE_DELAY_MS),
         );
         const formatLengths = new Map([
           [BarcodeFormat.UPC_A, 12],
@@ -86,8 +114,8 @@ export default function CameraScanner({ onDetected, onType }: Props) {
           [DecodeHintType.ALLOWED_LENGTHS, [14]],
         ]);
         const reader = new BrowserMultiFormatReader(hints, {
-          delayBetweenScanAttempts: 250,
-          delayBetweenScanSuccess: 250,
+          delayBetweenScanAttempts: SCAN_INTERVAL_MS,
+          delayBetweenScanSuccess: SCAN_INTERVAL_MS,
         });
         const controls = await reader.decodeFromStream(
           stream,
@@ -96,6 +124,7 @@ export default function CameraScanner({ onDetected, onType }: Props) {
             if (!result || controller.signal.aborted || accepted) {
               return;
             }
+
             const value = result.getText();
             const barcode = normalizeBarcode(value);
             if (
@@ -103,18 +132,22 @@ export default function CameraScanner({ onDetected, onType }: Props) {
               value.length !== formatLengths.get(result.getBarcodeFormat())
             ) {
               candidate = null;
+
               return;
             }
+
             // A valid checksum alone cannot rule out a misread. Require three
             // matching frames, without carrying old reads across a long gap.
             const now = performance.now();
             candidate =
-              candidate?.barcode === barcode && now - candidate.lastRead <= 1500
+              candidate?.barcode === barcode &&
+              now - candidate.lastRead <= MAX_READ_GAP_MS
                 ? { barcode, reads: candidate.reads + 1, lastRead: now }
                 : { barcode, reads: 1, lastRead: now };
-            if (candidate.reads < 3) {
+            if (candidate.reads < REQUIRED_MATCHING_READS) {
               return;
             }
+
             accepted = true;
             controls.stop();
             stop();
@@ -130,17 +163,13 @@ export default function CameraScanner({ onDetected, onType }: Props) {
       } catch (error) {
         stop();
         if (!controller.signal.aborted) {
-          setError(
-            error instanceof DOMException && error.name === "NotAllowedError"
-              ? "Allow camera access in your browser settings, or enter the barcode number instead."
-              : error instanceof DOMException && error.name === "NotFoundError"
-                ? "No camera was found. Enter the barcode number instead."
-                : "Camera scanning isn't available here. Enter the barcode number instead.",
-          );
+          setError(cameraErrorMessage(error));
         }
       }
     }
+
     void start();
+
     return () => {
       controller.abort();
       stop();

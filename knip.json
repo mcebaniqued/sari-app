@@ -1,5 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
+  "includeEntryExports": true,
   "workspaces": {
     ".": {
       "entry": ["scripts/verify-atlas-restore.mjs"]
@@ -9,10 +10,9 @@
     },
     "api": {
       "entry": ["src/app.ts"],
-      "project": ["src/**/*.ts"]
+      "project": ["src/**/*.ts", "test/**/*.ts"]
     },
     "web": {
-      "entry": ["src/api/apiFetch.ts"],
       "project": ["src/**/*.{ts,tsx,css}", "*.config.ts"]
     }
   }

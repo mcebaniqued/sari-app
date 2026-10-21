@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-
 import app from "./app.js";
 
 const port = Number(process.env.PORT ?? 3001);
@@ -12,10 +11,12 @@ const server = app.listen(port, () => {
 });
 
 let shuttingDown = false;
+
 function shutdown() {
   if (shuttingDown) {
     return;
   }
+
   shuttingDown = true;
 
   const timeout = setTimeout(() => process.exit(1), 10_000);

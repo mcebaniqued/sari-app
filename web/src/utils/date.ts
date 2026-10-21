@@ -19,5 +19,6 @@ export function formatDate(value: string): string {
   if (!Number.isFinite(date.getTime())) {
     return "";
   }
+
   return `${months[date.getUTCMonth()] ?? ""} ${String(date.getUTCDate()).padStart(2, "0")}, ${String(date.getUTCFullYear()).padStart(4, "0")}`;
 }

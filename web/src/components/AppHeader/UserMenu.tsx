@@ -11,6 +11,7 @@ export default function UserMenu({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const action = useRef<HTMLButtonElement>(null);
@@ -21,7 +22,9 @@ export default function UserMenu({
     if (!open) {
       return;
     }
+
     action.current?.focus();
+
     const outside = (event: PointerEvent) => {
       if (
         event.target instanceof Node &&
@@ -30,7 +33,9 @@ export default function UserMenu({
         setOpen(false);
       }
     };
+
     window.addEventListener("pointerdown", outside);
+
     return () => {
       window.removeEventListener("pointerdown", outside);
     };
@@ -40,9 +45,11 @@ export default function UserMenu({
     if (pending.current) {
       return;
     }
+
     pending.current = true;
     setBusy(true);
     setError("");
+
     try {
       await onLogout();
     } catch {

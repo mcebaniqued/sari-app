@@ -4,7 +4,6 @@ import {
   type LoginInput,
   type RegisterInput,
 } from "@sari/contracts";
-
 import { ApiError, apiFetch } from "@/api/apiFetch";
 
 const authErrorMessages: Record<string, string> = {
@@ -34,6 +33,7 @@ export async function getSession(signal?: AbortSignal) {
     ...(signal ? { signal } : {}),
     cache: "no-store",
   });
+
   return authSessionSchema.parse(response);
 }
 
@@ -55,6 +55,7 @@ export async function authenticate(
         }),
       },
     );
+
     return authUserSchema.parse(response?.user);
   } catch (error) {
     let message = "Could not reach Sari. Check your connection and try again.";

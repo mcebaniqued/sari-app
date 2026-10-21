@@ -4,7 +4,6 @@ import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import type { Db } from "mongodb";
 import mongoose from "mongoose";
-
 import { connectDatabase } from "../db.js";
 
 export function appOrigins() {
@@ -26,6 +25,7 @@ export function appOrigins() {
       appUrl.hostname === "localhost" ? "127.0.0.1" : "localhost";
     origins.push(appUrl.origin);
   }
+
   return [...new Set(origins)];
 }
 
@@ -40,11 +40,13 @@ function createAuth(database: Db) {
       "Configure BETTER_AUTH_URL with your HTTPS frontend origin in production.",
     );
   }
+
   if (!secret || secret.length < 32) {
     throw new Error(
       "Configure BETTER_AUTH_SECRET with at least 32 random characters.",
     );
   }
+
   return betterAuth({
     appName: "Sari",
     baseURL,
@@ -101,6 +103,7 @@ function createAuth(database: Db) {
         if (ctx.path !== "/sign-in/email" && ctx.path !== "/sign-up/email") {
           return Promise.resolve();
         }
+
         const signingUp = ctx.path === "/sign-up/email";
         if (signingUp) {
           const result = registerSchema.safeParse(ctx.body);
@@ -112,6 +115,7 @@ function createAuth(database: Db) {
                 "Check your account details.",
             });
           }
+
           ctx.body = {
             ...result.data,
             name: `${result.data.firstName} ${result.data.lastName}`,
@@ -126,8 +130,10 @@ function createAuth(database: Db) {
                 "Check your account details.",
             });
           }
+
           ctx.body = result.data;
         }
+
         return Promise.resolve();
       }),
     },
@@ -143,9 +149,11 @@ export async function getAuth() {
   if (!database) {
     throw new Error("Database is unavailable.");
   }
+
   if (cached?.database !== database) {
     cached = { database, auth: createAuth(database) };
   }
+
   return cached.auth;
 }
 

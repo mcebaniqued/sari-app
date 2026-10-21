@@ -8,7 +8,6 @@ import {
   type RowSelectionOptions,
   themeQuartz,
 } from "ag-grid-community";
-
 import SelectPageHeader from "./SelectPageHeader";
 
 export const FOOD_ITEMS_PAGE_SIZE = 20;
@@ -54,6 +53,7 @@ export const selectionColumnDef = {
   resizable: false,
   headerComponent: SelectPageHeader,
 };
+
 export const getRowId = ({ data }: GetRowIdParams<FoodItem>) => data.id;
 
 // Infinite scrolling needs a placeholder to trigger its first request. Keep it

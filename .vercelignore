@@ -1,7 +1,10 @@
+# Configure deployment secrets in Vercel; upload only the environment examples.
 **/.env
 **/.env.*
 !**/.env.example
+# Browser-test artifacts and coverage reports are not deployment inputs.
 test-results/
 playwright-report/
 coverage/
+# Production backups, protected credentials, and database tools must stay local.
 .backups/

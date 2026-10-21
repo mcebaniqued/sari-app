@@ -1,7 +1,6 @@
 import type { CreateFoodItem, FoodItem } from "@sari/contracts";
 import { useEffect, useRef, useState } from "react";
 import { LuCheck, LuPlus } from "react-icons/lu";
-
 import { useBarcodeProduct } from "../../hooks/useBarcodeProduct";
 import { useFoodItemDraft } from "../../hooks/useFoodItemDraft";
 import { useFoodItemForm } from "../../hooks/useFoodItemForm";
@@ -24,6 +23,7 @@ export default function FoodItemForm({
 }: FoodItemFormProps) {
   const [mode, setMode] = useState<"manual" | "barcode">("manual");
   const [barcodeValue, setBarcodeValue] = useState("");
+
   const entryRef = useRef<HTMLDivElement>(null);
   const draft = useFoodItemDraft(item);
   const barcode = useBarcodeProduct(item, draft);
@@ -92,7 +92,7 @@ export default function FoodItemForm({
               productId={barcode.productId}
               barcode={barcode.barcode}
               message={barcode.productId ? barcode.message : ""}
-              replacing={Boolean(barcode.replace)}
+              replacing={Boolean(barcode.replacement)}
               onReplace={barcode.replaceValues}
               onKeep={barcode.keepValues}
               onUnlink={barcode.unlink}

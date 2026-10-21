@@ -1,6 +1,5 @@
 import { createElement } from "react";
 import { toast } from "react-toastify/unstyled";
-
 import Toast, { type NotificationTone } from "./Toast";
 
 /** Call after the final outcome. IDs prevent duplicate notices while one is visible. */

@@ -1,6 +1,5 @@
 import { LuCircleAlert, LuCircleCheck, LuInfo } from "react-icons/lu";
 import type { ToastContentProps } from "react-toastify/unstyled";
-
 import { useAutoDismiss } from "@/hooks/useAutoDismiss";
 
 export type NotificationTone = "success" | "error" | "info" | "warning";
@@ -27,6 +26,7 @@ export default function Toast({
       : data.tone === "info"
         ? LuInfo
         : LuCircleAlert;
+
   return (
     <div className="flex min-w-0 flex-1 items-center gap-3">
       <Icon

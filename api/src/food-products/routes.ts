@@ -1,6 +1,5 @@
 import { barcodeSchema, foodItemIdSchema } from "@sari/contracts";
 import { Router } from "express";
-
 import { connectDatabase } from "../db.js";
 import { FoodProductModel } from "./model.js";
 import { lookupBarcode, productDto } from "./service.js";
@@ -17,8 +16,10 @@ foodProductsRouter.get("/barcode/:barcode", async (req, res) => {
         message: parsed.error.issues[0]?.message ?? "Invalid barcode.",
       },
     });
+
     return;
   }
+
   try {
     await connectDatabase();
     res.json(await lookupBarcode(parsed.data));
@@ -41,8 +42,10 @@ foodProductsRouter.get("/:id", async (req, res) => {
     res
       .status(400)
       .json({ error: { code: "INVALID_ID", message: "Invalid product ID." } });
+
     return;
   }
+
   await connectDatabase();
   const product = await FoodProductModel.findById(req.params.id);
   if (!product) {
@@ -52,7 +55,9 @@ foodProductsRouter.get("/:id", async (req, res) => {
         message: "Linked product is unavailable. You can remove its link.",
       },
     });
+
     return;
   }
+
   res.json(productDto(product));
 });

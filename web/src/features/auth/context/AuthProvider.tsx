@@ -6,7 +6,6 @@ import {
   useRef,
   useState,
 } from "react";
-
 import { getSession, signOut } from "../api/authApi";
 import { AuthContext } from "./AuthContext";
 
@@ -14,14 +13,22 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // A response must belong to the current session version, even after an account switch.
   const version = useRef(0);
   const request = useRef<AbortController | null>(null);
+
+  const invalidateSessionRequest = useCallback(() => {
+    ++version.current;
+    request.current?.abort();
+  }, []);
 
   const refresh = useCallback(async () => {
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
     const current = ++version.current;
+
     try {
       const session = await getSession(controller.signal);
       if (version.current === current) {
@@ -42,45 +49,48 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const signedIn = useCallback((nextUser: AuthUser) => {
-    ++version.current;
-    request.current?.abort();
-    setUser(nextUser);
-    setError("");
-    setLoading(false);
-  }, []);
+  const signedIn = useCallback(
+    (nextUser: AuthUser) => {
+      invalidateSessionRequest();
+      setUser(nextUser);
+      setError("");
+      setLoading(false);
+    },
+    [invalidateSessionRequest],
+  );
 
   const logout = useCallback(async () => {
     await signOut();
-    ++version.current;
-    request.current?.abort();
+    invalidateSessionRequest();
     setUser(null);
     setError("");
-  }, []);
+  }, [invalidateSessionRequest]);
 
   useEffect(() => {
     const expired = () => {
-      ++version.current;
-      request.current?.abort();
+      invalidateSessionRequest();
       setUser(null);
       setError("");
       setLoading(false);
     };
+
     const recheck = () => {
       void refresh();
     };
+
     const initialCheck = window.setTimeout(() => {
       void refresh();
     }, 0);
     window.addEventListener("sari:unauthorized", expired);
     window.addEventListener("focus", recheck);
+
     return () => {
       window.clearTimeout(initialCheck);
       request.current?.abort();
       window.removeEventListener("sari:unauthorized", expired);
       window.removeEventListener("focus", recheck);
     };
-  }, [refresh]);
+  }, [refresh, invalidateSessionRequest]);
 
   // Key the subtree so changing accounts discards every pantry cache and draft.
   return (

@@ -1,6 +1,5 @@
 import { createFoodItemSchema, updateFoodItemSchema } from "@sari/contracts";
 import { describe, expect, it } from "vitest";
-
 import { FoodItemModel } from "./model.js";
 
 describe("food units across contracts and storage", () => {

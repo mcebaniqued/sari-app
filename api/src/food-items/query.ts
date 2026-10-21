@@ -1,6 +1,7 @@
 import type { FoodItemQuery } from "@sari/contracts";
 
 type Predicate = Record<string, unknown>;
+
 const escapeRegex = (value: string) =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -11,9 +12,11 @@ function textPredicate(
   if (filter.type === "blank") {
     return { [field]: { $in: [null, ""] } };
   }
+
   if (filter.type === "notBlank") {
     return { [field]: { $nin: [null, ""] } };
   }
+
   let value = filter.filter ?? "";
   if (field === "unit" && value.toLowerCase() === "items") {
     value = "item";
@@ -28,6 +31,7 @@ function textPredicate(
           ? `${literal}$`
           : literal;
   const regex = new RegExp(pattern, "i");
+
   return {
     [field]:
       filter.type === "notEqual" || filter.type === "notContains"
@@ -41,6 +45,7 @@ function numberPredicate(
 ): Predicate {
   switch (filter.type) {
     case "blank":
+      // Quantity is required, so a blank filter must match no documents.
       return { _id: { $exists: false } };
     case "notBlank":
       return {};
@@ -68,13 +73,16 @@ function datePredicate(
   if (filter.type === "blank") {
     return { [field]: null };
   }
+
   if (filter.type === "notBlank") {
     return { [field]: { $ne: null } };
   }
+
   const date = filter.dateFrom;
   if (!date) {
     throw new Error("Date filter was not validated.");
   }
+
   if (field === "expiresOn") {
     switch (filter.type) {
       case "equals":
@@ -93,8 +101,11 @@ function datePredicate(
         return { expiresOn: { $gte: date, $lte: filter.dateTo } };
     }
   }
+  // Calendar filters on timestamps cover a UTC day with an exclusive upper bound.
   const from = new Date(`${date}T00:00:00.000Z`);
+
   const nextDay = (value: Date) => new Date(value.getTime() + 86_400_000);
+
   switch (filter.type) {
     case "equals":
       return { createdAt: { $gte: from, $lt: nextDay(from) } };
@@ -123,6 +134,7 @@ function datePredicate(
   }
 }
 
+/** Translate an already validated whitelist of filters into MongoDB predicates. */
 export function foodMongoQuery(query: FoodItemQuery) {
   const clauses: Predicate[] = [];
   if (query.search) {
@@ -152,6 +164,8 @@ export function foodMongoQuery(query: FoodItemQuery) {
   } else {
     sort.createdAt = -1;
   }
+  // Deterministic ties keep page boundaries stable when several values are equal.
   sort._id = -1;
+
   return { filter: clauses.length ? { $and: clauses } : {}, sort };
 }

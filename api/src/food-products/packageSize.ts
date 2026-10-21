@@ -10,6 +10,34 @@ const units = {
   "fl oz": { dimension: "volume", imperial: true, factor: 29.5735295625 },
 } as const;
 
+const unitAliases: Record<string, keyof typeof units> = {
+  g: "g",
+  gram: "g",
+  grams: "g",
+  kg: "kg",
+  kilogram: "kg",
+  kilograms: "kg",
+  ml: "ml",
+  milliliter: "ml",
+  milliliters: "ml",
+  millilitre: "ml",
+  millilitres: "ml",
+  l: "l",
+  liter: "l",
+  liters: "l",
+  litre: "l",
+  litres: "l",
+  oz: "oz",
+  onz: "oz",
+  ounce: "oz",
+  ounces: "oz",
+  lb: "lb",
+  lbs: "lb",
+  pound: "lb",
+  pounds: "lb",
+  floz: "fl oz",
+};
+
 function measurement(value: string | undefined) {
   const match = value?.match(
     /^\s*(\d+(?:\.\d+)?)\s*(g|grams?|kg|kilograms?|ml|millilit(?:er|re)s?|l|lit(?:er|re)s?|oz|onz|ounces?|lb|lbs|pounds?|fl\s*oz)\s*$/i,
@@ -17,27 +45,18 @@ function measurement(value: string | undefined) {
   if (!match?.[1] || !match[2]) {
     return null;
   }
+
   const quantity = Number(match[1]);
   if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1_000_000) {
     return null;
   }
+
   const name = match[2].toLowerCase().replace(/\s/g, "");
-  const unit =
-    name.startsWith("kg") || name.startsWith("kilogram")
-      ? "kg"
-      : name.startsWith("ml") || name.startsWith("millilit")
-        ? "ml"
-        : name.startsWith("fl")
-          ? "fl oz"
-          : name.startsWith("lb") || name.startsWith("pound")
-            ? "lb"
-            : name.startsWith("oz") ||
-                name === "onz" ||
-                name.startsWith("ounce")
-              ? "oz"
-              : name.startsWith("g")
-                ? "g"
-                : "l";
+  const unit = unitAliases[name];
+  if (!unit) {
+    return null;
+  }
+
   return { quantity, unit, ...units[unit] };
 }
 
@@ -48,18 +67,22 @@ export function parsePackageSize(description: string | null | undefined) {
   if (single) {
     return { packageQuantity: single.quantity, packageUnit: single.unit };
   }
+
   const pair = description?.match(/^(.+?)\s*(?:\/\s*(.+)|\(\s*(.+)\s*\))$/);
   if (!pair) {
     return empty;
   }
+
   const left = measurement(pair[1]);
   const right = measurement(pair[2] ?? pair[3]);
   if (!left || !right) {
     return empty;
   }
+
   if (left.dimension !== right.dimension || left.imperial === right.imperial) {
     return empty;
   }
+
   const imperial = left.imperial ? left : right;
   const metric = left.imperial ? right : left;
   const imperialAmount = imperial.quantity * imperial.factor;
@@ -69,5 +92,6 @@ export function parsePackageSize(description: string | null | undefined) {
   if (Math.abs(imperialAmount - metricAmount) > tolerance) {
     return empty;
   }
+
   return { packageQuantity: imperial.quantity, packageUnit: imperial.unit };
 }

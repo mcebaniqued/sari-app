@@ -7,7 +7,6 @@ import {
 } from "@testing-library/react";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
 import CameraScanner from "./CameraScanner";
 
 const { decode, stop, reader } = vi.hoisted(() => ({
@@ -38,6 +37,7 @@ function read(value: string, format = BarcodeFormat.UPC_A) {
     );
   });
 }
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
@@ -52,6 +52,7 @@ describe("camera scanning lifecycle", () => {
     const getUserMedia = vi.fn().mockResolvedValue(stream);
     vi.stubGlobal("navigator", { mediaDevices: { getUserMedia } });
     decode.mockResolvedValue({ stop });
+
     return { stream, trackStop, getUserMedia };
   }
 
@@ -83,14 +84,18 @@ describe("camera scanning lifecycle", () => {
     });
     const hints = reader.mock.calls[0]?.[0] as Map<DecodeHintType, unknown>;
     expect(hints.get(DecodeHintType.ALLOWED_LENGTHS)).toEqual([14]);
+
     for (let i = 0; i < 3; i++) {
       read("25384482", BarcodeFormat.ITF);
     }
+
     expect(onDetected).not.toHaveBeenCalled();
     expect(trackStop).not.toHaveBeenCalled();
+
     for (let i = 0; i < 3; i++) {
       read("853807005033");
     }
+
     expect(onDetected).toHaveBeenCalledExactlyOnceWith("853807005033");
   });
   it("discards an isolated valid misread when the following frames identify another barcode", async () => {
@@ -118,9 +123,11 @@ describe("camera scanning lifecycle", () => {
     await waitFor(() => {
       expect(decode).toHaveBeenCalledOnce();
     });
+
     for (let i = 0; i < 3; i++) {
       read(value, format);
     }
+
     expect(onDetected).toHaveBeenCalledExactlyOnceWith(value);
   });
   it.each([
@@ -134,9 +141,11 @@ describe("camera scanning lifecycle", () => {
     await waitFor(() => {
       expect(decode).toHaveBeenCalledOnce();
     });
+
     for (let i = 0; i < 3; i++) {
       read(value, format);
     }
+
     expect(onDetected).not.toHaveBeenCalled();
     expect(trackStop).not.toHaveBeenCalled();
   });
@@ -216,6 +225,40 @@ describe("camera scanning lifecycle", () => {
     expect(trackStop).toHaveBeenCalled();
     expect(decode).not.toHaveBeenCalled();
   });
+  it("does not clear a newer preview when cancelled permission resolves late", async () => {
+    const { trackStop, getUserMedia, stream } = camera();
+    let resolvePermission: ((value: unknown) => void) | undefined;
+    getUserMedia.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePermission = resolve;
+        }),
+    );
+
+    const view = render(
+      <CameraScanner onDetected={vi.fn()} onType={vi.fn()} />,
+    );
+    const video = screen.getByLabelText<HTMLVideoElement>(
+      "Barcode camera preview",
+    );
+    await waitFor(() => {
+      expect(getUserMedia).toHaveBeenCalledOnce();
+    });
+    view.unmount();
+
+    // Simulate a newer effect taking ownership before the cancelled request settles.
+    const newerStream = {} as MediaStream;
+    video.srcObject = newerStream;
+    await act(async () => {
+      resolvePermission?.(stream);
+      await Promise.resolve();
+    });
+
+    expect(trackStop).toHaveBeenCalled();
+    expect(video.srcObject).toBe(newerStream);
+    expect(decode).not.toHaveBeenCalled();
+  });
+
   it("offers manual input after camera permission failure", async () => {
     const { getUserMedia } = camera();
     getUserMedia.mockRejectedValue(

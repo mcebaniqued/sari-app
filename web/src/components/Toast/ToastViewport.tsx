@@ -22,8 +22,10 @@ function InstantTransition(props: ToastTransitionProps) {
       exit();
     }
   }, [props.isIn]);
+
   return <>{props.children}</>;
 }
+
 function CloseButton({ closeToast }: CloseButtonProps) {
   return (
     <button
@@ -48,6 +50,7 @@ function CloseButton({ closeToast }: CloseButtonProps) {
     </button>
   );
 }
+
 export default function ToastViewport() {
   return (
     <ToastContainer

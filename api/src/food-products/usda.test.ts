@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import { mapUsdaFood, selectUsdaFood } from "./usda.js";
 
 const barcode = "00012345678905";

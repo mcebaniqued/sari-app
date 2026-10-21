@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import { safeReturnPath } from "./returnPath";
 
 describe("login return destinations", () => {

@@ -17,5 +17,6 @@ export function useAuth() {
   if (!auth) {
     throw new Error("Authentication provider is missing.");
   }
+
   return auth;
 }

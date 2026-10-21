@@ -1,5 +1,4 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-
 import { useAuth } from "../context/AuthContext";
 
 export default function AuthBoundary({
@@ -16,6 +15,7 @@ export default function AuthBoundary({
       </p>
     );
   }
+
   if (error) {
     return (
       <div className="mx-auto max-w-md p-8 text-center">
@@ -31,9 +31,11 @@ export default function AuthBoundary({
       </div>
     );
   }
+
   if (publicOnly) {
     return user ? <Navigate to="/pantry" replace /> : <Outlet />;
   }
+
   return user ? (
     <Outlet />
   ) : (

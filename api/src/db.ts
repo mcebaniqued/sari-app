@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 
 let connectionPromise: Promise<typeof mongoose> | undefined;
 
+/** Share connection attempts across requests; clear settled attempts so failures can retry. */
 export async function connectDatabase(): Promise<void> {
   const uri = process.env.MONGODB_URI?.trim();
   if (!uri) {

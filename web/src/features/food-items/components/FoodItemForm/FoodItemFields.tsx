@@ -1,8 +1,6 @@
 import { foodUnitSchema } from "@sari/contracts";
 import { LuChevronDown } from "react-icons/lu";
-
 import Input from "@/components/Input/Input";
-
 import type { FoodItemDraft } from "../../hooks/useFoodItemDraft";
 import { foodUnitLabels } from "../../utils/foodUnits";
 
@@ -66,7 +64,7 @@ export default function FoodItemFields({ values, onChange }: Props) {
               onChange={(event) => {
                 onChange("unit", event.target.value);
               }}
-              className="min-h-[2.875rem] w-full min-w-0 appearance-none rounded-control border border-border-control bg-surface py-2.5 pr-10 pl-3 text-base text-content focus:border-brand focus:outline-2 focus:outline-offset-1 focus:outline-brand disabled:opacity-50"
+              className="min-h-11.5 w-full min-w-0 appearance-none rounded-control border border-border-control bg-surface py-2.5 pr-10 pl-3 text-base text-content focus:border-brand focus:outline-2 focus:outline-offset-1 focus:outline-brand disabled:opacity-50"
             >
               {foodUnitSchema.options.map((unit) => (
                 <option key={unit} value={unit}>

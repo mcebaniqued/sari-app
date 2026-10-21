@@ -1,11 +1,18 @@
 import type { FoodItem } from "@sari/contracts";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { useMemo } from "react";
-
 import { formatDate } from "@/utils/date";
-
 import FoodItemRowActions from "../components/FoodItemsTable/FoodItemRowActions";
 import type { FoodItemActions } from "../types/foodItems";
+
+const dateFilterParams = {
+  browserDatePicker: true,
+  maxNumConditions: 1,
+  debounceMs: 300,
+  inRangeInclusive: true,
+  minValidYear: 1,
+  maxValidYear: 9999,
+};
 
 export function useFoodItemColumns({
   disabled,
@@ -43,14 +50,7 @@ export function useFoodItemColumns({
         width: 180,
         cellDataType: "dateString",
         filter: "agDateColumnFilter",
-        filterParams: {
-          browserDatePicker: true,
-          maxNumConditions: 1,
-          debounceMs: 300,
-          inRangeInclusive: true,
-          minValidYear: 1,
-          maxValidYear: 9999,
-        },
+        filterParams: dateFilterParams,
         valueFormatter: ({ value, data }) =>
           !data
             ? ""
@@ -64,14 +64,7 @@ export function useFoodItemColumns({
         width: 160,
         cellDataType: "dateTimeString",
         filter: "agDateColumnFilter",
-        filterParams: {
-          browserDatePicker: true,
-          maxNumConditions: 1,
-          debounceMs: 300,
-          inRangeInclusive: true,
-          minValidYear: 1,
-          maxValidYear: 9999,
-        },
+        filterParams: dateFilterParams,
         valueFormatter: ({ value }: { value: unknown }) =>
           typeof value === "string" ? formatDate(value) : "",
       },
