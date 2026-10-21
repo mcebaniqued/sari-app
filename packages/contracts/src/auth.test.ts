@@ -1,5 +1,6 @@
-import { loginSchema, registerSchema } from "@sari/contracts";
 import { describe, expect, it } from "vitest";
+
+import { loginSchema, registerSchema } from "./auth.js";
 
 describe("account validation", () => {
   const input = {

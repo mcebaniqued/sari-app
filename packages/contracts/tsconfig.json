@@ -4,6 +4,8 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": ["ES2023"],
+    // Source checking includes tests; only tsconfig.build.json may emit library files.
+    "noEmit": true,
     "rootDir": "src",
     "outDir": "dist",
     "declaration": true,

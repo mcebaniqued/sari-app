@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false
+  },
+  // Tests are typechecked by the workspace config but never emitted for consumers.
+  "exclude": ["src/**/*.test.ts"]
+}
