@@ -10,6 +10,7 @@ import {
   vi,
 } from "vitest";
 
+import { testDatabaseUri } from "../../test/database.js";
 import app from "../app.js";
 import { connectDatabase } from "../db.js";
 import { FoodItemModel } from "../food-items/model.js";
@@ -39,14 +40,7 @@ const otherAgent = request.agent(app).set("Origin", "http://127.0.0.1:5173");
 // CI or test:integration instead of using the application's database settings.
 describe.skipIf(!testUri)("USDA lookup persistence", () => {
   beforeAll(async () => {
-    if (!testUri || !/_test(?:\?|$)/.test(testUri)) {
-      throw new Error("Disposable _test database required.");
-    }
-
-    vi.stubEnv(
-      "MONGODB_URI",
-      testUri.replace(/_test(?=\?|$)/, "_barcode_test"),
-    );
+    vi.stubEnv("MONGODB_URI", testDatabaseUri(testUri, "barcode"));
     vi.stubEnv(
       "BETTER_AUTH_SECRET",
       "test-only-barcode-secret-long-enough-123456789",

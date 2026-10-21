@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { removeTestUsers, testDatabaseUri } from "../../test/database.js";
 import app from "../app.js";
 import { connectDatabase } from "../db.js";
 import { FoodItemModel } from "./model.js";
@@ -18,13 +19,7 @@ describe.skipIf(!testUri)("MongoDB food persistence", () => {
   let userId: string;
 
   beforeAll(async () => {
-    if (!testUri || !/\/_?[\w-]+_test(?:\?|$)/.test(testUri)) {
-      throw new Error(
-        "TEST_MONGODB_URI must explicitly name a database ending in _test.",
-      );
-    }
-
-    vi.stubEnv("MONGODB_URI", testUri.replace(/_test(?=\?|$)/, "_pantry_test"));
+    vi.stubEnv("MONGODB_URI", testDatabaseUri(testUri, "pantry"));
     vi.stubEnv(
       "BETTER_AUTH_SECRET",
       "test-only-secret-for-pantry-persistence-12345",
@@ -49,11 +44,7 @@ describe.skipIf(!testUri)("MongoDB food persistence", () => {
       }
     } finally {
       if (userId) {
-        const db = mongoose.connection.db;
-        const id = new mongoose.Types.ObjectId(userId);
-        await db?.collection("session").deleteMany({ userId: id });
-        await db?.collection("account").deleteMany({ userId: id });
-        await db?.collection("user").deleteOne({ _id: id });
+        await removeTestUsers([userId]);
       }
       await mongoose.disconnect();
       vi.unstubAllEnvs();

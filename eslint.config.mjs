@@ -56,6 +56,7 @@ export default defineConfig(
   {
     files: [
       "api/src/**/*.ts",
+      "api/test/**/*.ts",
       "packages/contracts/src/**/*.ts",
       "web/src/**/*.{ts,tsx}",
     ],

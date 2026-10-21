@@ -7,6 +7,7 @@ import mongoose from "mongoose";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { removeTestUsers, testDatabaseUri } from "../../test/database.js";
 import app from "../app.js";
 import { connectDatabase } from "../db.js";
 import { FoodItemModel } from "../food-items/model.js";
@@ -25,11 +26,7 @@ describe.skipIf(!testUri)("real authentication and pantry isolation", () => {
   const email = `alice-${new mongoose.Types.ObjectId().toHexString()}@example.com`;
 
   beforeAll(async () => {
-    if (!testUri || !/\/_?[\w-]+_test(?:\?|$)/.test(testUri)) {
-      throw new Error("Use an explicitly named _test database.");
-    }
-
-    vi.stubEnv("MONGODB_URI", testUri.replace(/_test(?=\?|$)/, "_auth_test"));
+    vi.stubEnv("MONGODB_URI", testDatabaseUri(testUri, "auth"));
     vi.stubEnv(
       "BETTER_AUTH_SECRET",
       "auth-integration-test-secret-at-least-32-chars",
@@ -41,11 +38,7 @@ describe.skipIf(!testUri)("real authentication and pantry isolation", () => {
   afterAll(async () => {
     try {
       await FoodItemModel.deleteMany({ _id: { $in: items } });
-      const ids = users.map((id) => new mongoose.Types.ObjectId(id));
-      const db = mongoose.connection.db;
-      await db?.collection("session").deleteMany({ userId: { $in: ids } });
-      await db?.collection("account").deleteMany({ userId: { $in: ids } });
-      await db?.collection("user").deleteMany({ _id: { $in: ids } });
+      await removeTestUsers(users);
     } finally {
       await mongoose.disconnect();
       vi.unstubAllEnvs();
