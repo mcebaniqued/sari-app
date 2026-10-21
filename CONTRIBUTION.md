@@ -35,8 +35,6 @@ web/src/
 
 Keep feature-specific API calls, state, and UI inside that feature. Route pages compose components and hooks; form submission and table loading belong to hooks, while the imperative datasource adapter stays independent of React. Shared components, hooks, and utilities should not import feature code. Source tests live beside the code they exercise. Shared API test helpers live in `api/test`; browser fixtures live in `e2e/fixtures`. Use `@/` for imports from `web/src` across shared areas; relative imports work within a feature or component folder. TypeScript, Vite, and Vitest resolve the same alias.
 
-SearchBar accepts its label, placeholder, and length limit from the caller and uses the shared debounce hook. Pantry-specific wording and query limits stay in the pantry toolbar.
-
 ## Local development details
 
 Vite proxies `/api/v1` to the API at port 3001. Browser requests use the same origin, so local development needs no CORS setup. The frontend's optional `VITE_API_BASE_URL` defaults to `/api/v1`.
@@ -92,7 +90,7 @@ Husky runs lint-staged before commits. GitHub Actions runs the validation comman
 
 Readability requires blank lines between independent declarations and meaningful steps inside functions. Keep related statements together and document non-obvious invariants. Prettier enforces formatting; manual review checks logical grouping.
 
-Keep `.json` files valid strict JSON, with configuration explanations in documentation. The root `tsconfig.json` checks Playwright configuration and browser tests; workspace configurations check application and contracts sources. API and contracts source checks include tests, while their separate `tsconfig.build.json` files exclude tests from emitted production files. The contracts source-check configuration disables emission. Shared `skipLibCheck` avoids rechecking dependency declarations in every workspace; application code and its use of those types remain checked.
+The root `tsconfig.json` checks Playwright configuration and browser tests; workspace configurations check application and contracts sources. API and contracts source checks include tests, while their separate `tsconfig.build.json` files exclude tests from emitted production files. The contracts source-check configuration disables emission. Shared `skipLibCheck` avoids rechecking dependency declarations in every workspace; application code and its use of those types remain checked.
 
 ESLint uses strict TypeScript type-aware rules, React Hooks checks, JSX accessibility checks, import sorting, unused import detection, and Playwright rules, with zero warnings allowed. The maintained `@htmlacademy/eslint-plugin-jsx-a11y` fork supports the project’s ESLint 10 version.
 
@@ -191,7 +189,7 @@ Integration tests never load `api/.env` and delete only the records they create.
 
 ## Vercel deployment
 
-The Vercel projects are `sari-api` and `sari-web` in Miguel's projects. Their production domains are `https://sari-api.vercel.app` and `https://sari-web.vercel.app`.
+The Vercel projects are `sari-api` and `sari-web`. Their production domains are `https://sari-api.vercel.app` and `https://sari-web.vercel.app`.
 
 Use two Vercel projects connected to this repository:
 
@@ -230,8 +228,8 @@ Keep `VITE_API_BASE_URL=/api/v1` so browser requests remain same-origin. Set the
 For CLI deployments, run from the repository root so both application directories and the contracts package are uploaded:
 
 ```sh
-npx vercel deploy . --project sari-api --scope miguels-projects-51fb4258 --prod
-npx vercel deploy . --project sari-web --scope miguels-projects-51fb4258 --prod
+npx vercel deploy . --project sari-api --prod
+npx vercel deploy . --project sari-web --prod
 ```
 
 Verify `/api/v1/health` and `/api/v1/ready` through the frontend domain, then check registration, login, pantry persistence, and a direct refresh of `/pantry`. Automatic Git deployments require the Vercel GitHub integration and the Vercel account's GitHub authentication to retain access to this repository.
