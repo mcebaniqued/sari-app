@@ -3,6 +3,7 @@ import { expect, type Page, test as base } from "@playwright/test";
 import {
   createFoodItemSchema,
   type FoodItem,
+  type FoodItemQuery,
   foodItemQuerySchema,
   type FoodProduct,
 } from "@sari/contracts";
@@ -60,6 +61,62 @@ export const usdaOats: FoodProduct = {
   sourcePublishedAt: "2026-01-01",
   checkedAt: "2026-10-20T00:00:00Z",
 };
+
+function matchesFilter(
+  value: string | number | null,
+  filter: NonNullable<FoodItemQuery["filters"][keyof FoodItemQuery["filters"]]>,
+) {
+  if (filter.type === "blank") {
+    return value === null || value === "";
+  }
+  if (filter.type === "notBlank") {
+    return value !== null && value !== "";
+  }
+  if (filter.filterType === "text") {
+    const text = String(value ?? "").toLowerCase();
+    const expected = String(filter.filter ?? "").toLowerCase();
+    switch (filter.type) {
+      case "equals":
+        return text === expected;
+      case "notEqual":
+        return text !== expected;
+      case "contains":
+        return text.includes(expected);
+      case "notContains":
+        return !text.includes(expected);
+      case "startsWith":
+        return text.startsWith(expected);
+      case "endsWith":
+        return text.endsWith(expected);
+    }
+  }
+  if (value === null) {
+    return false;
+  }
+  const from = filter.filterType === "date" ? filter.dateFrom : filter.filter;
+  const to = filter.filterType === "date" ? filter.dateTo : filter.filterTo;
+  const compare = (bound: string | number | null | undefined) =>
+    typeof value === "number" && typeof bound === "number"
+      ? value - bound
+      : String(value).localeCompare(String(bound));
+  const order = compare(from);
+  switch (filter.type) {
+    case "equals":
+      return order === 0;
+    case "notEqual":
+      return order !== 0;
+    case "lessThan":
+      return order < 0;
+    case "lessThanOrEqual":
+      return order <= 0;
+    case "greaterThan":
+      return order > 0;
+    case "greaterThanOrEqual":
+      return order >= 0;
+    case "inRange":
+      return order >= 0 && compare(to) <= 0;
+  }
+}
 
 export async function foodApi(
   page: Page,
@@ -120,22 +177,18 @@ export async function foodApi(
       let matching = items.filter((item) =>
         item.name.toLowerCase().includes(query.search.toLowerCase()),
       );
-      if (query.filters.name?.filter) {
-        matching = matching.filter((item) =>
-          item.name
-            .toLowerCase()
-            .includes(query.filters.name?.filter?.toLowerCase() ?? ""),
-        );
-      }
-      if (query.filters.expiresOn?.dateFrom) {
-        matching = matching.filter(
-          (item) => item.expiresOn === query.filters.expiresOn?.dateFrom,
-        );
-      }
-      if (query.filters.quantity?.filter !== undefined) {
-        matching = matching.filter(
-          (item) => item.quantity > (query.filters.quantity?.filter ?? 0),
-        );
+      for (const field of Object.keys(
+        query.filters,
+      ) as (keyof FoodItemQuery["filters"])[]) {
+        const filter = query.filters[field];
+        if (filter) {
+          matching = matching.filter((item) =>
+            matchesFilter(
+              field === "createdAt" ? item.createdAt.slice(0, 10) : item[field],
+              filter,
+            ),
+          );
+        }
       }
       matching.sort((left, right) => {
         for (const entry of query.sort) {
