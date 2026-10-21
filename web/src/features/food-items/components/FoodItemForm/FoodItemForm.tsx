@@ -93,7 +93,7 @@ export default function FoodItemForm({
               productId={barcode.productId}
               barcode={barcode.barcode}
               message={barcode.productId ? barcode.message : ""}
-              replacing={Boolean(barcode.replace)}
+              replacing={Boolean(barcode.replacement)}
               onReplace={barcode.replaceValues}
               onKeep={barcode.keepValues}
               onUnlink={barcode.unlink}

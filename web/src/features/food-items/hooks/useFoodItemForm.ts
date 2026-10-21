@@ -5,6 +5,16 @@ import { useAccessDenied } from "@/hooks/useAccessDenied";
 
 import type { FoodItemDraft } from "./useFoodItemDraft";
 
+const validationMessages = new Map([
+  ["name", "Enter a food name with 120 characters or fewer."],
+  [
+    "quantity",
+    "Enter a quantity greater than zero and no more than 1,000,000.",
+  ],
+  ["unit", "Choose a unit."],
+  ["expiresOn", "Enter a valid expiration date."],
+]);
+
 interface FoodItemFormOptions {
   disabled: boolean;
   onSave: (values: CreateFoodItem) => Promise<void>;
@@ -40,17 +50,9 @@ export function useFoodItemForm({
     setError("");
     if (!result.success) {
       const field = result.error.issues[0]?.path[0];
-      setError(
-        field === "name"
-          ? "Enter a food name with 120 characters or fewer."
-          : field === "quantity"
-            ? "Enter a quantity greater than zero and no more than 1,000,000."
-            : field === "unit"
-              ? "Choose a unit."
-              : field === "expiresOn"
-                ? "Enter a valid expiration date."
-                : "Check the item details and try again.",
-      );
+      const message =
+        typeof field === "string" ? validationMessages.get(field) : undefined;
+      setError(message ?? "Check the item details and try again.");
 
       return;
     }

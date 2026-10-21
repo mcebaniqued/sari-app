@@ -17,19 +17,28 @@ export function useFoodItemDraft(item: FoodItem | null) {
     expiresOn: item?.expiresOn ?? "",
   }));
 
-  const current = useRef(values);
-  const defaults = useRef(values);
-  const dirty = useRef(new Set<keyof FoodItemDraft>());
-  const automatic = useRef(new Map<keyof FoodItemDraft, string>());
+  // Refs keep asynchronous suggestions aligned with edits made before React rerenders.
+  const currentValues = useRef(values);
+  const initialValues = useRef(values);
+  const editedFields = useRef(new Set<keyof FoodItemDraft>());
+  const suggestedValues = useRef(new Map<keyof FoodItemDraft, string>());
 
   function update(next: FoodItemDraft) {
-    current.current = next;
+    currentValues.current = next;
     setValues(next);
   }
 
   function edit(field: keyof FoodItemDraft, value: string) {
-    dirty.current.add(field);
-    update({ ...current.current, [field]: value });
+    editedFields.current.add(field);
+    update({ ...currentValues.current, [field]: value });
+  }
+
+  /** Editing either half protects the entire amount from partial provider replacement. */
+  function hasEditedAmount(field: keyof FoodItemDraft) {
+    return (
+      (field === "quantity" || field === "unit") &&
+      (editedFields.current.has("quantity") || editedFields.current.has("unit"))
+    );
   }
 
   function applyProduct(product: FoodProduct, overwrite: boolean) {
@@ -38,7 +47,7 @@ export function useFoodItemDraft(item: FoodItem | null) {
       quantity: product.packageQuantity?.toString(),
       unit: product.packageUnit ?? undefined,
     };
-    const next = { ...current.current };
+    const next = { ...currentValues.current };
     let conflict = false;
 
     for (const field of ["name", "quantity", "unit"] as const) {
@@ -46,16 +55,14 @@ export function useFoodItemDraft(item: FoodItem | null) {
       if (!value) {
         continue;
       }
-      const amountEdited =
-        (field === "quantity" || field === "unit") &&
-        (dirty.current.has("quantity") || dirty.current.has("unit"));
+      const amountEdited = hasEditedAmount(field);
       if (
         overwrite ||
         (!amountEdited &&
-          (!next[field].trim() || (!item && !dirty.current.has(field))))
+          (!next[field].trim() || (!item && !editedFields.current.has(field))))
       ) {
         next[field] = value;
-        automatic.current.set(field, value);
+        suggestedValues.current.set(field, value);
       } else if (next[field] !== value) {
         conflict = true;
       }
@@ -66,25 +73,23 @@ export function useFoodItemDraft(item: FoodItem | null) {
     return conflict;
   }
 
+  /** Remove only unchanged suggestions; unlinking can promote them to private user values. */
   function resetSuggestions(keepValues: boolean) {
-    const next = { ...current.current };
+    const next = { ...currentValues.current };
 
-    for (const [field, value] of automatic.current) {
+    for (const [field, value] of suggestedValues.current) {
       if (keepValues) {
-        dirty.current.add(field);
+        editedFields.current.add(field);
       } else if (
-        !dirty.current.has(field) &&
+        !editedFields.current.has(field) &&
         next[field] === value &&
-        !(
-          (field === "quantity" || field === "unit") &&
-          (dirty.current.has("quantity") || dirty.current.has("unit"))
-        )
+        !hasEditedAmount(field)
       ) {
-        next[field] = defaults.current[field];
+        next[field] = initialValues.current[field];
       }
     }
 
-    automatic.current.clear();
+    suggestedValues.current.clear();
     update(next);
   }
 

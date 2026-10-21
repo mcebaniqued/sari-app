@@ -15,8 +15,14 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // A response must belong to the current session version, even after an account switch.
   const version = useRef(0);
   const request = useRef<AbortController | null>(null);
+
+  const invalidateSessionRequest = useCallback(() => {
+    ++version.current;
+    request.current?.abort();
+  }, []);
 
   const refresh = useCallback(async () => {
     request.current?.abort();
@@ -44,26 +50,26 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const signedIn = useCallback((nextUser: AuthUser) => {
-    ++version.current;
-    request.current?.abort();
-    setUser(nextUser);
-    setError("");
-    setLoading(false);
-  }, []);
+  const signedIn = useCallback(
+    (nextUser: AuthUser) => {
+      invalidateSessionRequest();
+      setUser(nextUser);
+      setError("");
+      setLoading(false);
+    },
+    [invalidateSessionRequest],
+  );
 
   const logout = useCallback(async () => {
     await signOut();
-    ++version.current;
-    request.current?.abort();
+    invalidateSessionRequest();
     setUser(null);
     setError("");
-  }, []);
+  }, [invalidateSessionRequest]);
 
   useEffect(() => {
     const expired = () => {
-      ++version.current;
-      request.current?.abort();
+      invalidateSessionRequest();
       setUser(null);
       setError("");
       setLoading(false);
@@ -85,7 +91,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("sari:unauthorized", expired);
       window.removeEventListener("focus", recheck);
     };
-  }, [refresh]);
+  }, [refresh, invalidateSessionRequest]);
 
   // Key the subtree so changing accounts discards every pantry cache and draft.
   return (

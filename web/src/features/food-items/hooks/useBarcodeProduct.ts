@@ -6,6 +6,19 @@ import { ApiError } from "@/api/apiFetch";
 import { getFoodProduct, lookupBarcode } from "../api/foodProductsApi";
 import type { useFoodItemDraft } from "./useFoodItemDraft";
 
+function lookupErrorMessage(error: unknown) {
+  if (error instanceof ApiError && error.code === "INVALID_BARCODE") {
+    return "Invalid barcode. Enter the item details manually.";
+  }
+
+  if (error instanceof ApiError && error.code === "PRODUCT_NOT_FOUND") {
+    return "Barcode not found. Enter the item details manually.";
+  }
+
+  return "Could not look up the barcode. Enter the item details manually.";
+}
+
+/** Only an active lookup may change product links or apply suggestions to the draft. */
 export function useBarcodeProduct(
   item: FoodItem | null,
   draft: ReturnType<typeof useFoodItemDraft>,
@@ -15,7 +28,7 @@ export function useBarcodeProduct(
   const [product, setProduct] = useState<FoodProduct | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const [replace, setReplace] = useState<FoodProduct | null>(null);
+  const [replacement, setReplacement] = useState<FoodProduct | null>(null);
 
   const request = useRef<AbortController | null>(null);
 
@@ -52,7 +65,7 @@ export function useBarcodeProduct(
   function resetSearch(keepValues = false) {
     cancelLookup();
     draft.resetSuggestions(keepValues);
-    setReplace(null);
+    setReplacement(null);
     setProduct(null);
     setProductId(null);
     setBarcode(null);
@@ -61,7 +74,7 @@ export function useBarcodeProduct(
 
   function apply(suggestion: FoodProduct, overwrite: boolean) {
     const conflict = draft.applyProduct(suggestion, overwrite);
-    setReplace(conflict && !overwrite ? suggestion : null);
+    setReplacement(conflict && !overwrite ? suggestion : null);
   }
 
   async function lookup(value: string) {
@@ -70,6 +83,7 @@ export function useBarcodeProduct(
     } else {
       cancelLookup();
     }
+    // Aborting the previous request prevents late results from replacing a newer draft.
     const controller = new AbortController();
     request.current = controller;
     setProduct(null);
@@ -97,13 +111,7 @@ export function useBarcodeProduct(
       return true;
     } catch (error) {
       if (!controller.signal.aborted) {
-        setMessage(
-          error instanceof ApiError && error.code === "INVALID_BARCODE"
-            ? "Invalid barcode. Enter the item details manually."
-            : error instanceof ApiError && error.code === "PRODUCT_NOT_FOUND"
-              ? "Barcode not found. Enter the item details manually."
-              : "Could not look up the barcode. Enter the item details manually.",
-        );
+        setMessage(lookupErrorMessage(error));
       }
 
       return false;
@@ -121,24 +129,28 @@ export function useBarcodeProduct(
     );
   }
 
+  function keepValues() {
+    setReplacement(null);
+  }
+
+  function replaceValues() {
+    if (replacement) {
+      apply(replacement, true);
+    }
+  }
+
   return {
     productId,
     barcode,
     product,
     loading,
     message,
-    replace,
+    replacement,
     lookup,
     resetSearch,
     cancelLookup,
     unlink,
-    keepValues: () => {
-      setReplace(null);
-    },
-    replaceValues: () => {
-      if (replace) {
-        apply(replace, true);
-      }
-    },
+    keepValues,
+    replaceValues,
   };
 }
