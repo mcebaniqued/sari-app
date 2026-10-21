@@ -10,7 +10,7 @@ import {
 import type { FoodItemEditorState } from "../types/foodItems";
 
 /** Coordinate mutations; retain a creation key only while retrying the same draft. */
-export function usePantryItems() {
+export function usePantryItems(onChanged?: () => void) {
   const [revision, setRevision] = useState(0);
   const [editor, setEditor] = useState<FoodItemEditorState | null>(null);
   const [deleteTargets, setDeleteTargets] = useState<FoodItem[] | null>(null);
@@ -54,6 +54,7 @@ export function usePantryItems() {
         : await createFoodItem(values, creationKeyFor(values));
 
       setRevision((value) => value + 1);
+      onChanged?.();
       notify(
         "success",
         `${saved.name} ${original ? "updated" : "added to your pantry"}.`,
@@ -80,6 +81,7 @@ export function usePantryItems() {
       );
       if (deletedIds.length) {
         setRevision((value) => value + 1);
+        onChanged?.();
         notify(
           "success",
           deleteTargets.length === 1
