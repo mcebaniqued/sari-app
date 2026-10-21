@@ -64,7 +64,7 @@ const numberFilter = z
     "Provide an ordered numeric range.",
   );
 
-// AG Grid sends calendar dates with a midnight suffix. Normalize them at the boundary.
+// Accept the legacy midnight suffix while normalizing calendar dates at the API boundary.
 const calendarDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}(?: 00:00:00)?$/)

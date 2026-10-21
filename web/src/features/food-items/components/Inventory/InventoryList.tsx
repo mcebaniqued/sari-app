@@ -1,0 +1,135 @@
+import type { FoodItem } from "@sari/contracts";
+import { useEffect, useRef, useState } from "react";
+import { LuEllipsis } from "react-icons/lu";
+import { formatDate } from "@/utils/date";
+import type { FoodItemActions } from "../../types/foodItems";
+
+interface InventoryListProps extends FoodItemActions {
+  items: FoodItem[];
+  selecting: boolean;
+  selectedIds: Set<string>;
+  onSelectionChange: (ids: Set<string>) => void;
+}
+
+export default function InventoryList({
+  items,
+  selecting,
+  selectedIds,
+  onSelectionChange,
+  disabled,
+  onEdit,
+  onDelete,
+}: InventoryListProps) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const openAction = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!openId) {
+      return;
+    }
+    const closeOutside = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !openAction.current?.contains(event.target)
+      ) {
+        setOpenId(null);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpenId(null);
+        openAction.current?.querySelector("button")?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    document.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [openId]);
+
+  return (
+    <ul
+      aria-label="Food inventory"
+      className="divide-y divide-border-default rounded-panel border border-border-default bg-surface"
+    >
+      {items.map((item) => (
+        <li key={item.id} className="flex min-w-0 items-start gap-3 px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <p className="wrap-anywhere font-medium">{item.name}</p>
+            <p className="mt-1 text-sm text-content-muted">
+              {item.quantity} {item.unit === "item" ? "items" : item.unit}
+            </p>
+            <p className="mt-1 text-sm text-content-muted">
+              {item.expiresOn
+                ? `Expires ${formatDate(item.expiresOn)}`
+                : "No expiration date"}
+            </p>
+          </div>
+          <div
+            ref={openId === item.id ? openAction : undefined}
+            className="relative flex size-11 shrink-0 items-center justify-center"
+          >
+            {selecting ? (
+              <input
+                type="checkbox"
+                aria-label={`Select ${item.name}`}
+                checked={selectedIds.has(item.id)}
+                disabled={disabled}
+                className="size-6 accent-brand"
+                onChange={(event) => {
+                  const next = new Set(selectedIds);
+                  if (event.target.checked) {
+                    next.add(item.id);
+                  } else {
+                    next.delete(item.id);
+                  }
+                  onSelectionChange(next);
+                }}
+              />
+            ) : (
+              <button
+                type="button"
+                aria-label={`Actions for ${item.name}`}
+                aria-expanded={openId === item.id}
+                disabled={disabled}
+                onClick={() => {
+                  setOpenId(openId === item.id ? null : item.id);
+                }}
+                className="inline-flex size-11 items-center justify-center rounded-control hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-brand"
+              >
+                <LuEllipsis aria-hidden="true" className="size-5" />
+              </button>
+            )}
+            {!selecting && openId === item.id && (
+              <div className="absolute top-full right-0 z-20 w-40 rounded-panel border border-border-default bg-surface p-1 shadow-modal">
+                <button
+                  type="button"
+                  className="min-h-11 w-full rounded-control px-3 text-left hover:bg-surface-hover"
+                  onClick={() => {
+                    setOpenId(null);
+                    onEdit(item);
+                  }}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="min-h-11 w-full rounded-control px-3 text-left text-danger hover:bg-danger-subtle"
+                  onClick={() => {
+                    setOpenId(null);
+                    onDelete([item]);
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}

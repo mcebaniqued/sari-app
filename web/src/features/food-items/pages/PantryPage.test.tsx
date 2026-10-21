@@ -11,49 +11,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { notify } from "@/components/Toast/notifications";
 import PantryPage from "./PantryPage";
 
-// Real grid layout, sorting, filtering, and selection run in Playwright.
-// This fixture isolates the page's modal and persistence behavior from jsdom layout.
-vi.mock(
-  "@/features/food-items/components/FoodItemsTable/FoodItemsTable",
-  () => ({
-    default: ({
-      revision,
-      disabled,
-      onAdd,
-      onEdit,
-      onDelete,
-    }: {
-      revision: number;
-      disabled: boolean;
-      onAdd: () => void;
-      onEdit: (item: FoodItem) => void;
-      onDelete: (items: FoodItem[]) => void;
-    }) => (
-      <div>
-        <span data-testid="revision">{revision}</span>
-        <button disabled={disabled} onClick={onAdd}>
-          Add item
-        </button>
-        <button
-          disabled={disabled}
-          onClick={() => {
-            onEdit(item);
-          }}
-        >
-          Edit Milk
-        </button>
-        <button
-          disabled={disabled}
-          onClick={() => {
-            onDelete([item, other]);
-          }}
-        >
-          Delete selected
-        </button>
-      </div>
-    ),
-  }),
-);
 vi.mock("@/components/Toast/notifications", () => ({ notify: vi.fn() }));
 afterEach(() => vi.unstubAllGlobals());
 
@@ -71,6 +28,39 @@ const other: FoodItem = {
   id: "112345678901234567890123",
   name: "Eggs",
 };
+
+function stubFoodFetch(
+  mutation: (url: string, init?: RequestInit) => Promise<Response>,
+) {
+  let loads = 0;
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn(() => ({ matches: false })),
+  );
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((url: string, init?: RequestInit) => {
+      if (!init?.method || init.method === "GET") {
+        loads++;
+        return Promise.resolve(
+          Response.json({
+            items: [item, other],
+            total: 2,
+            start: 0,
+            limit: 20,
+          }),
+        );
+      }
+
+      return mutation(url, init);
+    }),
+  );
+  return {
+    get loads() {
+      return loads;
+    },
+  };
+}
 
 async function addDialog() {
   await waitFor(() =>
@@ -90,7 +80,7 @@ describe("pantry modals and persistence", () => {
           complete = resolve;
         }),
     );
-    vi.stubGlobal("fetch", fetch);
+    const api = stubFoodFetch(fetch);
     render(
       <MemoryRouter>
         <PantryPage />
@@ -129,7 +119,9 @@ describe("pantry modals and persistence", () => {
       "success",
       "Milk added to your pantry.",
     );
-    expect(screen.getByTestId("revision")).toHaveTextContent("1");
+    await waitFor(() => {
+      expect(api.loads).toBe(2);
+    });
     expect(screen.getByRole("button", { name: "Edit Milk" })).toBeVisible();
   });
 
@@ -145,7 +137,7 @@ describe("pantry modals and persistence", () => {
         { status: 503 },
       ),
     );
-    vi.stubGlobal("fetch", fetch);
+    stubFoodFetch(fetch);
     render(
       <MemoryRouter>
         <PantryPage />
@@ -186,7 +178,7 @@ describe("pantry modals and persistence", () => {
 
   it("rejects whitespace names before making a save request", async () => {
     const fetch = vi.fn();
-    vi.stubGlobal("fetch", fetch);
+    stubFoodFetch(fetch);
     render(
       <MemoryRouter>
         <PantryPage />
@@ -214,28 +206,39 @@ describe("pantry modals and persistence", () => {
         ),
       )
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
-    vi.stubGlobal("fetch", fetch);
+    const api = stubFoodFetch(fetch);
     render(
       <MemoryRouter>
         <PantryPage />
       </MemoryRouter>,
     );
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Delete selected" }),
-    );
+    const table = within(screen.getByRole("table"));
+    await table.findByRole("checkbox", { name: "Select Milk" });
+    fireEvent.click(table.getByRole("checkbox", { name: "Select Milk" }));
+    fireEvent.click(table.getByRole("checkbox", { name: "Select Eggs" }));
+    const desktopActions = screen.getAllByRole("toolbar", {
+      name: "Selected items",
+    })[0];
+    if (!desktopActions) {
+      throw new Error("Missing desktop bulk actions");
+    }
+    const bulkActions = within(desktopActions);
+    fireEvent.click(bulkActions.getByRole("button", { name: "Delete (2)" }));
     expect(fetch).not.toHaveBeenCalled();
     let dialog = within(
       screen.getByRole("dialog", { name: "Delete 2 items?" }),
     );
     fireEvent.click(dialog.getByRole("button", { name: "Cancel" }));
     expect(fetch).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Delete selected" }));
+    fireEvent.click(bulkActions.getByRole("button", { name: "Delete (2)" }));
     dialog = within(screen.getByRole("dialog", { name: "Delete 2 items?" }));
     fireEvent.click(dialog.getByRole("button", { name: "Confirm delete" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "1 item could not be deleted",
     );
-    expect(screen.getByTestId("revision")).toHaveTextContent("1");
+    await waitFor(() => {
+      expect(api.loads).toBe(2);
+    });
     dialog = within(screen.getByRole("dialog", { name: "Delete item?" }));
     expect(dialog.queryByText("Milk")).not.toBeInTheDocument();
     expect(dialog.getByText("Eggs")).toBeVisible();

@@ -166,6 +166,74 @@ test("registration displays the server's specific rejection reason", async ({
   );
 });
 
+test("Amount filters the full stored inventory using an exact unit and inclusive bounds", async ({
+  page,
+  context,
+}) => {
+  // eslint-disable-next-line playwright/no-skipped-test -- Real filtering requires the explicit disposable database runner.
+  test.skip(
+    !process.env.TEST_MONGODB_URI,
+    "Run npm run test:integration for an isolated MongoDB.",
+  );
+  const email = `amount-${crypto.randomUUID()}@example.com`;
+  createdEmails.add(email);
+  await page.goto("/register");
+  await page.getByLabel("First name").fill("Amount");
+  await page.getByLabel("Last name").fill("Tester");
+  await page.getByLabel("Email", { exact: true }).fill(email);
+  await page.getByLabel("Password", { exact: true }).fill("pantry rice!");
+  await page
+    .getByRole("button", { name: "Create an account", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/pantry$/);
+  const items = [
+    { name: "Three items", quantity: 3, unit: "item" },
+    { name: "Two ounces", quantity: 2, unit: "oz" },
+    { name: "Five ounces", quantity: 5, unit: "oz" },
+    { name: "Three pounds", quantity: 3, unit: "lb" },
+    ...Array.from({ length: 22 }, (_, index) => ({
+      name: `Bulk kg ${index}`,
+      quantity: 3,
+      unit: "kg",
+    })),
+  ];
+  // Create matching items first so the newest-first initial batch contains only other units.
+  for (const item of items) {
+    const response = await context.request.post("/api/v1/food-items", {
+      data: item,
+      headers: { Origin: "http://127.0.0.1:5273" },
+    });
+    expect(response.status()).toBe(201);
+  }
+  await page.reload();
+  await expect(page.locator('table tbody th[scope="row"]')).toHaveCount(20);
+  await expect(
+    page.getByRole("button", { name: "Edit Three items" }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Filter items" });
+  await dialog.getByLabel("Filter by").selectOption("amount");
+  await dialog.getByLabel("Condition").selectOption("lessThan");
+  await dialog.getByLabel("Quantity").fill("5");
+  await dialog.getByLabel("Unit").selectOption("item");
+  await dialog.getByRole("button", { name: "Apply" }).click();
+  await expect(page.locator('table tbody th[scope="row"]')).toHaveText([
+    "Three items",
+  ]);
+  await page.getByRole("button", { name: "Edit Amount filter" }).click();
+  await dialog.getByLabel("Condition").selectOption("inRange");
+  await dialog.getByLabel("From").fill("2");
+  await dialog.getByLabel("To").fill("5");
+  await dialog.getByLabel("Unit").selectOption("oz");
+  await dialog.getByRole("button", { name: "Apply" }).click();
+  await expect(page.locator('table tbody th[scope="row"]')).toHaveText([
+    "Five ounces",
+    "Two ounces",
+  ]);
+  await page.getByRole("button", { name: "Remove Amount filter" }).click();
+  await expect(page.locator('table tbody th[scope="row"]')).toHaveCount(20);
+});
+
 test("real registration, private pantry, reload, logout, and login", async ({
   page,
   context,
@@ -217,9 +285,9 @@ test("real registration, private pantry, reload, logout, and login", async ({
       .click();
     await expect(stranger).toHaveURL(/\/pantry$/);
     await expect(
-      stranger.getByText("Add your first item to start your pantry.", {
-        exact: false,
-      }),
+      stranger
+        .getByRole("region", { name: "No items found" })
+        .getByText("Add your first item to start your pantry."),
     ).toBeVisible();
     await expect(
       stranger.getByRole("button", { name: "Edit Jamie's rice" }),
