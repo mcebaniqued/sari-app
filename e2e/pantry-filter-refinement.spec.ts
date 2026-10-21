@@ -97,22 +97,35 @@ for (const width of [1280, 390, 320]) {
         exact: width < 768,
       })
       .click();
-    const sort = page.getByRole("group", { name: "Sort pantry items" });
-    await expect(sort.getByRole("radio")).toHaveCount(10);
-    await expect(sort.locator("label")).toHaveText(sortLabels);
+    const sort = page
+      .getByRole("menu", { name: "Sort pantry items" })
+      .or(page.getByRole("group", { name: "Sort pantry items" }));
+    const choices = sort.getByRole("menuitemradio").or(sort.getByRole("radio"));
+    await expect(choices).toHaveCount(10);
+    await expect(sort.locator("label, [role=menuitemradio]")).toHaveText(
+      sortLabels,
+    );
     await expect(
-      sort.getByRole("radio", { name: "Added: Newest" }),
+      sort
+        .getByRole("menuitemradio", { name: "Added: Newest" })
+        .or(sort.getByRole("radio", { name: "Added: Newest" })),
     ).toBeChecked();
-    await expect(sort.getByRole("radio", { checked: true })).toHaveCount(1);
+    await expect(
+      sort
+        .getByRole("menuitemradio", { checked: true })
+        .or(sort.getByRole("radio", { checked: true })),
+    ).toHaveCount(1);
     await expect(
       sort.locator("hr, [role=separator], optgroup, h2, h3"),
     ).toHaveCount(0);
-    const rows = await sort.locator("label").evaluateAll((labels) =>
-      labels.map((label) => ({
-        top: label.getBoundingClientRect().top,
-        height: label.getBoundingClientRect().height,
-      })),
-    );
+    const rows = await sort
+      .locator("label, [role=menuitemradio]")
+      .evaluateAll((elements) =>
+        elements.map((element) => ({
+          top: element.getBoundingClientRect().top,
+          height: element.getBoundingClientRect().height,
+        })),
+      );
     expect(new Set(rows.map((row) => row.height)).size).toBe(1);
     const gaps = rows
       .slice(1)

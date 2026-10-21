@@ -14,12 +14,12 @@ test("table, filter dialog, editor, and confirmation are keyboard accessible", a
   await page.goto("/pantry");
   await expect(nameCells(page)).toHaveText(["Milk"]);
   await expectAccessible(page);
-  const sort = page.getByRole("button", { name: "Sort: Added: Newest" });
+  const sort = page.getByRole("button", { name: /Sort:/ });
   await sort.click();
   await expect(
     page
-      .getByRole("group", { name: "Sort pantry items" })
-      .getByRole("radio", { name: "Added: Newest" }),
+      .getByRole("menu", { name: "Sort pantry items" })
+      .getByRole("menuitemradio", { name: "Added: Newest" }),
   ).toBeFocused();
   await expectAccessible(page);
   await page.keyboard.press("Escape");
@@ -90,6 +90,141 @@ test("empty state and recovery pages remain accessible", async ({ page }) => {
     await expect(page.getByRole("heading", { name: title })).toBeVisible();
     await expectAccessible(page);
   }
+});
+
+test("desktop sort navigation waits for deliberate selection", async ({
+  page,
+}) => {
+  const api = await foodApi(page, [milk]);
+  await page.goto("/pantry");
+  await expect(nameCells(page)).toHaveText(["Milk"]);
+  const initialRequests = api.queries.length;
+  const sort = page.getByRole("button", { name: /Sort:/ });
+  await sort.focus();
+  await page.keyboard.press("Enter");
+  await expect(sort).toHaveAttribute("aria-expanded", "true");
+  const menu = page.getByRole("menu", { name: "Sort pantry items" });
+  const applied = menu.getByRole("menuitemradio", { name: "Added: Newest" });
+  await expect(applied).toBeFocused();
+  await expect(applied).toHaveAttribute("aria-checked", "true");
+
+  for (const label of [
+    "Added: Oldest",
+    "Expiration: Soonest",
+    "Expiration: Latest",
+    "Name: A to Z",
+    "Name: Z to A",
+    "Quantity: Lowest",
+    "Quantity: Highest",
+  ]) {
+    await page.keyboard.press("ArrowDown");
+    await expect(
+      menu.getByRole("menuitemradio", { name: label }),
+    ).toBeFocused();
+    await expect(menu).toBeVisible();
+  }
+  await expect(applied).toHaveAttribute("aria-checked", "true");
+  expect(api.queries).toHaveLength(initialRequests);
+  await page.keyboard.press("Enter");
+  await expect(menu).toHaveCount(0);
+  await expect(sort).toBeFocused();
+  await expect(sort).toHaveAttribute("aria-expanded", "false");
+  await expect(sort).toHaveAccessibleName("Sort: Quantity: Highest");
+  await expect.poll(() => api.queries.length).toBe(initialRequests + 1);
+  expect(api.queries.at(-1)?.get("sort")).toContain('"quantity"');
+
+  await page.keyboard.press("Space");
+  await expect(
+    menu.getByRole("menuitemradio", { name: "Quantity: Highest" }),
+  ).toBeFocused();
+  await page.keyboard.press("Home");
+  await expect(applied).toBeFocused();
+  await page.keyboard.press("End");
+  await expect(
+    menu.getByRole("menuitemradio", { name: "Unit: Z to A" }),
+  ).toBeFocused();
+  await page.keyboard.press("ArrowUp");
+  await expect(
+    menu.getByRole("menuitemradio", { name: "Unit: A to Z" }),
+  ).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(sort).toBeFocused();
+  await expect(sort).toHaveAccessibleName("Sort: Quantity: Highest");
+  expect(api.queries).toHaveLength(initialRequests + 1);
+
+  await page.keyboard.press("Space");
+  await page.keyboard.press("ArrowUp");
+  await expect(
+    menu.getByRole("menuitemradio", { name: "Quantity: Lowest" }),
+  ).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(menu).toHaveCount(0);
+  await expect(sort).toBeFocused();
+  await expect(sort).toHaveAccessibleName("Sort: Quantity: Lowest");
+  await expect.poll(() => api.queries.length).toBe(initialRequests + 2);
+});
+
+test("desktop sort arrows do not commit or dismiss a choice", async ({
+  page,
+}) => {
+  const api = await foodApi(page, [milk]);
+  await page.goto("/pantry");
+  await expect(nameCells(page)).toHaveText(["Milk"]);
+  const initialRequests = api.queries.length;
+  const sort = page.getByRole("button", { name: /Sort:/ });
+  await sort.focus();
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("ArrowDown");
+  await expect(
+    page
+      .getByRole("radio", { name: "Added: Oldest" })
+      .or(page.getByRole("menuitemradio", { name: "Added: Oldest" })),
+  ).toBeFocused();
+  await expect(sort).toHaveAttribute("aria-expanded", "true");
+  await expect(sort).toHaveAccessibleName("Sort: Added: Newest");
+  expect(api.queries).toHaveLength(initialRequests);
+});
+
+test("desktop sort supports pointer selection and natural Tab departure", async ({
+  page,
+}) => {
+  const api = await foodApi(page, [milk]);
+  await page.goto("/pantry");
+  await expect(nameCells(page)).toHaveText(["Milk"]);
+  const sort = page.getByRole("button", { name: /Sort:/ });
+  const filter = page.getByRole("button", { name: "Filter", exact: true });
+  const search = page.getByRole("searchbox", { name: "Search food items" });
+  const menu = page.getByRole("menu", { name: "Sort pantry items" });
+  const initialRequests = api.queries.length;
+
+  await sort.click();
+  await menu.getByRole("menuitemradio", { name: "Name: A to Z" }).click();
+  await expect(sort).toBeFocused();
+  await expect(sort).toHaveAccessibleName("Sort: Name: A to Z");
+  await expect.poll(() => api.queries.length).toBe(initialRequests + 1);
+  await sort.click();
+  await menu.getByRole("menuitemradio", { name: "Name: A to Z" }).click();
+  expect(api.queries).toHaveLength(initialRequests + 1);
+
+  await sort.click();
+  await page.keyboard.press("Tab");
+  await expect(filter).toBeFocused();
+  await expect(menu).toHaveCount(0);
+  expect(api.queries).toHaveLength(initialRequests + 1);
+  await sort.focus();
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Shift+Tab");
+  await expect(sort).toBeFocused();
+  await expect(menu).toHaveCount(0);
+  await page.keyboard.press("Shift+Tab");
+  await expect(search).toBeFocused();
+
+  await sort.click();
+  await search.click();
+  await expect(menu).toHaveCount(0);
+  await expect(search).toBeFocused();
+  expect(api.queries).toHaveLength(initialRequests + 1);
 });
 
 for (const { width, sortName, actionOrder } of [

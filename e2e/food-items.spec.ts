@@ -19,8 +19,8 @@ const manyItems = Array.from({ length: 65 }, (_, index) => ({
 async function chooseDesktopSort(page: Page, label: string) {
   await page.getByRole("button", { name: /Sort:/ }).click();
   await page
-    .getByRole("group", { name: "Sort pantry items" })
-    .getByRole("radio", { name: label })
+    .getByRole("menu", { name: "Sort pantry items" })
+    .getByRole("menuitemradio", { name: label })
     .click();
 }
 
