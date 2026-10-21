@@ -37,6 +37,14 @@ Sari is a pantry app with a React frontend in `web/`, an Express API in `api/`, 
 - Follow the syntax and conventions supported by each file's parser or tooling. Add comments only where supported; otherwise, put necessary explanations in the appropriate documentation. Keep `.json` files valid strict JSON.
 - Review ignore rules, coverage exclusions, and lint/type suppressions when relevant to a change. Keep necessary exceptions narrowly scoped and explain their purpose in a supported comment or linked documentation; do not add exceptions merely to make checks pass.
 
+## Frontend accessibility
+
+- Target WCAG 2.2 Level AA for applicable frontend work. Prefer semantic HTML and native accessible controls; use custom ARIA patterns only when needed. Keep accessible names, roles, states, descriptions, announcements, and control-specific error associations accurate.
+- Make interactive functionality keyboard operable. Keep DOM and focus order aligned with the visible order at each responsive layout, and implement each control's established keyboard pattern without unintended activation or data changes during navigation.
+- Provide consistent, visible focus indicators through the application's styling system. Place focus on the relevant control or content after an action, and restore it to the invoker or a logical successor when focused controls disappear. Give dialogs, menus, and popups appropriate focus and dismissal behavior without trapping focus outside a modal interaction.
+- Check applicable contrast, zoom, text resizing, reflow, target size, and reduced motion behavior.
+- Add relevant accessibility regression coverage for affected behavior, and preserve existing accessibility behavior during features, fixes, and refactors. Keep review and validation proportionate to the change and its risks.
+
 ## Validation
 
 - Run commands from the repository root. Use `npm ci --include=optional` when installing dependencies; native build tools depend on optional packages. Root development, lint, type-check, and test scripts prepare shared contracts automatically; run `npm run contracts:build` before invoking application workspace checks directly.
