@@ -35,6 +35,8 @@ const raw = {
 const agent = request.agent(app).set("Origin", "http://127.0.0.1:5173");
 const otherAgent = request.agent(app).set("Origin", "http://127.0.0.1:5173");
 
+// This suite writes and clears its test database. Require an explicit URI from
+// CI or test:integration instead of using the application's database settings.
 describe.skipIf(!testUri)("USDA lookup persistence", () => {
   beforeAll(async () => {
     if (!testUri || !/_test(?:\?|$)/.test(testUri)) {

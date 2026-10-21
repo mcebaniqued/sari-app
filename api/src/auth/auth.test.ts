@@ -15,6 +15,8 @@ const testUri = process.env.TEST_MONGODB_URI;
 const origin = "http://127.0.0.1:5173";
 const password = "  password  ";
 
+// Real persistence needs an explicit _test database; CI and test:integration
+// provide it, while ordinary local unit runs need no database credentials.
 describe.skipIf(!testUri)("real authentication and pantry isolation", () => {
   const alice = request.agent(app).set("Origin", origin);
   const bob = request.agent(app).set("Origin", origin);

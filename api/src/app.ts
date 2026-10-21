@@ -89,5 +89,6 @@ const handleError: ErrorRequestHandler = (error: unknown, _req, res, _next) => {
 
 app.use(handleError);
 
-// Vercel imports this app; only server.ts opens a port locally.
+// Vercel imports this app; knip.json marks it as an externally loaded entry.
+// Only server.ts opens a port locally.
 export default app;

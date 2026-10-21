@@ -6,5 +6,7 @@
     "sourceMap": true
   },
   "include": ["src/**/*.ts"],
+  // Omit tests from production output; api/tsconfig.json still typechecks them
+  // and Vitest discovers them independently.
   "exclude": ["src/**/*.test.ts"]
 }

@@ -10,6 +10,8 @@ import { FoodItemModel } from "./model.js";
 // Never load api/.env here. Integration tests need an explicitly selected test DB.
 const testUri = process.env.TEST_MONGODB_URI;
 
+// CI and test:integration supply this database; skip real writes in local unit
+// runs that have not explicitly selected a test database.
 describe.skipIf(!testUri)("MongoDB food persistence", () => {
   const createdIds: string[] = [];
   const agent = request.agent(app).set("Origin", "http://127.0.0.1:5173");

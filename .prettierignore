@@ -1,7 +1,11 @@
+# Dependencies and compiled bundles are generated, not maintained source.
 node_modules/
 dist/
+# Test tools own these generated coverage reports, traces, and screenshots.
 coverage/
 test-results/
 playwright-report/
+# npm owns lockfile formatting; keep dependency resolutions in its native format.
 package-lock.json
+# Backup archives, credentials, and downloaded database tools are local operational data.
 .backups/

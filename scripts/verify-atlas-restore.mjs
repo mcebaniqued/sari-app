@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
 
 import { BSON, MongoClient } from "mongodb";
 
+// backup-atlas.ps1 invokes this file through Node rather than a JS import;
+// knip.json lists it as an entry point so it is not mistaken for an unused file.
 // Receive the credential through stdin, never command-line arguments or logs.
 let uri = "";
 for await (const chunk of process.stdin) {
