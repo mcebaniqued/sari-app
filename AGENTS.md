@@ -31,6 +31,7 @@ Sari is a pantry app with a React frontend in `web/`, an Express API in `api/`, 
 
 - Review every code change for purpose, readability, correctness, and impact. Use clear names and logical structure; add comments or JSDoc where reasoning, behavior, constraints, side effects, or tradeoffs are not obvious. Explain why when the code alone is insufficient, without restating obvious operations.
 - Follow existing conventions, with ESLint, Prettier, and TypeScript as the primary enforceable quality checks. Keep formatting and refactoring within the agreed scope; do not introduce unrelated style-only changes or restructure code to suit subjective preferences.
+- Keep imports in one sorted block per file, without blank lines between import categories. Use multiple blocks only when a concrete technical constraint requires the separation.
 - Prefer canonical Tailwind utilities from the configured theme and spacing scale when they express the intended value (for example, use `min-h-11.5` for `2.875rem`). Reserve arbitrary values for cases the existing scale cannot express, such as viewport calculations or selectors.
 - Separate independent declarations and meaningful steps with blank lines, keeping related statements together. Passing Prettier does not establish readability; review the logical grouping manually.
 - Follow the syntax and conventions supported by each file's parser or tooling. Add comments only where supported; otherwise, put necessary explanations in the appropriate documentation. Keep `.json` files valid strict JSON.
