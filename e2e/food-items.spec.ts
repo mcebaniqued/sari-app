@@ -1,4 +1,4 @@
-import { expect, type Route } from "@playwright/test";
+import { expect, type Page, type Route } from "@playwright/test";
 import {
   bananas,
   expectAccessible,
@@ -16,6 +16,14 @@ const manyItems = Array.from({ length: 65 }, (_, index) => ({
   name: `Food ${String(index + 1).padStart(2, "0")}`,
 }));
 
+async function chooseDesktopSort(page: Page, label: string) {
+  await page.getByRole("button", { name: /Sort:/ }).click();
+  await page
+    .getByRole("group", { name: "Sort pantry items" })
+    .getByRole("radio", { name: label })
+    .click();
+}
+
 test("desktop uses a semantic table with independent scrolling and loaded-only selection", async ({
   page,
 }) => {
@@ -31,21 +39,52 @@ test("desktop uses a semantic table with independent scrolling and loaded-only s
   await expect(nameCells(page)).toHaveCount(20);
   expect(api.queries[0]?.get("limit")).toBe("20");
   await expect(page.getByRole("heading", { name: "My Pantry" })).toBeVisible();
+  const toolbar = page.getByLabel("Pantry actions");
+  const searchBounds = await toolbar.getByRole("searchbox").boundingBox();
+  const sortBounds = await toolbar
+    .getByRole("button", { name: /Sort:/ })
+    .boundingBox();
+  const filterBounds = await toolbar
+    .getByRole("button", { name: "Filter" })
+    .boundingBox();
+  const addBounds = await toolbar
+    .getByRole("button", { name: "Add item" })
+    .boundingBox();
+  const centers = [searchBounds, sortBounds, filterBounds, addBounds].map(
+    (bounds) => (bounds?.y ?? 0) + (bounds?.height ?? 0) / 2,
+  );
+  expect(Math.max(...centers) - Math.min(...centers)).toBeLessThan(3);
+  expect(searchBounds?.x).toBeLessThan(sortBounds?.x ?? 0);
+  expect(sortBounds?.x).toBeLessThan(filterBounds?.x ?? 0);
+  expect(filterBounds?.x).toBeLessThan(addBounds?.x ?? 0);
   await page.getByRole("checkbox", { name: "Select all loaded items" }).check();
   await expect(
-    page.getByRole("button", { name: "Delete selected (20)" }),
+    page
+      .getByRole("toolbar", { name: "Selected items" })
+      .getByRole("button", { name: "Delete (20)" }),
   ).toBeVisible();
+  await expect(toolbar.getByRole("searchbox")).toBeVisible();
+  await expect(toolbar.getByRole("button", { name: /Sort:/ })).toBeVisible();
+  await expect(toolbar.getByRole("button", { name: "Filter" })).toBeVisible();
+  await expect(toolbar.getByRole("button", { name: "Add item" })).toBeVisible();
   await scroller.evaluate((element) => {
     element.scrollTop = element.scrollHeight;
   });
   await expect(nameCells(page)).toHaveCount(40);
-  await expect(
-    page.getByRole("button", { name: "Delete selected (20)" }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Delete (20)" })).toBeVisible();
   await selectRow(page, manyItems[20]!.id);
+  await expect(page.getByRole("button", { name: "Delete (21)" })).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Delete selected (21)" }),
-  ).toBeVisible();
+    page.getByRole("checkbox", { name: "Select all loaded items" }),
+  ).toHaveJSProperty("indeterminate", true);
+  await page
+    .getByRole("toolbar", { name: "Selected items" })
+    .getByRole("button", { name: "Clear selection" })
+    .click();
+  await expect(
+    page.getByRole("checkbox", { name: "Select all loaded items" }),
+  ).toHaveJSProperty("indeterminate", false);
+  await expect(toolbar.getByRole("button", { name: /Sort:/ })).toBeVisible();
   expect(
     await scroller.evaluate((element) => element.scrollTop),
   ).toBeGreaterThan(0);
@@ -55,6 +94,13 @@ test("desktop uses a semantic table with independent scrolling and loaded-only s
   const headerBounds = await header.boundingBox();
   expect(headerBounds?.y).toBeGreaterThanOrEqual(scrollBounds?.y ?? 0);
   await page.setViewportSize({ width: 800, height: 700 });
+  const narrowSort = await toolbar
+    .getByRole("button", { name: /Sort:/ })
+    .boundingBox();
+  const narrowAdd = await toolbar
+    .getByRole("button", { name: "Add item" })
+    .boundingBox();
+  expect(Math.abs((narrowSort?.y ?? 0) - (narrowAdd?.y ?? 0))).toBeLessThan(4);
   await expect(
     page.getByRole("columnheader", { name: "Date added", includeHidden: true }),
   ).toBeHidden();
@@ -82,48 +128,66 @@ test("sort and filter apply to the server result and compose with search", async
   const api = await foodApi(page, [milk, rice, bananas]);
   await page.goto("/pantry");
   await expect(nameCells(page)).toHaveText(["Milk", "Rice", "Bananas"]);
-  await page
-    .getByRole("combobox", { name: "Sort pantry items" })
-    .selectOption("name-asc");
+  await chooseDesktopSort(page, "Name: A to Z");
   await expect(nameCells(page)).toHaveText(["Bananas", "Milk", "Rice"]);
+  await expect(
+    page.getByRole("button", { name: "Sort: Name: A to Z" }),
+  ).toHaveAttribute("aria-expanded", "false");
   await page.getByRole("button", { name: "Filter", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Filter items" });
-  await dialog.getByLabel("Add filter").selectOption("name");
   await dialog
-    .getByRole("group", { name: "Food name" })
-    .getByLabel("Value")
-    .fill("milk");
+    .getByRole("group", { name: "Filter 1" })
+    .getByLabel("Filter by")
+    .selectOption("amount");
+  await dialog
+    .getByRole("group", { name: "Filter 1" })
+    .getByLabel("Condition")
+    .selectOption("greaterThan");
+  await dialog
+    .getByRole("group", { name: "Filter 1" })
+    .getByLabel("Quantity")
+    .fill("11");
+  await dialog.getByLabel("Unit").selectOption("item");
   await dialog.getByRole("button", { name: "Apply" }).click();
-  await expect(nameCells(page)).toHaveText(["Milk"]);
+  await expect(nameCells(page)).toHaveText(["Bananas"]);
   await expect(
-    page.getByRole("button", { name: "Remove name filter" }),
-  ).toContainText("contains milk");
-  expect(api.queries.at(-1)?.get("filters")).toContain('"name"');
+    page.getByRole("button", { name: "Edit Amount filter" }),
+  ).toHaveText("Amount: > 11 items");
+  expect(api.queries.at(-1)?.get("filters")).toContain('"quantity"');
   expect(api.queries.at(-1)?.get("sort")).toContain('"name"');
   await page.getByRole("searchbox", { name: "Search food items" }).fill("ri");
   await expect(nameCells(page)).toHaveCount(0);
   expect(api.queries.at(-1)?.get("search")).toBe("ri");
-  await page.getByRole("button", { name: /name filter/ }).click();
+  await page.getByRole("button", { name: "Remove Amount filter" }).click();
   await expect(nameCells(page)).toHaveText(["Rice"]);
 });
 
 test("sorting and filtering reach matching items beyond the first loaded batch", async ({
   page,
 }) => {
-  const api = await foodApi(page, manyItems);
+  const api = await foodApi(
+    page,
+    manyItems.map((item, index) => ({ ...item, quantity: index + 1 })),
+  );
   await page.goto("/pantry");
   await expect(nameCells(page)).toHaveCount(20);
-  await page
-    .getByRole("combobox", { name: "Sort pantry items" })
-    .selectOption("name-desc");
+  await chooseDesktopSort(page, "Name: Z to A");
   await expect(nameCells(page).first()).toHaveText("Food 65");
   await page.getByRole("button", { name: "Filter", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Filter items" });
-  await dialog.getByLabel("Add filter").selectOption("name");
   await dialog
-    .getByRole("group", { name: "Food name" })
-    .getByLabel("Value")
-    .fill("Food 6");
+    .getByRole("group", { name: "Filter 1" })
+    .getByLabel("Filter by")
+    .selectOption("amount");
+  await dialog
+    .getByRole("group", { name: "Filter 1" })
+    .getByLabel("Condition")
+    .selectOption("greaterThan");
+  await dialog
+    .getByRole("group", { name: "Filter 1" })
+    .getByLabel("Quantity")
+    .fill("59");
+  await dialog.getByLabel("Unit").selectOption("l");
   await dialog.getByRole("button", { name: "Apply" }).click();
   await expect(nameCells(page)).toHaveText([
     "Food 65",
@@ -147,37 +211,59 @@ test("mobile sort and filters use draft Apply, Cancel, and Reset", async ({
     page.getByRole("list", { name: "Food inventory" }).getByRole("listitem"),
   ).toHaveCount(3);
   await page.getByRole("button", { name: "Sort", exact: true }).click();
-  let dialog = page.getByRole("dialog", { name: "Filter and sort" });
-  await dialog.getByLabel("Sort by").selectOption("name-asc");
+  let dialog = page.getByRole("dialog", { name: "Sort items" });
+  await dialog.getByRole("radio", { name: "Name: A to Z" }).check();
   await dialog.getByRole("button", { name: "Cancel" }).click();
   expect(api.queries.at(-1)?.get("sort")).toBe("[]");
+  await page.getByRole("button", { name: "Sort", exact: true }).click();
+  dialog = page.getByRole("dialog", { name: "Sort items" });
+  await dialog.getByRole("radio", { name: "Name: A to Z" }).check();
+  await dialog.getByRole("button", { name: "Apply" }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(api.queries.at(-1)?.get("sort")).toContain('"name"');
   await page.getByRole("button", { name: "Filter", exact: true }).click();
-  dialog = page.getByRole("dialog", { name: "Filter and sort" });
-  await dialog.getByLabel("Sort by").selectOption("name-asc");
-  await dialog.getByLabel("Add filter").selectOption("expiresOn");
+  dialog = page.getByRole("dialog", { name: "Filter items" });
   await dialog
-    .getByRole("group", { name: "Expiration date" })
-    .getByLabel("Value")
+    .getByRole("group", { name: "Filter 1" })
+    .getByLabel("Filter by")
+    .selectOption("expiresOn");
+  await dialog
+    .getByRole("group", { name: "Filter 1" })
+    .getByLabel("Date", { exact: true })
+    .fill("2028-02-29");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  expect(api.queries.at(-1)?.get("filters")).toBe("{}");
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  dialog = page.getByRole("dialog", { name: "Filter items" });
+  await dialog
+    .getByRole("group", { name: "Filter 1" })
+    .getByLabel("Filter by")
+    .selectOption("expiresOn");
+  await dialog
+    .getByRole("group", { name: "Filter 1" })
+    .getByLabel("Date", { exact: true })
     .fill("2028-02-29");
   await dialog.getByRole("button", { name: "Apply" }).click();
   await expect(
     page.getByRole("listitem").filter({ hasText: "Milk" }),
   ).toBeVisible();
   expect(api.queries.at(-1)?.get("filters")).toContain("2028-02-29");
-  await page.getByRole("button", { name: /Expiration date filter/ }).click();
-  await expect(
-    page.getByRole("list", { name: "Food inventory" }).getByRole("listitem"),
-  ).toHaveCount(3);
-  await page.getByRole("button", { name: "Filter", exact: true }).click();
-  dialog = page.getByRole("dialog", { name: "Filter and sort" });
-  await dialog.getByLabel("Add filter").selectOption("name");
+  await expect(page.getByRole("button", { name: "Filter (1)" })).toBeVisible();
+  await page.getByRole("button", { name: "Filter (1)" }).click();
+  dialog = page.getByRole("dialog", { name: "Filter items" });
+  await expect(dialog.getByRole("group", { name: "Filter 1" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Add another filter" }).click();
+  await dialog
+    .getByRole("group", { name: "Filter 2" })
+    .getByLabel("Filter by")
+    .selectOption("amount");
   await dialog.getByRole("button", { name: "Reset" }).click();
   await dialog.getByRole("button", { name: "Apply" }).click();
   expect(api.queries.at(-1)?.get("filters")).toBe("{}");
-  expect(api.queries.at(-1)?.get("sort")).toBe("[]");
+  expect(api.queries.at(-1)?.get("sort")).toContain('"name"');
 });
 
-test("filter controls serialize supported fields and operators", async ({
+test("filter controls serialize three logical filters with AND semantics", async ({
   page,
 }) => {
   const api = await foodApi(page, [milk, rice, bananas]);
@@ -185,62 +271,80 @@ test("filter controls serialize supported fields and operators", async ({
   await expect(nameCells(page)).toHaveCount(3);
   await page.getByRole("button", { name: "Filter", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Filter items" });
-  await dialog.getByLabel("Add filter").selectOption("name");
-  await dialog
-    .getByRole("group", { name: "Food name" })
-    .getByLabel("Condition")
-    .selectOption("notContains");
-  await dialog
-    .getByRole("group", { name: "Food name" })
-    .getByLabel("Value")
-    .fill("xyz");
-  await dialog.getByLabel("Add filter").selectOption("quantity");
-  await dialog
-    .getByRole("group", { name: "Quantity" })
-    .getByLabel("Condition")
-    .selectOption("inRange");
-  await dialog
-    .getByRole("group", { name: "Quantity" })
-    .getByLabel("Value")
-    .fill("1");
-  await dialog
-    .getByRole("group", { name: "Quantity" })
-    .getByLabel("Through")
-    .fill("12");
-  await dialog.getByLabel("Add filter").selectOption("unit");
-  await dialog
-    .getByRole("group", { name: "Unit" })
-    .getByLabel("Condition")
-    .selectOption("notBlank");
-  await dialog.getByLabel("Add filter").selectOption("expiresOn");
-  await dialog
-    .getByRole("group", { name: "Expiration date" })
-    .getByLabel("Condition")
-    .selectOption("lessThan");
-  await dialog
-    .getByRole("group", { name: "Expiration date" })
-    .getByLabel("Value")
-    .fill("2029-01-01");
-  await dialog.getByLabel("Add filter").selectOption("createdAt");
-  await dialog
-    .getByRole("group", { name: "Date added" })
-    .getByLabel("Condition")
-    .selectOption("greaterThan");
-  await dialog
-    .getByRole("group", { name: "Date added" })
-    .getByLabel("Value")
-    .fill("2025-01-01");
+  const first = dialog.getByRole("group", { name: "Filter 1" });
+  await expect(first.getByLabel("Filter by").locator("option")).toHaveText([
+    "Choose a field",
+    "Amount",
+    "Expiration date",
+    "Date added",
+  ]);
+  await expect(
+    dialog.getByRole("button", { name: "Add another filter" }),
+  ).toHaveCount(0);
+  await first.getByLabel("Filter by").selectOption("amount");
+  await expect(dialog.getByLabel("Filter by")).toHaveCount(1);
+  await expect(first.getByLabel("Condition").locator("option")).toHaveText([
+    "Equals",
+    "Not equal",
+    "Less than",
+    "At most",
+    "Greater than",
+    "At least",
+    "Between",
+  ]);
+  await first.getByLabel("Condition").selectOption("inRange");
+  await first.getByLabel("From").fill("1");
+  await first.getByLabel("To").fill("12");
+  await first.getByLabel("Unit").selectOption("l");
+  await dialog.getByRole("button", { name: "Add another filter" }).click();
+  const second = dialog.getByRole("group", { name: "Filter 2" });
+  await expect(second.getByLabel("Filter by")).toBeFocused();
+  await expect(
+    second.getByLabel("Filter by").locator("option[value=amount]"),
+  ).toHaveCount(0);
+  await second.getByLabel("Filter by").selectOption("expiresOn");
+  await expect(second.getByLabel("Condition").locator("option")).toHaveText([
+    "On",
+    "Not on",
+    "Before",
+    "On or before",
+    "After",
+    "On or after",
+    "Between",
+    "Has date",
+    "No date",
+  ]);
+  await second.getByLabel("Condition").selectOption("lessThan");
+  await second.getByLabel("Date", { exact: true }).fill("2029-01-01");
+  await dialog.getByRole("button", { name: "Add another filter" }).click();
+  const third = dialog.getByRole("group", { name: "Filter 3" });
+  await third.getByLabel("Filter by").selectOption("createdAt");
+  await expect(third.getByLabel("Condition").locator("option")).toHaveText([
+    "On",
+    "Not on",
+    "Before",
+    "On or before",
+    "After",
+    "On or after",
+    "Between",
+  ]);
+  await third.getByLabel("Condition").selectOption("greaterThan");
+  await third.getByLabel("Date", { exact: true }).fill("2025-01-01");
+  await expect(
+    dialog.getByRole("button", { name: "Add another filter" }),
+  ).toHaveCount(0);
   await dialog.getByRole("button", { name: "Apply" }).click();
   await expect(dialog).toHaveCount(0);
-  expect(JSON.parse(api.queries.at(-1)?.get("filters") ?? "{}")).toMatchObject({
-    name: { filterType: "text", type: "notContains", filter: "xyz" },
+  await expect(nameCells(page)).toHaveText(["Milk"]);
+  await expect(page.getByRole("button", { name: "Filter (3)" })).toBeVisible();
+  expect(JSON.parse(api.queries.at(-1)?.get("filters") ?? "{}")).toEqual({
     quantity: {
       filterType: "number",
       type: "inRange",
       filter: 1,
       filterTo: 12,
     },
-    unit: { filterType: "text", type: "notBlank" },
+    unit: { filterType: "text", type: "equals", filter: "l" },
     expiresOn: { filterType: "date", type: "lessThan", dateFrom: "2029-01-01" },
     createdAt: {
       filterType: "date",
@@ -248,6 +352,81 @@ test("filter controls serialize supported fields and operators", async ({
       dateFrom: "2025-01-01",
     },
   });
+  await page
+    .getByRole("button", { name: "Remove Expiration date filter" })
+    .click();
+  await expect(page.getByRole("button", { name: "Filter (2)" })).toBeVisible();
+  const remaining = JSON.parse(api.queries.at(-1)?.get("filters") ?? "{}");
+  expect(remaining.quantity).toMatchObject({ filter: 1, filterTo: 12 });
+  expect(remaining.unit).toMatchObject({ type: "equals", filter: "l" });
+});
+
+test("applied chips edit and clear filters without losing search or sort", async ({
+  page,
+}) => {
+  const api = await foodApi(page, [milk, rice, bananas]);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/pantry");
+  const toolbar = page.getByLabel("Pantry actions");
+  const [search, add, sort, filter] = await Promise.all([
+    toolbar.getByRole("searchbox").boundingBox(),
+    toolbar.getByRole("button", { name: "Add item" }).boundingBox(),
+    toolbar.getByRole("button", { name: "Sort", exact: true }).boundingBox(),
+    toolbar.getByRole("button", { name: "Filter", exact: true }).boundingBox(),
+  ]);
+  expect(Math.abs((search?.y ?? 0) - (add?.y ?? 0))).toBeLessThan(4);
+  expect(Math.abs((sort?.y ?? 0) - (filter?.y ?? 0))).toBeLessThan(4);
+  expect(sort?.y).toBeGreaterThan((search?.y ?? 0) + (search?.height ?? 0));
+  await page.getByRole("button", { name: "Sort", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "Sort items" })
+    .getByRole("radio", { name: "Name: A to Z" })
+    .check();
+  await page
+    .getByRole("dialog", { name: "Sort items" })
+    .getByRole("button", { name: "Apply" })
+    .click();
+  await page.getByRole("searchbox", { name: "Search food items" }).fill("a");
+  await expect.poll(() => api.queries.at(-1)?.get("search")).toBe("a");
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  let dialog = page.getByRole("dialog", { name: "Filter items" });
+  let first = dialog.getByRole("group", { name: "Filter 1" });
+  await first.getByLabel("Filter by").selectOption("amount");
+  await first.getByLabel("Quantity").fill("1");
+  await first.getByLabel("Unit").selectOption("item");
+  await dialog.getByRole("button", { name: "Apply" }).click();
+  const chips = page.getByRole("region", { name: "Applied filters" });
+  await expect(
+    chips.getByRole("button", { name: "Edit Amount filter" }),
+  ).toHaveText("Amount: 1 items");
+  await chips.getByRole("button", { name: "Edit Amount filter" }).click();
+  dialog = page.getByRole("dialog", { name: "Filter items" });
+  first = dialog.getByRole("group", { name: "Filter 1" });
+  await expect(first.getByLabel("Filter by")).toBeFocused();
+  await first.getByLabel("Condition").selectOption("greaterThan");
+  await expect(first.getByLabel("Unit")).toHaveValue("item");
+  await expect(first.getByLabel("Quantity")).toHaveValue("1");
+  await first.getByLabel("Quantity").fill("");
+  await dialog.getByRole("button", { name: "Apply" }).click();
+  await expect(first.getByRole("alert")).toHaveText("Enter a quantity.");
+  await first.getByLabel("Quantity").fill("2");
+  await dialog.getByRole("button", { name: "Apply" }).click();
+  await expect(
+    chips.getByRole("button", { name: "Edit Amount filter" }),
+  ).toHaveText("Amount: > 2 items");
+  await page.getByRole("button", { name: "Filter (1)" }).click();
+  dialog = page.getByRole("dialog", { name: "Filter items" });
+  await dialog.getByRole("button", { name: "Add another filter" }).click();
+  await dialog.getByRole("button", { name: "Apply" }).click();
+  await expect(
+    dialog.getByRole("group", { name: "Filter 2" }).getByRole("alert"),
+  ).toHaveText("Choose a field or remove this filter.");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await chips.getByRole("button", { name: "Clear all" }).click();
+  await expect(chips).toHaveCount(0);
+  await expect.poll(() => api.queries.at(-1)?.get("filters")).toBe("{}");
+  expect(api.queries.at(-1)?.get("search")).toBe("a");
+  expect(api.queries.at(-1)?.get("sort")).toContain('"name"');
 });
 
 test("mobile list, selection, item actions, and viewport changes share one result set", async ({
@@ -273,7 +452,9 @@ test("mobile list, selection, item actions, and viewport changes share one resul
   await page.getByRole("button", { name: "Select", exact: true }).click();
   await list.getByRole("checkbox", { name: "Select Milk" }).check();
   await expect(
-    page.getByRole("button", { name: "Delete selected (1)" }),
+    page
+      .getByRole("toolbar", { name: "Selected items" })
+      .getByRole("button", { name: "Delete (1)" }),
   ).toBeVisible();
   await page.setViewportSize({ width: 1100, height: 700 });
   await expect(
@@ -284,6 +465,59 @@ test("mobile list, selection, item actions, and viewport changes share one resul
   await expect(
     list.getByRole("checkbox", { name: "Select Milk" }),
   ).toBeChecked();
+});
+
+test("mobile selection exits cleanly and keeps deletion contextual", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 500 });
+  const api = await foodApi(page, [milk, rice]);
+  await page.goto("/pantry");
+  const list = page.getByRole("list", { name: "Food inventory" });
+  await expect(page.getByText("2 items", { exact: true })).toBeVisible();
+  const itemX = (await list.getByText("Milk", { exact: true }).boundingBox())
+    ?.x;
+  await page.getByRole("button", { name: "Select", exact: true }).click();
+  expect((await list.getByText("Milk", { exact: true }).boundingBox())?.x).toBe(
+    itemX,
+  );
+  await list.getByRole("checkbox", { name: "Select Milk" }).check();
+  await expect(
+    list.locator("..").getByText("1 selected", { exact: true }),
+  ).toBeVisible();
+  const actions = page.getByRole("toolbar", { name: "Selected items" });
+  await expect(
+    actions.getByRole("button", { name: "Delete (1)" }),
+  ).toBeVisible();
+  await page.evaluate(() =>
+    window.scrollTo(0, document.documentElement.scrollHeight),
+  );
+  const lastItem = await list.getByRole("listitem").last().boundingBox();
+  const bar = await actions.boundingBox();
+  expect((lastItem?.y ?? 0) + (lastItem?.height ?? 0)).toBeLessThanOrEqual(
+    (bar?.y ?? 0) + 1,
+  );
+  await page.getByRole("button", { name: "Done selecting" }).click();
+  await expect(list.getByRole("checkbox")).toHaveCount(0);
+  await expect(actions).toHaveCount(0);
+  expect(api.deleted).toEqual([]);
+
+  await page.getByRole("button", { name: "Select", exact: true }).click();
+  await actions.getByRole("button", { name: "Select all" }).click();
+  await expect(
+    list.getByRole("checkbox", { name: "Select Milk" }),
+  ).toBeChecked();
+  await expect(
+    actions.getByRole("button", { name: "Delete (2)" }),
+  ).toBeVisible();
+  await actions.getByRole("button", { name: "Delete (2)" }).click();
+  const dialog = page.getByRole("dialog", { name: "Delete 2 items?" });
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  expect(api.deleted).toEqual([]);
+  await actions.getByRole("button", { name: "Delete (2)" }).click();
+  await dialog.getByRole("button", { name: "Confirm delete" }).click();
+  await expect(list.getByRole("listitem")).toHaveCount(0);
+  expect(api.deleted).toEqual([milk.id, rice.id]);
 });
 
 test("mobile header reveals on upward scroll and Back to top restores it", async ({
@@ -373,7 +607,7 @@ test("bulk deletion refreshes after partial success and retries only failed IDs"
   await expect(nameCells(page)).toHaveCount(3);
   await selectRow(page, milk.id);
   await selectRow(page, rice.id);
-  await page.getByRole("button", { name: "Delete selected (2)" }).click();
+  await page.getByRole("button", { name: "Delete (2)" }).click();
   let dialog = page.getByRole("dialog", { name: "Delete 2 items?" });
   await dialog.getByRole("button", { name: "Confirm delete" }).click();
   dialog = page.getByRole("dialog", { name: "Delete item?" });
@@ -389,22 +623,24 @@ test("bulk deletion refreshes after partial success and retries only failed IDs"
 test("successful add, edit, and delete refetch the first page with applied query and reset desktop scroll", async ({
   page,
 }) => {
-  const api = await foodApi(page, manyItems);
+  const api = await foodApi(page, manyItems.slice(0, 30));
   await page.goto("/pantry");
   await expect(nameCells(page)).toHaveCount(20);
-  await page
-    .getByRole("combobox", { name: "Sort pantry items" })
-    .selectOption("name-asc");
+  await chooseDesktopSort(page, "Name: A to Z");
   await page.getByRole("searchbox", { name: "Search food items" }).fill("Food");
+  await expect.poll(() => api.queries.at(-1)?.get("search")).toBe("Food");
   await expect(nameCells(page)).toHaveCount(20);
   const scroller = page.getByTestId("desktop-inventory-scroll");
+  await expect(scroller).toHaveAttribute("aria-busy", "false");
+  const loadMore = scroller.getByRole("button", { name: "Load more" });
+  await loadMore.click();
+  await expect.poll(() => nameCells(page).count()).toBeGreaterThan(20);
   await scroller.evaluate((element) => {
     element.scrollTop = element.scrollHeight;
   });
   await expect
     .poll(() => scroller.evaluate((element) => element.scrollTop))
     .toBeGreaterThan(0);
-  await expect(nameCells(page)).toHaveCount(40);
 
   async function expectResetAfter(action: () => Promise<void>) {
     const before = api.queries.length;

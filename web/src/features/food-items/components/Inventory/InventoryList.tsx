@@ -57,24 +57,6 @@ export default function InventoryList({
     >
       {items.map((item) => (
         <li key={item.id} className="flex min-w-0 items-start gap-3 px-4 py-3">
-          {selecting && (
-            <input
-              type="checkbox"
-              aria-label={`Select ${item.name}`}
-              checked={selectedIds.has(item.id)}
-              disabled={disabled}
-              className="mt-3 size-5 shrink-0"
-              onChange={(event) => {
-                const next = new Set(selectedIds);
-                if (event.target.checked) {
-                  next.add(item.id);
-                } else {
-                  next.delete(item.id);
-                }
-                onSelectionChange(next);
-              }}
-            />
-          )}
           <div className="min-w-0 flex-1">
             <p className="wrap-anywhere font-medium">{item.name}</p>
             <p className="mt-1 text-sm text-content-muted">
@@ -86,11 +68,28 @@ export default function InventoryList({
                 : "No expiration date"}
             </p>
           </div>
-          {!selecting && (
-            <div
-              ref={openId === item.id ? openAction : undefined}
-              className="relative shrink-0"
-            >
+          <div
+            ref={openId === item.id ? openAction : undefined}
+            className="relative flex size-11 shrink-0 items-center justify-center"
+          >
+            {selecting ? (
+              <input
+                type="checkbox"
+                aria-label={`Select ${item.name}`}
+                checked={selectedIds.has(item.id)}
+                disabled={disabled}
+                className="size-6 accent-brand"
+                onChange={(event) => {
+                  const next = new Set(selectedIds);
+                  if (event.target.checked) {
+                    next.add(item.id);
+                  } else {
+                    next.delete(item.id);
+                  }
+                  onSelectionChange(next);
+                }}
+              />
+            ) : (
               <button
                 type="button"
                 aria-label={`Actions for ${item.name}`}
@@ -103,32 +102,32 @@ export default function InventoryList({
               >
                 <LuEllipsis aria-hidden="true" className="size-5" />
               </button>
-              {openId === item.id && (
-                <div className="absolute top-full right-0 z-20 w-40 rounded-panel border border-border-default bg-surface p-1 shadow-modal">
-                  <button
-                    type="button"
-                    className="min-h-11 w-full rounded-control px-3 text-left hover:bg-surface-hover"
-                    onClick={() => {
-                      setOpenId(null);
-                      onEdit(item);
-                    }}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="min-h-11 w-full rounded-control px-3 text-left text-danger hover:bg-danger-subtle"
-                    onClick={() => {
-                      setOpenId(null);
-                      onDelete([item]);
-                    }}
-                  >
-                    Delete
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+            )}
+            {!selecting && openId === item.id && (
+              <div className="absolute top-full right-0 z-20 w-40 rounded-panel border border-border-default bg-surface p-1 shadow-modal">
+                <button
+                  type="button"
+                  className="min-h-11 w-full rounded-control px-3 text-left hover:bg-surface-hover"
+                  onClick={() => {
+                    setOpenId(null);
+                    onEdit(item);
+                  }}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="min-h-11 w-full rounded-control px-3 text-left text-danger hover:bg-danger-subtle"
+                  onClick={() => {
+                    setOpenId(null);
+                    onDelete([item]);
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
         </li>
       ))}
     </ul>

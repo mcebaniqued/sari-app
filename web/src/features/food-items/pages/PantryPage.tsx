@@ -1,7 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { LuArrowUp, LuLayoutGrid } from "react-icons/lu";
+import { LuArrowUp, LuLayoutGrid, LuTrash2 } from "react-icons/lu";
 import DeleteFoodItemsDialog from "../components/DeleteFoodItemsDialog/DeleteFoodItemsDialog";
 import FoodItemEditorDialog from "../components/FoodItemEditorDialog/FoodItemEditorDialog";
+import AppliedFilters from "../components/Inventory/AppliedFilters";
+import FilterDialog from "../components/Inventory/FilterDialog";
+import {
+  type LogicalFilterField,
+  removeLogicalFilter,
+} from "../components/Inventory/filterModel";
 import FoodItemsEmptyState from "../components/Inventory/FoodItemsEmptyState";
 import InventoryList from "../components/Inventory/InventoryList";
 import InventoryTable from "../components/Inventory/InventoryTable";
@@ -13,6 +19,9 @@ export default function PantryPage() {
   const inventory = useInventory();
   const pantry = usePantryItems(inventory.invalidate);
   const [selecting, setSelecting] = useState(false);
+  const [filterEditor, setFilterEditor] = useState<{
+    focusField?: LogicalFilterField;
+  } | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const desktopScroll = useRef<HTMLDivElement>(null);
   const desktopEnd = useRef<HTMLDivElement>(null);
@@ -115,6 +124,7 @@ export default function PantryPage() {
     onDelete: pantry.startDelete,
   };
   const empty = inventory.total === 0 && !inventory.loading && !inventory.error;
+  const mobileSelecting = selecting || inventory.selected.length > 0;
 
   return (
     <div className="flex min-h-0 flex-col md:h-full">
@@ -129,8 +139,6 @@ export default function PantryPage() {
         <PantryToolbar
           query={inventory.query}
           selectedCount={inventory.selected.length}
-          loadedCount={inventory.items.length}
-          selecting={selecting}
           disabled={pantry.busy}
           onSearch={(search) => {
             inventory.applyQuery({ ...inventory.query, search });
@@ -138,33 +146,31 @@ export default function PantryPage() {
           onSort={(sort) => {
             inventory.applyQuery({ ...inventory.query, sort });
           }}
-          onFilters={(filters, sort) => {
-            inventory.applyQuery({ ...inventory.query, filters, sort });
-          }}
-          onRemoveFilter={(field) => {
-            const filters = Object.fromEntries(
-              Object.entries(inventory.query.filters).filter(
-                ([name]) => name !== field,
-              ),
-            );
-            inventory.applyQuery({ ...inventory.query, filters });
+          filterOpen={filterEditor !== null}
+          onOpenFilters={() => {
+            setFilterEditor({});
           }}
           onAdd={pantry.startAdd}
-          onSelectMode={() => {
-            setSelecting((value) => !value);
-            inventory.clearSelection();
-          }}
-          onSelectAll={() => {
-            inventory.setSelectedIds(
-              new Set(inventory.items.map((item) => item.id)),
-            );
-          }}
           onClearSelection={inventory.clearSelection}
           onDeleteSelected={() => {
             pantry.startDelete(inventory.selected);
           }}
         />
       </div>
+      <AppliedFilters
+        filters={inventory.query.filters}
+        disabled={pantry.busy}
+        onEdit={(field) => {
+          setFilterEditor({ focusField: field });
+        }}
+        onRemove={(field) => {
+          const filters = removeLogicalFilter(inventory.query.filters, field);
+          inventory.applyQuery({ ...inventory.query, filters });
+        }}
+        onClear={() => {
+          inventory.applyQuery({ ...inventory.query, filters: {} });
+        }}
+      />
       <p role="status" aria-live="polite" className="sr-only">
         {inventory.loading
           ? "Loading items…"
@@ -202,11 +208,52 @@ export default function PantryPage() {
           {stateAndFallback()}
         </div>
       </section>
-      <section aria-label="Food inventory" className="pb-12 md:hidden">
+      {filterEditor && (
+        <FilterDialog
+          filters={inventory.query.filters}
+          focusField={filterEditor.focusField}
+          onClose={() => {
+            setFilterEditor(null);
+          }}
+          onApply={(filters) => {
+            inventory.applyQuery({ ...inventory.query, filters });
+            setFilterEditor(null);
+          }}
+        />
+      )}
+      <section
+        aria-label="Food inventory"
+        className={`${mobileSelecting ? "pb-[calc(env(safe-area-inset-bottom)+6rem)]" : "pb-12"} md:hidden`}
+      >
+        <div className="flex min-h-11 items-center justify-between gap-3 text-sm">
+          <p className="text-content-muted" aria-live="polite">
+            {mobileSelecting
+              ? `${inventory.selected.length} selected`
+              : inventory.total === null
+                ? "Loading items…"
+                : `${inventory.total} ${inventory.total === 1 ? "item" : "items"}`}
+          </p>
+          {(inventory.items.length > 0 || mobileSelecting) && (
+            <button
+              type="button"
+              onClick={() => {
+                if (mobileSelecting) {
+                  inventory.clearSelection();
+                  setSelecting(false);
+                } else {
+                  setSelecting(true);
+                }
+              }}
+              className="min-h-11 rounded-control px-2 text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-brand"
+            >
+              {mobileSelecting ? "Done selecting" : "Select"}
+            </button>
+          )}
+        </div>
         {inventory.items.length > 0 && (
           <InventoryList
             items={inventory.items}
-            selecting={selecting}
+            selecting={mobileSelecting}
             selectedIds={inventory.selectedIds}
             onSelectionChange={inventory.setSelectedIds}
             {...actions}
@@ -225,6 +272,44 @@ export default function PantryPage() {
         <div ref={mobileEnd} aria-hidden="true" />
         {stateAndFallback()}
       </section>
+      {mobileSelecting && (
+        <div
+          role="toolbar"
+          aria-label="Selected items"
+          className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-2 border-t border-border-default bg-surface px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-modal md:hidden"
+        >
+          <button
+            type="button"
+            disabled={pantry.busy || inventory.items.length === 0}
+            onClick={() => {
+              inventory.setSelectedIds(
+                new Set(inventory.items.map((item) => item.id)),
+              );
+            }}
+            className="min-h-11 rounded-control px-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50"
+          >
+            Select all
+          </button>
+          <button
+            type="button"
+            disabled={pantry.busy || inventory.selected.length === 0}
+            onClick={inventory.clearSelection}
+            className="min-h-11 rounded-control px-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50"
+          >
+            Clear
+          </button>
+          <button
+            type="button"
+            disabled={pantry.busy || inventory.selected.length === 0}
+            onClick={() => {
+              pantry.startDelete(inventory.selected);
+            }}
+            className="inline-flex min-h-11 items-center gap-1 rounded-control border border-danger-border px-3 text-sm font-medium text-danger hover:bg-danger-subtle focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50"
+          >
+            <LuTrash2 aria-hidden="true" /> Delete ({inventory.selected.length})
+          </button>
+        </div>
+      )}
       {showBackToTop && (
         <button
           type="button"
@@ -238,7 +323,7 @@ export default function PantryPage() {
                 : "smooth",
             });
           }}
-          className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-20 inline-flex size-12 items-center justify-center rounded-full bg-brand text-content-inverse shadow-modal focus-visible:outline-2 focus-visible:outline-brand md:hidden"
+          className={`fixed right-4 z-20 inline-flex size-12 items-center justify-center rounded-full bg-brand text-content-inverse shadow-modal focus-visible:outline-2 focus-visible:outline-brand md:hidden ${mobileSelecting ? "bottom-[calc(env(safe-area-inset-bottom)+6rem)]" : "bottom-[calc(env(safe-area-inset-bottom)+1rem)]"}`}
         >
           <LuArrowUp aria-hidden="true" />
         </button>

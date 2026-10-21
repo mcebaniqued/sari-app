@@ -1,4 +1,5 @@
 import type { FoodItem } from "@sari/contracts";
+import { useEffect, useRef } from "react";
 import { formatDate } from "@/utils/date";
 import type { FoodItemActions } from "../../types/foodItems";
 import FoodItemRowActions from "./FoodItemRowActions";
@@ -15,8 +16,15 @@ export default function InventoryTable({
   onSelectionChange,
   ...actions
 }: InventoryTableProps) {
-  const allSelected =
-    items.length > 0 && items.every((item) => selectedIds.has(item.id));
+  const selectAll = useRef<HTMLInputElement>(null);
+  const selectedCount = items.filter((item) => selectedIds.has(item.id)).length;
+  const allSelected = items.length > 0 && selectedCount === items.length;
+
+  useEffect(() => {
+    if (selectAll.current) {
+      selectAll.current.indeterminate = selectedCount > 0 && !allSelected;
+    }
+  }, [allSelected, selectedCount]);
 
   return (
     <table className="w-full table-fixed border-collapse text-sm">
@@ -33,9 +41,11 @@ export default function InventoryTable({
         <tr>
           <th scope="col" className="border-b border-border-default px-3 py-2">
             <input
+              ref={selectAll}
               type="checkbox"
               aria-label="Select all loaded items"
               checked={allSelected}
+              className="size-6 accent-brand"
               disabled={items.length === 0 || actions.disabled}
               onChange={(event) => {
                 onSelectionChange(
@@ -81,6 +91,7 @@ export default function InventoryTable({
                 type="checkbox"
                 aria-label={`Select ${item.name}`}
                 checked={selectedIds.has(item.id)}
+                className="size-6 accent-brand"
                 disabled={actions.disabled}
                 onChange={(event) => {
                   const next = new Set(selectedIds);

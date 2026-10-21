@@ -14,9 +14,22 @@ test("table, filter dialog, editor, and confirmation are keyboard accessible", a
   await page.goto("/pantry");
   await expect(nameCells(page)).toHaveText(["Milk"]);
   await expectAccessible(page);
-  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  const sort = page.getByRole("button", { name: "Sort: Added: Newest" });
+  await sort.click();
+  await expect(
+    page
+      .getByRole("group", { name: "Sort pantry items" })
+      .getByRole("radio", { name: "Added: Newest" }),
+  ).toBeFocused();
   await expectAccessible(page);
   await page.keyboard.press("Escape");
+  await expect(sort).toBeFocused();
+  await expect(sort).toHaveAttribute("aria-expanded", "false");
+  const filter = page.getByRole("button", { name: "Filter", exact: true });
+  await filter.click();
+  await expectAccessible(page);
+  await page.keyboard.press("Escape");
+  await expect(filter).toBeFocused();
   await page.getByRole("button", { name: "Edit Milk" }).click();
   await expect(
     page.getByRole("dialog", { name: "Edit item" }).getByLabel(/^Food name/),
@@ -49,6 +62,15 @@ test("mobile list and action menu fit a narrow viewport", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: "Edit", exact: true }),
   ).toBeVisible();
+  await expectAccessible(page);
+  await page.keyboard.press("Escape");
+  const sort = page.getByRole("button", { name: "Sort", exact: true });
+  await sort.click();
+  await expectAccessible(page);
+  await page.keyboard.press("Escape");
+  await expect(sort).toBeFocused();
+  await page.getByRole("button", { name: "Select", exact: true }).click();
+  await page.getByRole("checkbox", { name: /Select A pantry item/ }).check();
   await expectAccessible(page);
 });
 

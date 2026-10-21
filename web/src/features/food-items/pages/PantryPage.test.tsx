@@ -212,19 +212,25 @@ describe("pantry modals and persistence", () => {
         <PantryPage />
       </MemoryRouter>,
     );
-    await screen.findByRole("checkbox", { name: "Select Milk" });
-    fireEvent.click(screen.getByRole("checkbox", { name: "Select Milk" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: "Select Eggs" }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: /Delete selected/ }),
-    );
+    const table = within(screen.getByRole("table"));
+    await table.findByRole("checkbox", { name: "Select Milk" });
+    fireEvent.click(table.getByRole("checkbox", { name: "Select Milk" }));
+    fireEvent.click(table.getByRole("checkbox", { name: "Select Eggs" }));
+    const desktopActions = screen.getAllByRole("toolbar", {
+      name: "Selected items",
+    })[0];
+    if (!desktopActions) {
+      throw new Error("Missing desktop bulk actions");
+    }
+    const bulkActions = within(desktopActions);
+    fireEvent.click(bulkActions.getByRole("button", { name: "Delete (2)" }));
     expect(fetch).not.toHaveBeenCalled();
     let dialog = within(
       screen.getByRole("dialog", { name: "Delete 2 items?" }),
     );
     fireEvent.click(dialog.getByRole("button", { name: "Cancel" }));
     expect(fetch).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: /Delete selected/ }));
+    fireEvent.click(bulkActions.getByRole("button", { name: "Delete (2)" }));
     dialog = within(screen.getByRole("dialog", { name: "Delete 2 items?" }));
     fireEvent.click(dialog.getByRole("button", { name: "Confirm delete" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(

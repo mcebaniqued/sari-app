@@ -35,7 +35,7 @@ export default function SearchBar({
   }, [debouncedValue, onSearch]);
 
   return (
-    <div role="search" className="relative w-full min-w-0 sm:max-w-80">
+    <div role="search" className="relative w-full min-w-0">
       <label htmlFor={id} className="sr-only">
         {label}
       </label>
