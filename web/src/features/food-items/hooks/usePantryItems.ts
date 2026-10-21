@@ -75,8 +75,6 @@ export function usePantryItems() {
       );
       if (deletedIds.length) {
         setRevision((value) => value + 1);
-      }
-      if (deletedIds.length) {
         notify(
           "success",
           deleteTargets.length === 1

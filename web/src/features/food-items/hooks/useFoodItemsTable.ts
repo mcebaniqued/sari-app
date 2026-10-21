@@ -38,10 +38,13 @@ export function useFoodItemsTable(revision: number) {
   // Rebuilding resets paging and cancels obsolete requests after edits or retries.
   const datasource = useMemo(
     () =>
-      createFoodItemsDatasource(
-        { search, revision, retry },
-        { setLoading, setError, setTotal, onError },
-      ),
+      createFoodItemsDatasource(search, {
+        setLoading,
+        setError,
+        setTotal,
+        onError,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Writes and explicit retries must rebuild the datasource even when the search is unchanged.
     [search, revision, retry, onError],
   );
 

@@ -4,7 +4,7 @@ import type { IDatasource } from "ag-grid-community";
 import { listFoodItems } from "../api/foodItemsApi";
 
 export function createFoodItemsDatasource(
-  context: { search: string; revision: number; retry: number },
+  search: string,
   handlers: {
     setLoading: (value: boolean) => void;
     setError: (value: string) => void;
@@ -12,7 +12,6 @@ export function createFoodItemsDatasource(
     onError: (error: unknown) => void;
   },
 ): IDatasource {
-  const { search } = context;
   const { setLoading, setError, setTotal, onError } = handlers;
 
   const controllers = new Set<AbortController>();
