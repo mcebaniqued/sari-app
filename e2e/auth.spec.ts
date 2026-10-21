@@ -217,9 +217,9 @@ test("real registration, private pantry, reload, logout, and login", async ({
       .click();
     await expect(stranger).toHaveURL(/\/pantry$/);
     await expect(
-      stranger.getByText("Add your first item to start your pantry.", {
-        exact: false,
-      }),
+      stranger
+        .getByRole("region", { name: "No items found" })
+        .getByText("Add your first item to start your pantry."),
     ).toBeVisible();
     await expect(
       stranger.getByRole("button", { name: "Edit Jamie's rice" }),

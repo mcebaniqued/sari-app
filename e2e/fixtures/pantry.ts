@@ -167,11 +167,11 @@ export async function foodApi(
 }
 
 export const nameCells = (page: Page) =>
-  page.locator('.ag-row [col-id="name"]').filter({ hasText: /\S/ });
+  page.locator('table tbody th[scope="row"]');
 
 export async function selectRow(page: Page, id: string) {
   const checkbox = page.locator(
-    `.ag-row[row-id="${id}"] input[type="checkbox"]`,
+    `table tbody tr[data-item-id="${id}"] input[type="checkbox"]`,
   );
   await checkbox.click();
   await expect(checkbox).toBeChecked();

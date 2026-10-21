@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { signedIn } from "./authFixture";
+import { foodApi } from "./fixtures/pantry";
 
 test("frontend loads and its same-origin proxy reaches the API", async ({
   page,
@@ -20,6 +21,7 @@ test("a direct visit to an unknown SPA route can navigate home", async ({
   page,
 }) => {
   await signedIn(page);
+  await foodApi(page, []);
   await page.goto("/missing");
   await expect(
     page.getByRole("heading", { name: "Page not found" }),
