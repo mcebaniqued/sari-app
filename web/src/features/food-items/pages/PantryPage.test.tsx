@@ -69,11 +69,12 @@ async function addDialog(copy: "mobile" | "desktop" = "mobile") {
     expect(buttons).toHaveLength(2);
     buttons.forEach((button) => expect(button).toBeEnabled());
   });
-  fireEvent.click(
-    screen.getAllByRole("button", { name: "Add item" })[
-      copy === "desktop" ? 1 : 0
-    ],
-  );
+  const buttons = screen.getAllByRole("button", { name: "Add item" });
+  const button = buttons[copy === "desktop" ? 1 : 0];
+  if (!button) {
+    throw new Error("Expected both responsive Add controls");
+  }
+  fireEvent.click(button);
 
   return within(screen.getByRole("dialog", { name: "Add item" }));
 }
