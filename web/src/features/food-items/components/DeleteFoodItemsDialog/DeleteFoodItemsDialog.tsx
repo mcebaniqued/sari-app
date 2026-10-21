@@ -1,6 +1,5 @@
 import type { FoodItem } from "@sari/contracts";
 import { LuTrash2 } from "react-icons/lu";
-
 import Modal from "@/components/Modal/Modal";
 
 interface DeleteFoodItemsDialogProps {

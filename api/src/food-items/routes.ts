@@ -6,7 +6,6 @@ import {
   updateFoodItemSchema,
 } from "@sari/contracts";
 import { type Response, Router } from "express";
-
 import { connectDatabase } from "../db.js";
 import { FoodItemModel } from "./model.js";
 import { foodMongoQuery } from "./query.js";

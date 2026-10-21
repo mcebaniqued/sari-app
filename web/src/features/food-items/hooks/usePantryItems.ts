@@ -1,9 +1,7 @@
 import type { CreateFoodItem, FoodItem } from "@sari/contracts";
 import { useCallback, useRef, useState } from "react";
-
 import { notify } from "@/components/Toast/notifications";
 import { useAccessDenied } from "@/hooks/useAccessDenied";
-
 import {
   createFoodItem,
   deleteFoodItems,

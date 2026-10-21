@@ -1,7 +1,6 @@
 import type { CreateFoodItem, FoodItem } from "@sari/contracts";
 import { useEffect, useRef, useState } from "react";
 import { LuCheck, LuPlus } from "react-icons/lu";
-
 import { useBarcodeProduct } from "../../hooks/useBarcodeProduct";
 import { useFoodItemDraft } from "../../hooks/useFoodItemDraft";
 import { useFoodItemForm } from "../../hooks/useFoodItemForm";

@@ -1,5 +1,4 @@
 import { Outlet, useLocation } from "react-router-dom";
-
 import AppHeader from "@/components/AppHeader/AppHeader";
 import ToastViewport from "@/components/Toast/ToastViewport";
 import { useAuth } from "@/features/auth/context/AuthContext";

@@ -1,6 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-
 import { useAutoDismiss } from "./useAutoDismiss";
 
 afterEach(() => {

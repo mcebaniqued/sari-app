@@ -1,6 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect } from "@playwright/test";
-
 import { foodApi, nameCells, test, usdaOats } from "./fixtures/pantry";
 
 test("camera decodes a UPC from video and looks up the item once", async ({

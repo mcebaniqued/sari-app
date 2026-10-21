@@ -1,6 +1,5 @@
 import type { FoodItem } from "@sari/contracts";
 import { AgGridReact } from "ag-grid-react";
-
 import { useFoodItemColumns } from "../../hooks/useFoodItemColumns";
 import { useFoodItemsTable } from "../../hooks/useFoodItemsTable";
 import type { FoodItemActions } from "../../types/foodItems";

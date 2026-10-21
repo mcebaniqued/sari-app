@@ -8,7 +8,6 @@ import {
 } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
 import FoodItemForm from "./FoodItemForm";
 
 const product: FoodProduct = {

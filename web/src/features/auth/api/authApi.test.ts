@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-
 import { authenticate } from "./authApi";
 
 const input = {

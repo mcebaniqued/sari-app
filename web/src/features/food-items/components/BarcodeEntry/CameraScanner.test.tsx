@@ -7,7 +7,6 @@ import {
 } from "@testing-library/react";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
 import CameraScanner from "./CameraScanner";
 
 const { decode, stop, reader } = vi.hoisted(() => ({

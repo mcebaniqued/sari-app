@@ -1,7 +1,6 @@
 import type { ApiErrorResponse } from "@sari/contracts";
 import { toNodeHandler } from "better-auth/node";
 import { Router } from "express";
-
 import { getAuth, hasSessionCookie } from "./auth.js";
 
 export const authRouter = Router();

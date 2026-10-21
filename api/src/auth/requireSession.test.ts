@@ -2,7 +2,6 @@ import type { ApiErrorResponse } from "@sari/contracts";
 import express from "express";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
 import type * as AuthModule from "./auth.js";
 import { getAuth } from "./auth.js";
 import { requireSession } from "./requireSession.js";

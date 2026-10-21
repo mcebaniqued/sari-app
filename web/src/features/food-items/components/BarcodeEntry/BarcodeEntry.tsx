@@ -1,9 +1,7 @@
 import { barcodeSchema } from "@sari/contracts";
 import { useRef, useState } from "react";
 import { LuCamera } from "react-icons/lu";
-
 import Input from "@/components/Input/Input";
-
 import BarcodeNumberGuide from "./BarcodeNumberGuide";
 import CameraScanner from "./CameraScanner";
 

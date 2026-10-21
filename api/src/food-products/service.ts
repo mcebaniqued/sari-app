@@ -1,5 +1,4 @@
 import { type BarcodeLookup, foodProductSchema } from "@sari/contracts";
-
 import { isDuplicateKeyError } from "../utils/mongoError.js";
 import { BarcodeLookupModel, FoodProductModel } from "./model.js";
 import { parsePackageSize } from "./packageSize.js";

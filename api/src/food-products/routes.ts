@@ -1,6 +1,5 @@
 import { barcodeSchema, foodItemIdSchema } from "@sari/contracts";
 import { Router } from "express";
-
 import { connectDatabase } from "../db.js";
 import { FoodProductModel } from "./model.js";
 import { lookupBarcode, productDto } from "./service.js";

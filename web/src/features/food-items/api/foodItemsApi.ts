@@ -5,7 +5,6 @@ import {
   foodItemSchema,
   type UpdateFoodItem,
 } from "@sari/contracts";
-
 import { ApiError, apiFetch } from "@/api/apiFetch";
 
 export async function listFoodItems(

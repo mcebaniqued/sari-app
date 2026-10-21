@@ -1,6 +1,5 @@
 import { LuCircleAlert, LuCircleCheck, LuInfo } from "react-icons/lu";
 import type { ToastContentProps } from "react-toastify/unstyled";
-
 import { useAutoDismiss } from "@/hooks/useAutoDismiss";
 
 export type NotificationTone = "success" | "error" | "info" | "warning";

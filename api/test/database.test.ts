@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import { testDatabaseUri } from "./database.js";
 
 describe("test database isolation", () => {

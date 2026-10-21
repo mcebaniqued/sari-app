@@ -1,9 +1,7 @@
 import type { FoodItem } from "@sari/contracts";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { useMemo } from "react";
-
 import { formatDate } from "@/utils/date";
-
 import FoodItemRowActions from "../components/FoodItemsTable/FoodItemRowActions";
 import type { FoodItemActions } from "../types/foodItems";
 

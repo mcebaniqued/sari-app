@@ -8,9 +8,7 @@ import {
 } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
 import { notify } from "@/components/Toast/notifications";
-
 import PantryPage from "./PantryPage";
 
 // Real grid layout, sorting, filtering, and selection run in Playwright.

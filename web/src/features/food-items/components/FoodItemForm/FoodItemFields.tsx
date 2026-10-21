@@ -1,8 +1,6 @@
 import { foodUnitSchema } from "@sari/contracts";
 import { LuChevronDown } from "react-icons/lu";
-
 import Input from "@/components/Input/Input";
-
 import type { FoodItemDraft } from "../../hooks/useFoodItemDraft";
 import { foodUnitLabels } from "../../utils/foodUnits";
 

@@ -6,7 +6,6 @@ import {
   useRef,
   useState,
 } from "react";
-
 import { getSession, signOut } from "../api/authApi";
 import { AuthContext } from "./AuthContext";
 

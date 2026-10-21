@@ -1,7 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { MongoClient } from "mongodb";
-
 import { signedIn } from "./authFixture";
 
 const createdEmails = new Set<string>();

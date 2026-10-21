@@ -2,9 +2,7 @@ import { loginSchema, registerSchema } from "@sari/contracts";
 import { type SubmitEvent, useEffect, useRef, useState } from "react";
 import { LuEye, LuEyeOff, LuLeaf } from "react-icons/lu";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-
 import Input from "@/components/Input/Input";
-
 import { authenticate } from "../api/authApi";
 import { useAuth } from "../context/AuthContext";
 import { safeReturnPath } from "../utils/returnPath";

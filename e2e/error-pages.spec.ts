@@ -1,7 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, type Route, test } from "@playwright/test";
 import type { FoodItem } from "@sari/contracts";
-
 import { signedIn } from "./authFixture";
 
 test.beforeEach(async ({ page }) => {

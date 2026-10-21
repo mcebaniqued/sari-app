@@ -4,7 +4,6 @@ import {
   type LoginInput,
   type RegisterInput,
 } from "@sari/contracts";
-
 import { ApiError, apiFetch } from "@/api/apiFetch";
 
 const authErrorMessages: Record<string, string> = {

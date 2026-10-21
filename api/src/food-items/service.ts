@@ -1,11 +1,9 @@
 import { createHash } from "node:crypto";
-
 import {
   type CreateFoodItem,
   foodItemSchema,
   type UpdateFoodItem,
 } from "@sari/contracts";
-
 import { FoodProductModel } from "../food-products/model.js";
 import { isDuplicateKeyError } from "../utils/mongoError.js";
 import { FoodItemModel } from "./model.js";

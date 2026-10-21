@@ -1,5 +1,4 @@
 import { foodProductSchema, normalizeBarcode } from "@sari/contracts";
-
 import { parsePackageSize } from "./packageSize.js";
 
 export class LookupError extends Error {

@@ -1,6 +1,5 @@
 import { foodItemQuerySchema } from "@sari/contracts";
 import type { IDatasource } from "ag-grid-community";
-
 import { listFoodItems } from "../api/foodItemsApi";
 
 /** Destroying an obsolete datasource aborts every request and rejects late callbacks. */

@@ -7,7 +7,6 @@ import {
   type FoodProduct,
 } from "@sari/contracts";
 import type { AxeResults } from "axe-core";
-
 import { signedIn } from "../authFixture";
 
 export const test = base.extend({

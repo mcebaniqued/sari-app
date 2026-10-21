@@ -1,5 +1,4 @@
 import { LuLayoutGrid } from "react-icons/lu";
-
 import DeleteFoodItemsDialog from "../components/DeleteFoodItemsDialog/DeleteFoodItemsDialog";
 import FoodItemEditorDialog from "../components/FoodItemEditorDialog/FoodItemEditorDialog";
 import FoodItemsTable from "../components/FoodItemsTable/FoodItemsTable";

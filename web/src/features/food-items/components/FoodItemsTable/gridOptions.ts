@@ -8,7 +8,6 @@ import {
   type RowSelectionOptions,
   themeQuartz,
 } from "ag-grid-community";
-
 import SelectPageHeader from "./SelectPageHeader";
 
 export const FOOD_ITEMS_PAGE_SIZE = 20;

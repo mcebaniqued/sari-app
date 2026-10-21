@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import { barcodeSchema, normalizeBarcode } from "./barcodes.js";
 
 describe("barcode identities", () => {

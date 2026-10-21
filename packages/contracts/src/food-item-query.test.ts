@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import { foodItemQuerySchema } from "./food-item-query.js";
 
 describe("pantry query boundaries", () => {

@@ -4,7 +4,6 @@ import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import type { Db } from "mongodb";
 import mongoose from "mongoose";
-
 import { connectDatabase } from "../db.js";
 
 export function appOrigins() {

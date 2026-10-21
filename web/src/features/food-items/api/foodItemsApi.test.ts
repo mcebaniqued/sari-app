@@ -1,5 +1,4 @@
 import { afterEach, expect, it, vi } from "vitest";
-
 import { deleteFoodItems } from "./foodItemsApi";
 
 afterEach(() => vi.unstubAllGlobals());

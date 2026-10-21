@@ -1,8 +1,6 @@
 import { type FoodItem, type FoodProduct } from "@sari/contracts";
 import { useEffect, useRef, useState } from "react";
-
 import { ApiError } from "@/api/apiFetch";
-
 import { getFoodProduct, lookupBarcode } from "../api/foodProductsApi";
 import type { useFoodItemDraft } from "./useFoodItemDraft";
 

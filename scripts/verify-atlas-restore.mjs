@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-
 import { BSON, MongoClient } from "mongodb";
 
 // backup-atlas.ps1 invokes this file through Node rather than a JS import;

@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import { createFoodItemSchema, updateFoodItemSchema } from "./food-items.js";
 
 describe("pantry input contracts", () => {

@@ -2,7 +2,6 @@ import { foodItemListSchema, foodItemSchema } from "@sari/contracts";
 import mongoose from "mongoose";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-
 import { removeTestUsers, testDatabaseUri } from "../../test/database.js";
 import app from "../app.js";
 import { connectDatabase } from "../db.js";

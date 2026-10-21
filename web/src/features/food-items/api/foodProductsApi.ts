@@ -1,5 +1,4 @@
 import { barcodeLookupSchema, foodProductSchema } from "@sari/contracts";
-
 import { apiFetch } from "@/api/apiFetch";
 
 export async function lookupBarcode(barcode: string, signal: AbortSignal) {

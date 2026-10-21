@@ -1,9 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
 import { getSession } from "@/features/auth/api/authApi";
-
 import App from "./App";
 
 vi.mock("@/features/auth/api/authApi", () => ({

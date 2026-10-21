@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { LuSearch, LuX } from "react-icons/lu";
-
 import Input from "@/components/Input/Input";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 

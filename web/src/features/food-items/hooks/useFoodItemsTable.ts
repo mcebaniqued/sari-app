@@ -1,11 +1,9 @@
 import type { FoodItem } from "@sari/contracts";
 import type { AgGridReact } from "ag-grid-react";
 import { useCallback, useMemo, useRef, useState } from "react";
-
 import { notify } from "@/components/Toast/notifications";
 import { useAccessDenied } from "@/hooks/useAccessDenied";
 import { getApiErrorMessage } from "@/utils/apiError";
-
 import { createFoodItemsDatasource } from "../utils/createFoodItemsDatasource";
 
 export function useFoodItemsTable(revision: number) {

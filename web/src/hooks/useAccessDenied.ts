@@ -1,6 +1,5 @@
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-
 import { ApiError } from "@/api/apiFetch";
 
 /** Keep HTTP transport independent of routing; handle forbidden outcomes at the UI boundary. */

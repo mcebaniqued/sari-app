@@ -1,5 +1,4 @@
 import { z } from "zod";
-
 import { foodUnitSchema } from "./food-items.js";
 
 export { barcodeSchema, normalizeBarcode } from "./barcodes.js";

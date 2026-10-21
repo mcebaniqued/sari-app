@@ -9,7 +9,6 @@ import {
   it,
   vi,
 } from "vitest";
-
 import { testDatabaseUri } from "../../test/database.js";
 import app from "../app.js";
 import { connectDatabase } from "../db.js";

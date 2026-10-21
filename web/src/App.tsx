@@ -1,5 +1,4 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-
 import AuthBoundary from "@/features/auth/components/AuthBoundary";
 import AuthProvider from "@/features/auth/context/AuthProvider";
 import AuthPage from "@/features/auth/pages/AuthPage";

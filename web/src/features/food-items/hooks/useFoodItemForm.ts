@@ -1,8 +1,6 @@
 import { type CreateFoodItem, createFoodItemSchema } from "@sari/contracts";
 import { type SubmitEvent, useRef, useState } from "react";
-
 import { useAccessDenied } from "@/hooks/useAccessDenied";
-
 import type { FoodItemDraft } from "./useFoodItemDraft";
 
 const validationMessages = new Map([

@@ -1,6 +1,5 @@
 import type { FoodItem } from "@sari/contracts";
 import { LuPencil, LuTrash2 } from "react-icons/lu";
-
 import type { FoodItemActions } from "../../types/foodItems";
 
 const actionClass =

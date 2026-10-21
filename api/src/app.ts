@@ -5,7 +5,6 @@ import type {
   ReadyResponse,
 } from "@sari/contracts";
 import express, { type ErrorRequestHandler, type Response } from "express";
-
 import { requireSession } from "./auth/requireSession.js";
 import { authRouter } from "./auth/routes.js";
 import { connectDatabase } from "./db.js";

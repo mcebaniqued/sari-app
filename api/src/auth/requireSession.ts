@@ -1,7 +1,6 @@
 import type { ApiErrorResponse } from "@sari/contracts";
 import { fromNodeHeaders } from "better-auth/node";
 import type { RequestHandler } from "express";
-
 import { appOrigins, getAuth, hasSessionCookie } from "./auth.js";
 
 declare global {

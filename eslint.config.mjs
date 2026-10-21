@@ -34,7 +34,11 @@ export default defineConfig(
       "unused-imports": unusedImports,
     },
     rules: {
-      "simple-import-sort/imports": "error",
+      // Keep the normal import order, without blank lines between categories.
+      "simple-import-sort/imports": [
+        "error",
+        { groups: [["^\\u0000", "^node:", "^@?\\w", "^", "^\\."]] },
+      ],
       "simple-import-sort/exports": "error",
       "unused-imports/no-unused-imports": "error",
       "@typescript-eslint/no-unused-vars": [
