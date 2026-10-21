@@ -15,6 +15,9 @@ test("table, filter dialog, editor, and confirmation are keyboard accessible", a
   await page.goto("/pantry");
   await expect(nameCells(page)).toHaveText(["Milk"]);
   await expectAccessible(page);
+  await expect(
+    page.getByRole("group", { name: "Pantry actions" }),
+  ).toBeVisible();
   const sort = page.getByRole("button", { name: /Sort:/ });
   await sort.click();
   await expect(
@@ -301,6 +304,9 @@ test("filter removal and dialog Apply restore focus to a surviving control", asy
   await second.getByLabel("Unit").selectOption("l");
   await dialog.getByRole("button", { name: "Apply" }).click();
 
+  await expect(filter).toHaveAccessibleName("Filter (2)");
+  await expect(filter).not.toHaveAttribute("aria-pressed");
+
   const chips = page.getByRole("region", { name: "Applied filters" });
   const amount = chips.getByRole("button", { name: "Edit Amount filter" });
   const removeExpiration = chips.getByRole("button", {
@@ -315,6 +321,27 @@ test("filter removal and dialog Apply restore focus to a surviving control", asy
   await dialog.getByRole("button", { name: "Apply" }).click();
   await expect(chips).toHaveCount(0);
   await expect(filter).toBeFocused();
+});
+
+test("filter errors identify and focus the invalid control", async ({
+  page,
+}) => {
+  await foodApi(page, [milk]);
+  await page.goto("/pantry");
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Filter items" });
+  await dialog.getByLabel("Filter by").selectOption("amount");
+  await dialog.getByLabel("Quantity").fill("2");
+  await dialog.getByRole("button", { name: "Apply" }).click();
+
+  const unit = dialog.getByLabel("Unit");
+  const quantity = dialog.getByLabel("Quantity");
+  await expect(unit).toBeFocused();
+  await expect(unit).toHaveAttribute("aria-invalid", "true");
+  await expect(unit).toHaveAccessibleDescription("Choose a unit.");
+  await expect(quantity).not.toHaveAttribute("aria-invalid");
+  await expect(quantity).not.toHaveAttribute("aria-describedby");
+  await expectAccessible(page);
 });
 
 test("mobile row actions close when focus leaves and restore focus on Escape", async ({

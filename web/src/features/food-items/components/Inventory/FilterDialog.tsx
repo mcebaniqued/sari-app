@@ -27,6 +27,8 @@ interface Editor {
   } | null;
 }
 
+type ValidationTarget = "field" | "operator" | "value" | "to" | "unit";
+
 const controlClass =
   "mt-1 min-h-11 w-full min-w-0 rounded-control border border-border-control bg-surface px-3";
 
@@ -86,18 +88,19 @@ function editorPredicates(
   editor: Editor,
 ):
   | { filters: InventoryFilters; error?: never }
-  | { error: string; filters?: never } {
+  | { error: string; target: ValidationTarget; filters?: never } {
   if (editor.legacy) {
     return { filters: editor.legacy.filters };
   }
   if (!editor.field) {
-    return { error: "Choose a field or remove this filter." };
+    return { error: "Choose a field or remove this filter.", target: "field" };
   }
 
   const range = editor.operator === "inRange";
   const noValue = editor.operator === "blank" || editor.operator === "notBlank";
   if (!noValue && !editor.value.trim()) {
     return {
+      target: "value",
       error:
         editor.field === "amount"
           ? range
@@ -110,6 +113,7 @@ function editorPredicates(
   }
   if (range && !editor.to.trim()) {
     return {
+      target: "to",
       error:
         editor.field === "amount"
           ? "Enter a To quantity."
@@ -120,7 +124,7 @@ function editorPredicates(
     editor.field === "amount" &&
     !foodUnitSchema.safeParse(editor.unit).success
   ) {
-    return { error: "Choose a unit." };
+    return { error: "Choose a unit.", target: "unit" };
   }
 
   const raw =
@@ -147,9 +151,25 @@ function editorPredicates(
           },
         };
   const parsed = foodItemQuerySchema.safeParse({ filters: raw });
-  return parsed.success
-    ? { filters: parsed.data.filters }
-    : { error: parsed.error.issues[0]?.message ?? "Check the filter values." };
+  if (parsed.success) {
+    return { filters: parsed.data.filters };
+  }
+
+  const issue = parsed.error.issues[0];
+  const path = issue?.path.join(".") ?? "";
+  const target: ValidationTarget =
+    path.endsWith(".filterTo") || path.endsWith(".dateTo")
+      ? "to"
+      : path.endsWith(".filter") || path.endsWith(".dateFrom")
+        ? "value"
+        : path.endsWith(".type")
+          ? "operator"
+          : path.startsWith("filters.unit")
+            ? "unit"
+            : range
+              ? "to"
+              : "value";
+  return { error: issue?.message ?? "Check the filter values.", target };
 }
 
 interface FilterDialogProps {
@@ -171,9 +191,11 @@ export default function FilterDialog({
   const nextId = useRef(6);
   const editorRefs = useRef(new Map<number, HTMLFieldSetElement>());
   const pendingFocus = useRef<number | null>(null);
-  const [error, setError] = useState<{ id: number; message: string } | null>(
-    null,
-  );
+  const [error, setError] = useState<{
+    id: number;
+    message: string;
+    target: ValidationTarget;
+  } | null>(null);
 
   useEffect(() => {
     if (pendingFocus.current !== null) {
@@ -221,7 +243,17 @@ export default function FilterDialog({
     for (const editor of editors) {
       const parsed = editorPredicates(editor);
       if (parsed.error !== undefined) {
-        setError({ id: editor.id, message: parsed.error });
+        setError({
+          id: editor.id,
+          message: parsed.error,
+          target: parsed.target,
+        });
+        editorRefs.current
+          .get(editor.id)
+          ?.querySelector<HTMLElement>(
+            `[data-filter-control="${parsed.target}"]`,
+          )
+          ?.focus();
         return;
       }
       Object.assign(applied, parsed.filters);
@@ -265,6 +297,10 @@ export default function FilterDialog({
           const autofocus = focusField
             ? editor.field === focusField
             : index === 0;
+          const invalid = (target: ValidationTarget) =>
+            error?.id === editor.id && error.target === target;
+          const describedBy = (target: ValidationTarget) =>
+            invalid(target) ? `filter-error-${editor.id}` : undefined;
           const input = (inputLabel: string, key: "value" | "to") => (
             <label className="block min-w-0 text-sm font-medium">
               {inputLabel}
@@ -272,12 +308,9 @@ export default function FilterDialog({
                 type={editor.field === "amount" ? "number" : "date"}
                 step={editor.field === "amount" ? "any" : undefined}
                 value={editor[key]}
-                aria-invalid={error?.id === editor.id || undefined}
-                aria-describedby={
-                  error?.id === editor.id
-                    ? `filter-error-${editor.id}`
-                    : undefined
-                }
+                data-filter-control={key}
+                aria-invalid={invalid(key) || undefined}
+                aria-describedby={describedBy(key)}
                 onChange={(event) => {
                   update(editor.id, { [key]: event.target.value });
                 }}
@@ -339,7 +372,10 @@ export default function FilterDialog({
                     Filter by
                     <select
                       data-autofocus={autofocus || undefined}
+                      data-filter-control="field"
                       value={editor.field}
+                      aria-invalid={invalid("field") || undefined}
+                      aria-describedby={describedBy("field")}
                       onChange={(event) => {
                         const field = filterFields.find(
                           (candidate) => candidate.id === event.target.value,
@@ -375,7 +411,10 @@ export default function FilterDialog({
                       <label className="block text-sm font-medium">
                         Condition
                         <select
+                          data-filter-control="operator"
                           value={editor.operator}
+                          aria-invalid={invalid("operator") || undefined}
+                          aria-describedby={describedBy("operator")}
                           onChange={(event) => {
                             const operator = event.target.value;
                             update(editor.id, {
@@ -422,7 +461,10 @@ export default function FilterDialog({
                             >
                               Unit
                               <select
+                                data-filter-control="unit"
                                 value={editor.unit}
+                                aria-invalid={invalid("unit") || undefined}
+                                aria-describedby={describedBy("unit")}
                                 onChange={(event) => {
                                   update(editor.id, {
                                     unit: event.target.value,

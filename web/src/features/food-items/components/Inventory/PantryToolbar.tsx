@@ -56,7 +56,7 @@ export default function PantryToolbar({
 
   return (
     <>
-      <div aria-label="Pantry actions">
+      <div role="group" aria-label="Pantry actions">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 md:flex md:min-h-11 md:items-center">
           <div className="min-w-0 md:flex-1">
             <SearchBar
@@ -96,7 +96,6 @@ export default function PantryToolbar({
               disabled={disabled}
               aria-haspopup="dialog"
               aria-expanded={filterOpen}
-              aria-pressed={activeFilters.length > 0}
               onClick={onOpenFilters}
               className={filterClass}
             >

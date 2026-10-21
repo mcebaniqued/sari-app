@@ -19,6 +19,26 @@ function change(control: HTMLElement, value: string) {
 }
 
 describe("FilterDialog", () => {
+  it("focuses and describes only the invalid value control", () => {
+    const { dialog, onApply } = setup();
+    change(dialog.getByLabelText("Filter by"), "amount");
+    change(dialog.getByLabelText("Condition"), "inRange");
+
+    fireEvent.click(dialog.getByRole("button", { name: "Apply" }));
+    const from = dialog.getByLabelText("From");
+    const to = dialog.getByLabelText("To");
+    const unit = dialog.getByLabelText("Unit");
+    const alert = dialog.getByRole("alert");
+    expect(from).toHaveFocus();
+    expect(from).toHaveAttribute("aria-invalid", "true");
+    expect(from).toHaveAttribute("aria-describedby", alert.id);
+    expect(to).not.toHaveAttribute("aria-invalid");
+    expect(to).not.toHaveAttribute("aria-describedby");
+    expect(unit).not.toHaveAttribute("aria-invalid");
+    expect(unit).not.toHaveAttribute("aria-describedby");
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
   it("opens with one empty editor, applies no filters, and restores that state on Reset or final removal", () => {
     const { dialog, onApply } = setup();
     expect(dialog.getByRole("group", { name: "Filter 1" })).toBeVisible();
@@ -74,6 +94,14 @@ describe("FilterDialog", () => {
     change(dialog.getByLabelText("Quantity"), "5");
     fireEvent.click(dialog.getByRole("button", { name: "Apply" }));
     expect(dialog.getByRole("alert")).toHaveTextContent("Choose a unit.");
+    expect(dialog.getByLabelText("Unit")).toHaveFocus();
+    expect(dialog.getByLabelText("Unit")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(dialog.getByLabelText("Quantity")).not.toHaveAttribute(
+      "aria-invalid",
+    );
     change(dialog.getByLabelText("Unit"), "item");
     change(dialog.getByLabelText("Condition"), "lessThan");
     expect(dialog.getByLabelText("Quantity")).toHaveValue(5);
@@ -137,10 +165,17 @@ describe("FilterDialog", () => {
       expect(dialog.getByLabelText("From")).toHaveValue("2028-02-29");
       fireEvent.click(dialog.getByRole("button", { name: "Apply" }));
       expect(dialog.getByRole("alert")).toHaveTextContent("Choose a To date.");
+      expect(dialog.getByLabelText("To")).toHaveFocus();
+      expect(dialog.getByLabelText("To")).toHaveAttribute(
+        "aria-invalid",
+        "true",
+      );
+      expect(dialog.getByLabelText("From")).not.toHaveAttribute("aria-invalid");
       change(dialog.getByLabelText("To"), "2028-02-01");
       fireEvent.click(dialog.getByRole("button", { name: "Apply" }));
       expect(onApply).not.toHaveBeenCalled();
       expect(dialog.getByRole("alert")).toHaveTextContent("ordered date range");
+      expect(dialog.getByLabelText("To")).toHaveFocus();
       change(dialog.getByLabelText("To"), "2028-03-01");
       fireEvent.click(dialog.getByRole("button", { name: "Apply" }));
       expect(onApply).toHaveBeenLastCalledWith({
@@ -194,6 +229,11 @@ describe("FilterDialog", () => {
     fireEvent.click(dialog.getByRole("button", { name: "Apply" }));
     expect(onApply).not.toHaveBeenCalled();
     expect(added.getByRole("alert")).toHaveTextContent("Choose a field");
+    expect(added.getByLabelText("Filter by")).toHaveFocus();
+    expect(added.getByLabelText("Filter by")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
     change(added.getByLabelText("Filter by"), "expiresOn");
     change(added.getByLabelText("Condition"), "blank");
     fireEvent.click(dialog.getByRole("button", { name: "Add another filter" }));
