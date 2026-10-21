@@ -1,6 +1,6 @@
 # Database operations
 
-The Atlas project is **Sari App**, cluster `sariapp-dev`. The cluster name is historical; it hosts the current production database as well as separate development and preview databases. Do not delete the cluster as part of legacy cleanup.
+The Atlas project is **Sari App**, cluster `sariapp-dev`. Production, development, and preview use separate databases and credentials within this cluster.
 
 | Environment       | Database       | Application user | Configuration                                       |
 | ----------------- | -------------- | ---------------- | --------------------------------------------------- |
@@ -9,10 +9,6 @@ The Atlas project is **Sari App**, cluster `sariapp-dev`. The cluster name is hi
 | Preview           | `sari_preview` | `sari_preview`   | `sari-api-preview`, plus `sari-api` Preview secrets |
 
 Each application user has `readWrite` access only to its own database, restricted to this cluster. Development and preview credentials must never receive production access. The environments share cluster capacity and its network access list, so this is database and credential isolation rather than infrastructure isolation.
-
-The old `sariapp_dev`, `sariapp_vercel`, and `sari_vercel_prod` database users have been revoked. Historical API deployments can still contain their old connection secrets. If a rollback is needed, redeploy the desired source revision using current Production environment variables rather than promoting a historical deployment that used a revoked account.
-
-The retired `sariapp_dev` database contained `users` and `pantryentries` and has been removed. The abandoned empty `sari_mvp1_test` database has also been removed; automated integration tests use their own disposable MongoDB and do not need Atlas. Production was migrated from the historical `sari_mvp1` name to `sari_prod`, preserving documents, BSON types, collection options, and indexes. The former database was removed after live verification and a verified backup of `sari_prod`; a protected migration archive remains available locally for recovery.
 
 ## Controlled database migrations
 
@@ -42,11 +38,11 @@ Preview barcode lookups require a separate `USDA_API_KEY` in the preview API pro
 
 ## Backups and restore verification
 
-Native backups are currently off, and the Atlas console does not offer them on this shared-tier cluster. The local workflow uses MongoDB's official `mongodump` and `mongorestore`, preserving BSON types, collection metadata, and indexes. It does not copy production data into development or preview.
+The local backup workflow uses MongoDB's official `mongodump` and `mongorestore`, preserving BSON types, collection metadata, and indexes. It does not copy production data into development or preview.
 
-The `sari_backup` user can read `sari_prod` and read/write only the disposable `sari_restore_verify` database. It cannot modify production. Its connection is stored as a Windows-protected SecureString in `.backups/backup-connection.xml`, usable only by the Windows user who created it. The `.backups` folder has restricted Windows permissions and is excluded from Git and Vercel uploads.
+The `sari_backup` user can read `sari_prod` and read/write only the disposable `sari_restore_verify` database. It cannot modify production. Its connection is stored as a Windows-protected SecureString in `.backups/backup-connection.xml`, usable only by the Windows user who created it. Restrict Windows access to `.backups`; the folder is excluded from Git and Vercel uploads.
 
-MongoDB Database Tools 100.19.1 are installed locally under `.backups/tools`. To reinstall, download the Windows x86-64 ZIP from MongoDB's official Database Tools download page. The verified ZIP SHA-256 is `527738a0f9ab2d80ea40cb8fc7a68f8e28664a2fd4e3b63626c2d4629aeb7f37`.
+The script defaults to MongoDB Database Tools 100.19.1 under `.backups/tools`. Install the official Windows Database Tools and pass `-ToolsDirectory` when using another installation path. Run `Get-Help ./scripts/backup-atlas.ps1 -Full` for script parameters and credential setup.
 
 Run from PowerShell:
 

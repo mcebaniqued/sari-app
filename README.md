@@ -37,7 +37,7 @@ web/src/
   utils/                Shared date and API-error formatting
 ```
 
-Keep feature-specific API calls, state, and UI inside that feature. Route pages compose components and hooks; form submission and table loading belong to hooks, while the imperative datasource adapter stays independent of React. Shared components, hooks, and utilities should not import feature code. Tests live beside the code they exercise. Use `@/` for imports from `web/src` across shared areas; relative imports work within a feature or component folder. TypeScript, Vite, and Vitest resolve the same alias.
+Keep feature-specific API calls, state, and UI inside that feature. Route pages compose components and hooks; form submission and table loading belong to hooks, while the imperative datasource adapter stays independent of React. Shared components, hooks, and utilities should not import feature code. Source tests live beside the code they exercise. Shared API test helpers live in `api/test`; browser fixtures live in `e2e/fixtures`. Use `@/` for imports from `web/src` across shared areas; relative imports work within a feature or component folder. TypeScript, Vite, and Vitest resolve the same alias.
 
 SearchBar accepts its label, placeholder, and length limit from the caller and uses the shared debounce hook. Pantry-specific wording and query limits stay in the pantry toolbar.
 
@@ -86,10 +86,10 @@ Only backend environment variables may contain secrets. `VITE_` variables are bu
 | `npm run dev`              | Start frontend and API together                                |
 | `npm run check`            | Formatting, lint, types, unused code, tests, production builds |
 | `npm run test:integration` | API and browser tests using a disposable MongoDB               |
-| `npm run test:coverage`    | API and frontend tests with V8 coverage                        |
+| `npm run test:coverage`    | Contracts, API, and frontend tests with V8 coverage            |
 | `npm run contracts:build`  | Build shared schemas and TypeScript declarations               |
 | `npm run format`           | Format source and configuration                                |
-| `npm run build`            | Build API and frontend                                         |
+| `npm run build`            | Build contracts, API, and frontend                             |
 | `npm start`                | Run the compiled API                                           |
 
 Install the browser once before running browser tests:
@@ -101,7 +101,7 @@ npm run test:e2e
 
 Playwright starts isolated servers on ports 3101 (API) and 5273 (frontend), leaving the normal development ports available. It checks the API proxy, SPA navigation, pagination, search, sorting/filtering, create/edit/delete flows, keyboard behavior, phone layout, and axe accessibility scans of pages, dialogs, filter popups, and notifications. Automated scans supplement manual accessibility review; they do not establish complete WCAG conformance. The test frontend sets `API_PROXY_TARGET` for its proxy; normal development defaults to port 3001.
 
-Husky runs lint-staged before commits. GitHub Actions runs the validation command and browser tests on pull requests and pushes to `main`. CI starts a disposable MongoDB 8 service for persistence tests and does not require Atlas credentials.
+Husky runs lint-staged before commits. GitHub Actions runs the validation command and browser tests on pull requests and pushes to `main` and `staging`. CI starts a disposable MongoDB 8 service for persistence tests and does not require Atlas credentials.
 
 ## API conventions
 
@@ -124,15 +124,15 @@ Names are required, trimmed, and limited to 80 characters each. Email addresses 
 
 Add `BETTER_AUTH_SECRET` (at least 32 random characters) and `BETTER_AUTH_URL` (the frontend origin) to `api/.env`; see `api/.env.example` for generation instructions. Local development defaults to `http://127.0.0.1:5173`. During local development, both `localhost` and `127.0.0.1` are accepted on the configured port. Other hostnames require an exact origin in `AUTH_TRUSTED_ORIGINS`, comma-separated. Production accepts only explicitly configured origins. Secrets must stay out of `VITE_` variables and source control. Production requires a stable secret and an HTTPS frontend URL. Session cookies are HttpOnly, SameSite=Lax, Secure in production, and valid for seven days without sliding refresh. Protected requests check MongoDB; cookie caching is disabled so revocation and expiration take effect immediately.
 
-Authentication endpoints live under `/api/v1/auth`: `POST /sign-up/email`, `POST /sign-in/email`, `GET /get-session`, and `POST /sign-out`. Other Better Auth HTTP endpoints are not exposed. Better Auth mounts before Express's JSON parser and manages password hashing, cookies, CSRF checks, and database-backed rate limiting (10 login attempts and 5 registration attempts per minute per client IP). The server overwrites its internal IP header with Express's socket-derived address. If deployed behind a proxy, configure a trusted proxy/IP policy for that platform before enabling forwarded client IPs. The MongoDB adapter automatically creates authentication collections and required unique indexes and supports standalone local MongoDB without transactions.
+Authentication endpoints live under `/api/v1/auth`: `POST /sign-up/email`, `POST /sign-in/email`, `GET /get-session`, and `POST /sign-out`. Other Better Auth HTTP endpoints are not exposed. Better Auth mounts before Express's JSON parser and manages password hashing, cookies, CSRF checks, and database-backed rate limiting (10 login attempts and 5 registration attempts per minute per client IP). The server overwrites its internal IP header with Express's socket-derived address. If deployed behind a proxy, configure a trusted proxy/IP policy for that platform before enabling forwarded client IPs. The MongoDB adapter manages authentication collections and supports standalone local MongoDB without transactions. Required production indexes are tracked for verification in `TODO.md`.
 
 All food-item endpoints require a session and return `401` when missing or expired. Cookie-authenticated writes also require an allowed `Origin` header. Authentication and pantry responses use `Cache-Control: no-store`. Health and readiness remain public. Authenticated `403` responses still open the access-denied page.
 
-Food items store the owner's user ID internally. Every list, count, read, update, and delete is scoped to that user; other users' IDs return `404`. Browser-supplied ownership is rejected. Existing ownerless records are preserved but hidden from every user. New accounts start empty, with no automatic ownership migration or separate pantry collection.
+Food items store the owner's user ID internally. Every list, count, read, update, and delete is scoped to that user; other users' IDs return `404`. Browser-supplied ownership is rejected. Records without an owner ID are hidden from every user. New accounts start empty, with no automatic ownership migration or separate pantry collection.
 
-`npm run test:integration` starts an isolated MongoDB using `mongodb-memory-server`, runs the API/component and Playwright suites, and stops MongoDB. The first install downloads a MongoDB binary. This command never loads personal database credentials. Existing `TEST_MONGODB_URI` runs still require a database ending in `_test`; API suites use separate `_auth_test` and `_pantry_test` databases and clean up their records. Playwright explicitly overrides the API database configuration so ordinary browser tests cannot reach `api/.env`'s database. Real browser authentication tests run when `TEST_MONGODB_URI` is set, including in CI and the disposable runner.
+`npm run test:integration` starts an isolated MongoDB using `mongodb-memory-server`, runs the API/component and Playwright suites, and stops MongoDB. The first install downloads a MongoDB binary. This command never loads personal database credentials. `TEST_MONGODB_URI` must name a database ending in `_test`; API suites use separate `_auth_test`, `_pantry_test`, and `_barcode_test` databases. Playwright explicitly overrides the API database configuration so ordinary browser tests cannot reach `api/.env`'s database. Real browser authentication tests run when `TEST_MONGODB_URI` is set, including in CI and the disposable runner.
 
-## Food items (MVP 1)
+## Food items
 
 The `/` route redirects signed-in users to `/pantry` and signed-out visitors to `/login`. The persistent header contains the Sari brand link, and the page heading reads My Pantry with a small icon. `/access-denied` shows an access-denied page, and unmatched routes show a not-found page; both share a responsive error layout with semantic colors, page titles, automatic heading focus, and working recovery actions. Back to pantry always returns to `/pantry`; Go back uses the previous app history entry, falling back to the pantry on direct visits. A single toolbar above the table contains a debounced search on the left and selection/bulk-delete actions and Add item on the right. A shared Input primitive underpins the SearchBar. AG Grid Community uses its Infinite Row Model with 20-row pages, a three-page cache, and server-backed search, column-header filtering, and sorting. After loading confirms zero results, an empty-state prompt opens the add-item modal. Searches and filters with no matches show guidance to adjust the query. New records appear first until a sort is applied. The Actions column stays pinned to the right and opens a prefilled edit modal or a delete confirmation.
 
@@ -174,11 +174,13 @@ Unknown fields are rejected, including client-supplied IDs and timestamps. The r
 
 `GET /api/v1/food-items` returns `{ "items": [...], "total": 42, "start": 0, "limit": 20 }`. It accepts `start` (0–1,000,000), `limit` (1–100, default 20), a trimmed `search` (up to 120 characters), and JSON-encoded `sort` and `filters`. Search matches literal text in food names. Sort is an ordered array of `{ "colId": "name", "sort": "asc" }`; allowed fields are name, quantity, unit, expiresOn, and createdAt. A stable ID tie-breaker prevents ambiguous page ordering. Filters use a single AG Grid text, numeric, or date condition per allowed column; combined conditions and unknown fields/operators are rejected. The shared Zod query schema validates both sides; MongoDB predicates are constructed from a whitelist, never raw client operators. Queries have a 5-second execution bound. API responses omit MongoDB's `_id` and internal version fields. Invalid input returns HTTP 400 with `VALIDATION_ERROR`; a failed database connection returns HTTP 503 with `DATABASE_UNAVAILABLE`. The form preserves entered values after a failed save and only reports success after the server confirms persistence.
 
-`GET /api/v1/food-items/:id` returns one food item. `PATCH /api/v1/food-items/:id` accepts one or more of the same four editable fields, validates them, and returns the saved item. Omitted fields retain their values; set `expiresOn` to `null` to clear the date. Updates preserve `id` and `createdAt` and refresh `updatedAt`. Empty updates, unknown fields, and client-supplied IDs/timestamps are rejected.
+`GET /api/v1/food-items/:id` returns one food item. `PATCH /api/v1/food-items/:id` accepts one or more editable fields defined by `updateFoodItemSchema`, validates them, and returns the saved item. Omitted fields retain their values; set `expiresOn` to `null` to clear the date. Updates preserve `id` and `createdAt` and refresh `updatedAt`. Empty updates, unknown fields, and client-supplied IDs/timestamps are rejected.
 
 `DELETE /api/v1/food-items/:id` permanently removes that item and returns HTTP 204 with no body. Malformed IDs return HTTP 400 with `INVALID_ID`. Reading, updating, or deleting a missing item returns HTTP 404 with `FOOD_ITEM_NOT_FOUND`.
 
 A reusable React Toastify notification component reports create, update, delete, partial bulk failures, and final network/load errors. Notifications sit at the bottom center with vertically centered contents, away from Add item, and dismiss after five seconds. The countdown pauses on hover, keyboard focus, or window focus loss. Notifications use semantic colors, Tailwind utilities, no motion, accessible status/alert roles, an explicit close button, and an Alt+T keyboard shortcut. The unstyled Toastify build uses a shared JavaScript countdown instead of depending on a CSS progress animation. Errors also remain next to their form or retry control.
+
+Readability requires blank lines between independent declarations and meaningful steps inside functions. Keep related statements together and document non-obvious invariants. Prettier enforces formatting; manual review checks logical grouping.
 
 ESLint uses strict TypeScript type-aware rules, React Hooks checks, JSX accessibility checks, import sorting, unused import detection, and Playwright rules, with zero warnings allowed. The maintained `@htmlacademy/eslint-plugin-jsx-a11y` fork supports the project’s ESLint 10 version.
 
@@ -242,7 +244,3 @@ npx vercel deploy . --project sari-web --scope miguels-projects-51fb4258 --prod
 ```
 
 Verify `/api/v1/health` and `/api/v1/ready` through the frontend domain, then check registration, login, pantry persistence, and a direct refresh of `/pantry`. Automatic Git deployments require the Vercel GitHub integration and the Vercel account's GitHub authentication to retain access to this repository.
-
-## Previous implementation
-
-The previous committed app remains on the remote `archive/pre-build` branch. Local uncommitted pantry work was preserved in `archive/pre-scaffold-wip` and a Git stash before scaffolding. Existing feature branches were retained. Legacy secrets were backed up outside this repository and were not carried into the new application.

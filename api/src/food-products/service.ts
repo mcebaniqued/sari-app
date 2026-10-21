@@ -14,8 +14,7 @@ const LOOKUP_LEASE_MS = 20_000;
 const pending = new Map<string, Promise<BarcodeLookup>>();
 
 export function productDto(product: InstanceType<typeof FoodProductModel>) {
-  // Older cached products can have an unrecognized label but no parsed size.
-  // Derive missing suggestions without refreshing USDA or changing source dates.
+  // Derive missing suggestions from saved labels without refreshing USDA or source dates.
   const hasSize =
     typeof product.packageQuantity === "number" &&
     typeof product.packageUnit === "string";

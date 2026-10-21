@@ -1,4 +1,6 @@
 const productionApi = "https://sari-api.vercel.app";
+// The staging branch uses the isolated preview API. Keep this server-side;
+// browser requests stay on /api/v1 so authentication cookies remain same-origin.
 const preview = process.env.VERCEL_ENV === "preview";
 const configuredApi = process.env.SARI_API_ORIGIN?.trim();
 
@@ -29,6 +31,7 @@ const rewrites = [
 ];
 
 export const config = {
+  // Build tools are dev dependencies; deployments install them without local Git hooks.
   installCommand:
     "HUSKY=0 npm ci --include=dev --workspaces --include-workspace-root",
   buildCommand: "npm run build -w @sari/contracts && npm run build",
