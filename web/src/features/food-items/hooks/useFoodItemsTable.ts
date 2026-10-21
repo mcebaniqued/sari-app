@@ -24,6 +24,7 @@ export function useFoodItemsTable(revision: number) {
       if (handleAccessDenied(cause)) {
         return;
       }
+
       const message = getApiErrorMessage(
         cause,
         "Unable to load items. Please try again.",
@@ -33,6 +34,7 @@ export function useFoodItemsTable(revision: number) {
     },
     [handleAccessDenied],
   );
+
   // Rebuilding resets paging and cancels obsolete requests after edits or retries.
   const datasource = useMemo(
     () =>
@@ -46,6 +48,7 @@ export function useFoodItemsTable(revision: number) {
   const retryLoad = useCallback(() => {
     setRetry((value) => value + 1);
   }, []);
+
   return {
     gridRef,
     selected,

@@ -20,6 +20,7 @@ interface FoodItemsTableProps extends FoodItemActions {
   revision: number;
   onAdd: () => void;
 }
+
 export default function FoodItemsTable({
   revision,
   disabled,
@@ -42,6 +43,7 @@ export default function FoodItemsTable({
     retryLoad,
   } = useFoodItemsTable(revision);
   const columnDefs = useFoodItemColumns({ disabled, onEdit, onDelete });
+
   return (
     <section
       aria-label="Food inventory"

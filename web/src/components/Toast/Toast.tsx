@@ -27,6 +27,7 @@ export default function Toast({
       : data.tone === "info"
         ? LuInfo
         : LuCircleAlert;
+
   return (
     <div className="flex min-w-0 flex-1 items-center gap-3">
       <Icon

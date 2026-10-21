@@ -27,11 +27,13 @@ export default function Modal({
     if (!dialog) {
       return;
     }
+
     const previousFocus = document.activeElement;
     const scrollWasLocked = document.body.classList.contains("overflow-hidden");
     document.body.classList.add("overflow-hidden");
     dialog.showModal();
     dialog.querySelector<HTMLElement>("[data-autofocus]")?.focus();
+
     return () => {
       dialog.close();
       if (!scrollWasLocked) {
@@ -55,6 +57,7 @@ export default function Modal({
         if (event.key !== "Tab") {
           return;
         }
+
         const controls = [
           ...event.currentTarget.querySelectorAll<HTMLElement>(
             "button, input, select, textarea, a[href], [tabindex]",
@@ -69,8 +72,10 @@ export default function Modal({
         const last = controls.at(-1);
         if (!first || !last) {
           event.preventDefault();
+
           return;
         }
+
         if (event.shiftKey && document.activeElement === first) {
           event.preventDefault();
           last.focus();
@@ -89,6 +94,7 @@ export default function Modal({
         if (event.target !== event.currentTarget || !dismissible) {
           return;
         }
+
         const bounds = event.currentTarget.getBoundingClientRect();
         if (
           event.clientX < bounds.left ||

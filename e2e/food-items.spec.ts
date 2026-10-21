@@ -103,6 +103,7 @@ test("camera decodes a UPC from video and looks up the item once", async ({
         document.body.append(canvas);
         const stream = canvas.captureStream(10);
         Object.defineProperty(canvas, "cameraStream", { value: stream });
+
         return stream;
       },
     });
@@ -111,6 +112,7 @@ test("camera decodes a UPC from video and looks up the item once", async ({
   const lookups: string[] = [];
   await page.route("**/api/v1/food-products/barcode/*", (route) => {
     lookups.push(new URL(route.request().url()).pathname);
+
     return route.fulfill({
       json: {
         product: {
@@ -299,6 +301,7 @@ async function foodApi(page: Page, initial: FoodItem[], failOnceId?: string) {
       if (!item) {
         throw new Error("Fixture item missing.");
       }
+
       Object.assign(item, request.postDataJSON(), {
         updatedAt: "2026-10-19T00:01:00Z",
       });
@@ -307,6 +310,7 @@ async function foodApi(page: Page, initial: FoodItem[], failOnceId?: string) {
       if (!id) {
         throw new Error("Missing fixture ID.");
       }
+
       deleted.push(id);
       if (failurePending && id === failOnceId) {
         failurePending = false;
@@ -359,6 +363,7 @@ async function foodApi(page: Page, initial: FoodItem[], failOnceId?: string) {
             return entry.sort === "asc" ? order : -order;
           }
         }
+
         return 0;
       });
       await route.fulfill({
@@ -371,11 +376,13 @@ async function foodApi(page: Page, initial: FoodItem[], failOnceId?: string) {
       });
     }
   });
+
   return { deleted, queries };
 }
 
 const nameCells = (page: Page) =>
   page.locator('.ag-row [col-id="name"]').filter({ hasText: /\S/ });
+
 async function selectRow(page: Page, id: string) {
   const checkbox = page.locator(
     `.ag-row[row-id="${id}"] input[type="checkbox"]`,
@@ -793,6 +800,7 @@ test("empty state and recovery pages are accessible and root redirects to pantry
     page.getByRole("status").filter({ hasText: "0 matching items." }),
   ).toBeAttached();
   await expectAccessible(page);
+
   for (const [path, title] of [
     ["/missing", "Page not found"],
     ["/access-denied", "Access denied"],
@@ -860,6 +868,7 @@ function requireGeometry<T>(value: T | null): T {
   if (value === null) {
     throw new Error("Expected element geometry.");
   }
+
   return value;
 }
 

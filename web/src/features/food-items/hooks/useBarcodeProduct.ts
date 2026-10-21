@@ -16,6 +16,7 @@ export function useBarcodeProduct(
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [replace, setReplace] = useState<FoodProduct | null>(null);
+
   const request = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -35,6 +36,7 @@ export function useBarcodeProduct(
           }
         });
     }
+
     return () => {
       controller.abort();
       request.current?.abort();
@@ -75,11 +77,13 @@ export function useBarcodeProduct(
     setBarcode(value);
     setLoading(true);
     setMessage("");
+
     try {
       const result = await lookupBarcode(value, controller.signal);
       if (controller.signal.aborted) {
         return false;
       }
+
       setProduct(result.product);
       setProductId(result.product.id);
       setBarcode(result.product.barcode);
@@ -89,6 +93,7 @@ export function useBarcodeProduct(
           : "Item found.",
       );
       apply(result.product, false);
+
       return true;
     } catch (error) {
       if (!controller.signal.aborted) {
@@ -100,6 +105,7 @@ export function useBarcodeProduct(
               : "Could not look up the barcode. Enter the item details manually.",
         );
       }
+
       return false;
     } finally {
       if (!controller.signal.aborted) {

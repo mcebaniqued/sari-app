@@ -7,6 +7,7 @@ import { usePantryItems } from "../hooks/usePantryItems";
 
 export default function PantryPage() {
   const pantry = usePantryItems();
+
   return (
     <div>
       <h1 className="mb-6 flex items-center gap-3 text-2xl font-semibold tracking-tight">

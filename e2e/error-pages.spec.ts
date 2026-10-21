@@ -108,29 +108,36 @@ test("Go back returns to the previous app page after a forbidden request", async
 
 async function rejectMethod(page: Page, method: string) {
   let requests = 0;
+
   const handler = async (route: Route) => {
     if (route.request().method() !== method) {
       await route.fallback();
+
       return;
     }
+
     requests++;
     await route.fulfill({
       status: 403,
       json: { error: { code: "FORBIDDEN", message: "Access denied." } },
     });
   };
+
   await page.route("**/api/v1/food-items**", handler);
+
   return {
     count: () => requests,
     restore: () => page.unroute("**/api/v1/food-items**", handler),
   };
 }
+
 async function submitEditor(page: Page, open: string, submit: string) {
   await page.getByRole("button", { name: open, exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel(/^Food name/).fill("Oat milk");
   await dialog.getByRole("button", { name: submit, exact: true }).click();
 }
+
 const forbiddenScenarios = [
   { method: "GET", perform: () => Promise.resolve() },
   {
@@ -153,6 +160,7 @@ const forbiddenScenarios = [
     },
   },
 ];
+
 for (const { method, perform } of forbiddenScenarios) {
   test(`forbidden ${method} requests open Access denied without retrying`, async ({
     page,

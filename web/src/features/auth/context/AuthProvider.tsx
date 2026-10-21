@@ -14,6 +14,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
   const version = useRef(0);
   const request = useRef<AbortController | null>(null);
 
@@ -22,6 +23,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     const controller = new AbortController();
     request.current = controller;
     const current = ++version.current;
+
     try {
       const session = await getSession(controller.signal);
       if (version.current === current) {
@@ -66,14 +68,17 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       setError("");
       setLoading(false);
     };
+
     const recheck = () => {
       void refresh();
     };
+
     const initialCheck = window.setTimeout(() => {
       void refresh();
     }, 0);
     window.addEventListener("sari:unauthorized", expired);
     window.addEventListener("focus", recheck);
+
     return () => {
       window.clearTimeout(initialCheck);
       request.current?.abort();

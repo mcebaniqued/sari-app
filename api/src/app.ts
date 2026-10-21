@@ -21,13 +21,17 @@ app.use((req, res, next) => {
     req.path === "/api/v1/health"
   ) {
     next();
+
     return;
   }
+
   res.set({ "Cache-Control": "no-store", "Retry-After": "60" });
   if (req.path === "/api/v1/ready") {
     res.status(503).json({ status: "not_ready" } satisfies NotReadyResponse);
+
     return;
   }
+
   res.status(503).json({
     error: {
       code: "MAINTENANCE",
@@ -79,6 +83,7 @@ const handleError: ErrorRequestHandler = (error: unknown, _req, res, _next) => {
           status === 413 ? "Request body is too large." : "Invalid JSON body.",
       },
     } satisfies ApiErrorResponse);
+
     return;
   }
 

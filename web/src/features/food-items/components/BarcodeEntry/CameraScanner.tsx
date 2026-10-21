@@ -8,8 +8,10 @@ interface Props {
 
 export default function CameraScanner({ onDetected, onType }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
+
   const [guidance, setGuidance] = useState(0);
   const [error, setError] = useState("");
+
   const detected = useEffectEvent(onDetected);
   const slowScan = guidance === 2 && !error;
 
@@ -22,6 +24,7 @@ export default function CameraScanner({ onDetected, onType }: Props) {
     let stopDecoding: (() => void) | undefined;
     const timers: ReturnType<typeof setTimeout>[] = [];
     const video = videoRef.current;
+
     const stop = () => {
       stopDecoding?.();
       stream?.getTracks().forEach((track) => {
@@ -32,19 +35,23 @@ export default function CameraScanner({ onDetected, onType }: Props) {
         video.srcObject = null;
       }
     };
+
     async function start() {
       try {
         if (!globalThis.isSecureContext) {
           setError(
             "Camera scanning needs a secure connection. You can enter the barcode number instead.",
           );
+
           return;
         }
+
         const media = (navigator as { mediaDevices?: MediaDevices })
           .mediaDevices;
         if (!media || !video) {
           throw new Error("Camera unavailable");
         }
+
         const [
           { BrowserMultiFormatReader },
           { BarcodeFormat, DecodeHintType },
@@ -96,6 +103,7 @@ export default function CameraScanner({ onDetected, onType }: Props) {
             if (!result || controller.signal.aborted || accepted) {
               return;
             }
+
             const value = result.getText();
             const barcode = normalizeBarcode(value);
             if (
@@ -103,8 +111,10 @@ export default function CameraScanner({ onDetected, onType }: Props) {
               value.length !== formatLengths.get(result.getBarcodeFormat())
             ) {
               candidate = null;
+
               return;
             }
+
             // A valid checksum alone cannot rule out a misread. Require three
             // matching frames, without carrying old reads across a long gap.
             const now = performance.now();
@@ -115,6 +125,7 @@ export default function CameraScanner({ onDetected, onType }: Props) {
             if (candidate.reads < 3) {
               return;
             }
+
             accepted = true;
             controls.stop();
             stop();
@@ -140,7 +151,9 @@ export default function CameraScanner({ onDetected, onType }: Props) {
         }
       }
     }
+
     void start();
+
     return () => {
       controller.abort();
       stop();

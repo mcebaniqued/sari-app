@@ -7,14 +7,17 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 const database = await MongoMemoryServer.create({
   instance: { dbName: "sari_auth_test", ip: "127.0.0.1" },
 });
+
 try {
   const client = new MongoClient(database.getUri("sari_auth_test"));
+
   try {
     await client.connect();
     await client.db().command({ ping: 1 });
   } finally {
     await client.close();
   }
+
   for (const command of ["test", "test:e2e"]) {
     const code = await new Promise((resolve, reject) => {
       const windows = process.platform === "win32";

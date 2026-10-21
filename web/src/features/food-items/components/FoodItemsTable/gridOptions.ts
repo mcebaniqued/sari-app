@@ -54,6 +54,7 @@ export const selectionColumnDef = {
   resizable: false,
   headerComponent: SelectPageHeader,
 };
+
 export const getRowId = ({ data }: GetRowIdParams<FoodItem>) => data.id;
 
 // Infinite scrolling needs a placeholder to trigger its first request. Keep it

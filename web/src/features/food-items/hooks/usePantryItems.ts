@@ -17,6 +17,7 @@ export function usePantryItems() {
   const [deleteTargets, setDeleteTargets] = useState<FoodItem[] | null>(null);
   const [deleteError, setDeleteError] = useState("");
   const [busy, setBusy] = useState(false);
+
   const mutationRef = useRef(false);
   const createOperation = useRef<{ body: string; key: string } | null>(null);
   const handleAccessDenied = useAccessDenied();
@@ -24,6 +25,7 @@ export function usePantryItems() {
   const startEdit = useCallback((item: FoodItem) => {
     setEditor({ item });
   }, []);
+
   const startDelete = useCallback((targets: FoodItem[]) => {
     setDeleteError("");
     setDeleteTargets([...targets]);
@@ -33,9 +35,11 @@ export function usePantryItems() {
     if (mutationRef.current) {
       throw new Error("Another change is in progress.");
     }
+
     mutationRef.current = true;
     setBusy(true);
     const original = editor?.item;
+
     try {
       const body = JSON.stringify(values);
       if (!original && createOperation.current?.body !== body) {
@@ -60,9 +64,11 @@ export function usePantryItems() {
     if (mutationRef.current || !deleteTargets?.length) {
       return;
     }
+
     mutationRef.current = true;
     setBusy(true);
     setDeleteError("");
+
     try {
       const { deletedIds, failedIds, accessDenied } = await deleteFoodItems(
         deleteTargets.map((item) => item.id),
@@ -81,6 +87,7 @@ export function usePantryItems() {
       if (handleAccessDenied(accessDenied)) {
         return;
       }
+
       if (failedIds.length) {
         const failed = new Set(failedIds);
         setDeleteTargets(deleteTargets.filter((item) => failed.has(item.id)));
@@ -105,12 +112,15 @@ export function usePantryItems() {
     createOperation.current = null;
     setEditor({ item: null });
   }, []);
+
   const closeEditor = useCallback(() => {
     setEditor(null);
   }, []);
+
   const closeDelete = useCallback(() => {
     setDeleteTargets(null);
   }, []);
+
   return {
     revision,
     editor,

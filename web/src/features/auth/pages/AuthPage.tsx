@@ -17,6 +17,7 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
   const pending = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const title = register ? "Create an account" : "Log in";
@@ -31,6 +32,7 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
     if (pending.current) {
       return;
     }
+
     const data = Object.fromEntries(new FormData(event.currentTarget));
     const result = register
       ? registerSchema.safeParse(data)
@@ -38,10 +40,13 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
     setError("");
     if (!result.success) {
       setError(result.error.issues[0]?.message ?? "Check your details.");
+
       return;
     }
+
     pending.current = true;
     setBusy(true);
+
     try {
       const user = await authenticate(result.data, register);
       const state: unknown = location.state;

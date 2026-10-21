@@ -11,6 +11,7 @@ interface FoodItemFormOptions {
   values: FoodItemDraft;
   linkage?: { productId: string | null; barcode: string | null };
 }
+
 export function useFoodItemForm({
   disabled,
   onSave,
@@ -19,6 +20,7 @@ export function useFoodItemForm({
 }: FoodItemFormOptions) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
   const savingRef = useRef(false);
   const handleAccessDenied = useAccessDenied();
 
@@ -27,6 +29,7 @@ export function useFoodItemForm({
     if (savingRef.current || disabled) {
       return;
     }
+
     const result = createFoodItemSchema.safeParse({
       name: values.name,
       quantity: Number(values.quantity),
@@ -48,16 +51,20 @@ export function useFoodItemForm({
                 ? "Enter a valid expiration date."
                 : "Check the item details and try again.",
       );
+
       return;
     }
+
     savingRef.current = true;
     setSaving(true);
+
     try {
       await onSave(result.data);
     } catch (error) {
       if (handleAccessDenied(error)) {
         return;
       }
+
       const message =
         error instanceof TypeError
           ? "Could not reach your pantry. Check your connection and try again."

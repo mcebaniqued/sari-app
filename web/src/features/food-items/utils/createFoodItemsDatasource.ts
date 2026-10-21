@@ -17,6 +17,7 @@ export function createFoodItemsDatasource(
 
   const controllers = new Set<AbortController>();
   let active = true;
+
   return {
     getRows(params) {
       const controller = new AbortController();
@@ -37,12 +38,14 @@ export function createFoodItemsDatasource(
           if (!active || controller.signal.aborted) {
             return;
           }
+
           params.successCallback(response.items, response.total);
           setTotal(response.total);
         } catch (cause) {
           if (!active || controller.signal.aborted) {
             return;
           }
+
           params.failCallback();
           onError(cause);
         } finally {
@@ -55,9 +58,11 @@ export function createFoodItemsDatasource(
     },
     destroy() {
       active = false;
+
       for (const controller of controllers) {
         controller.abort();
       }
+
       controllers.clear();
     },
   };

@@ -23,6 +23,7 @@ describe.skipIf(!testUri)("MongoDB food persistence", () => {
         "TEST_MONGODB_URI must explicitly name a database ending in _test.",
       );
     }
+
     vi.stubEnv("MONGODB_URI", testUri.replace(/_test(?=\?|$)/, "_pantry_test"));
     vi.stubEnv(
       "BETTER_AUTH_SECRET",
@@ -131,6 +132,7 @@ describe.skipIf(!testUri)("MongoDB food persistence", () => {
     const create = vi
       .spyOn(FoodItemModel, "create")
       .mockRejectedValueOnce(new Error("private database details"));
+
     try {
       const response = await agent
         .post("/api/v1/food-items")

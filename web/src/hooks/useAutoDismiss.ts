@@ -26,8 +26,10 @@ export function useAutoDismiss({
     if (duration === false || paused) {
       return;
     }
+
     const startedAt = Date.now();
     const timer = window.setTimeout(onDismiss, countdown.current.remaining);
+
     return () => {
       window.clearTimeout(timer);
       countdown.current.remaining = Math.max(

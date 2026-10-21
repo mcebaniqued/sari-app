@@ -91,6 +91,7 @@ describe("application routing", () => {
     expect(
       await screen.findByRole("heading", { name: "Create an account" }),
     ).toBeVisible();
+
     for (const name of ["First name", "Last name", "Email", "Password"]) {
       expect(screen.getByLabelText(name, { exact: true })).toBeRequired();
     }

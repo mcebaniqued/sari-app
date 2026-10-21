@@ -10,6 +10,7 @@ interface DeleteFoodItemsDialogProps {
   onClose: () => void;
   onConfirm: () => Promise<void>;
 }
+
 export default function DeleteFoodItemsDialog({
   items,
   error,

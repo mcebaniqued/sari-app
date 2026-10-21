@@ -28,6 +28,7 @@ describe.skipIf(!testUri)("real authentication and pantry isolation", () => {
     if (!testUri || !/\/_?[\w-]+_test(?:\?|$)/.test(testUri)) {
       throw new Error("Use an explicitly named _test database.");
     }
+
     vi.stubEnv("MONGODB_URI", testUri.replace(/_test(?=\?|$)/, "_auth_test"));
     vi.stubEnv(
       "BETTER_AUTH_SECRET",
@@ -104,6 +105,7 @@ describe.skipIf(!testUri)("real authentication and pantry isolation", () => {
     expect(duplicate.body).toMatchObject({
       code: "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL",
     });
+
     for (const invalid of [{ firstName: " " }, { password: "a".repeat(11) }]) {
       const response = await request(app)
         .post("/api/v1/auth/sign-up/email")
@@ -153,12 +155,14 @@ describe.skipIf(!testUri)("real authentication and pantry isolation", () => {
       items: [],
       total: 0,
     });
+
     for (const method of ["get", "patch", "delete"] as const) {
       const response = await bob[method](`/api/v1/food-items/${id}`).send({
         name: "Stolen rice",
       });
       expect(response.status).toBe(404);
     }
+
     expect((await FoodItemModel.findById(id))?.name).toBe("Alice rice");
     const own = await alice.get("/api/v1/food-items");
     expect(

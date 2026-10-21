@@ -24,6 +24,7 @@ export default function FoodItemForm({
 }: FoodItemFormProps) {
   const [mode, setMode] = useState<"manual" | "barcode">("manual");
   const [barcodeValue, setBarcodeValue] = useState("");
+
   const entryRef = useRef<HTMLDivElement>(null);
   const draft = useFoodItemDraft(item);
   const barcode = useBarcodeProduct(item, draft);

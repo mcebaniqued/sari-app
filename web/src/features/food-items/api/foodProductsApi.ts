@@ -10,6 +10,7 @@ export async function lookupBarcode(barcode: string, signal: AbortSignal) {
       retry: false,
     },
   );
+
   return barcodeLookupSchema.parse(response);
 }
 
@@ -21,5 +22,6 @@ export async function getFoodProduct(id: string, signal: AbortSignal) {
       retry: false,
     },
   );
+
   return foodProductSchema.parse(response);
 }

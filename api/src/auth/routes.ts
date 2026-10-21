@@ -14,12 +14,16 @@ authRouter.use(async (req, res, next) => {
     ["/sign-in/email", "/sign-up/email", "/sign-out"].includes(req.path);
   if (!sessionCheck && !mutation) {
     next();
+
     return;
   }
+
   if (sessionCheck && !hasSessionCookie(req.headers.cookie)) {
     res.json(null);
+
     return;
   }
+
   try {
     const auth = await getAuth();
     req.headers["x-sari-client-ip"] = req.ip ?? "unknown";

@@ -32,18 +32,22 @@ export default function BarcodeEntry({
 }: Props) {
   const [camera, setCamera] = useState(false);
   const [error, setError] = useState("");
+
   const inputRef = useRef<HTMLInputElement>(null);
 
   function lookup(input: string) {
     if (loading || disabled) {
       return;
     }
+
     const result = barcodeSchema.safeParse(input);
     if (!result.success) {
       onChange(input);
       setError("Invalid barcode. Enter the item details manually.");
+
       return;
     }
+
     setError("");
     onLookup(result.data);
   }

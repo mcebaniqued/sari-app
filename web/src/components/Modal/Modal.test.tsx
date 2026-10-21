@@ -6,6 +6,7 @@ import Modal from "./Modal";
 
 function Example({ busy = false }: { busy?: boolean }) {
   const [open, setOpen] = useState(false);
+
   return (
     <>
       <button

@@ -9,6 +9,7 @@ import { requireSession } from "./requireSession.js";
 
 vi.mock("./auth.js", async (original) => {
   const actual = await original<typeof AuthModule>();
+
   return { ...actual, getAuth: vi.fn() };
 });
 

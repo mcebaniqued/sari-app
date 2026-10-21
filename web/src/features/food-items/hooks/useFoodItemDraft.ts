@@ -16,6 +16,7 @@ export function useFoodItemDraft(item: FoodItem | null) {
     unit: item?.unit ?? "item",
     expiresOn: item?.expiresOn ?? "",
   }));
+
   const current = useRef(values);
   const defaults = useRef(values);
   const dirty = useRef(new Set<keyof FoodItemDraft>());
@@ -39,6 +40,7 @@ export function useFoodItemDraft(item: FoodItem | null) {
     };
     const next = { ...current.current };
     let conflict = false;
+
     for (const field of ["name", "quantity", "unit"] as const) {
       const value = proposals[field];
       if (!value) {
@@ -58,12 +60,15 @@ export function useFoodItemDraft(item: FoodItem | null) {
         conflict = true;
       }
     }
+
     update(next);
+
     return conflict;
   }
 
   function resetSuggestions(keepValues: boolean) {
     const next = { ...current.current };
+
     for (const [field, value] of automatic.current) {
       if (keepValues) {
         dirty.current.add(field);
@@ -78,6 +83,7 @@ export function useFoodItemDraft(item: FoodItem | null) {
         next[field] = defaults.current[field];
       }
     }
+
     automatic.current.clear();
     update(next);
   }

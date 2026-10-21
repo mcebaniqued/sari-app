@@ -23,6 +23,7 @@ export async function listFoodItems(
     `/food-items?${parameters.toString()}`,
     signal ? { signal } : {},
   );
+
   return foodItemListSchema.parse(response);
 }
 
@@ -38,6 +39,7 @@ export async function createFoodItem(
     },
     body: JSON.stringify(item),
   });
+
   return foodItemSchema.parse(response);
 }
 
@@ -47,6 +49,7 @@ export async function updateFoodItem(id: string, item: UpdateFoodItem) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(item),
   });
+
   return foodItemSchema.parse(response);
 }
 
@@ -59,6 +62,7 @@ export async function deleteFoodItems(ids: string[]) {
   const deletedIds: string[] = [];
   const failedIds: string[] = [];
   let accessDenied: ApiError | undefined;
+
   for (let offset = 0; offset < ids.length; offset += 10) {
     const batch = ids.slice(offset, offset + 10);
     const results = await Promise.allSettled(
@@ -92,5 +96,6 @@ export async function deleteFoodItems(ids: string[]) {
       break;
     }
   }
+
   return { deletedIds, failedIds, accessDenied };
 }

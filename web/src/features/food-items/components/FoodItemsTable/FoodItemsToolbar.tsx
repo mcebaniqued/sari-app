@@ -15,6 +15,7 @@ interface FoodItemsToolbarProps {
   onClearSelection: () => void;
   onDeleteSelected: () => void;
 }
+
 export default function FoodItemsToolbar({
   selectedCount,
   hasFilters,

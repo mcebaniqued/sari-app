@@ -95,11 +95,14 @@ function jsonParameter(value: unknown): unknown {
   if (typeof value !== "string") {
     return value;
   }
+
   if (value.length > 6000) {
     return undefined;
   }
+
   try {
     const parsed: unknown = JSON.parse(value);
+
     return parsed;
   } catch {
     return undefined;

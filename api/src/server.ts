@@ -12,10 +12,12 @@ const server = app.listen(port, () => {
 });
 
 let shuttingDown = false;
+
 function shutdown() {
   if (shuttingDown) {
     return;
   }
+
   shuttingDown = true;
 
   const timeout = setTimeout(() => process.exit(1), 10_000);

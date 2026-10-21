@@ -17,6 +17,7 @@ export function productDto(product: InstanceType<typeof FoodProductModel>) {
   const hasSize =
     typeof product.packageQuantity === "number" &&
     typeof product.packageUnit === "string";
+
   return foodProductSchema.parse({
     ...product.toObject(),
     ...(!hasSize ? parsePackageSize(product.packageDescription) : {}),
@@ -36,6 +37,7 @@ function duplicate(error: unknown) {
 
 async function reserveCall() {
   const hour = Math.floor(Date.now() / 3_600_000);
+
   try {
     await UsdaBudgetModel.findOneAndUpdate(
       { _id: `usda-${hour}`, calls: { $lt: 900 } },
@@ -53,6 +55,7 @@ async function reserveCall() {
         429,
       );
     }
+
     throw error;
   }
 }
@@ -69,6 +72,7 @@ async function usdaRequest(
       "USDA lookup is not configured. You can still enter item details manually.",
     );
   }
+
   await reserveCall();
   const url = new URL(`https://api.nal.usda.gov/fdc/v1/${path}`);
   url.search = new URLSearchParams({ ...parameters, api_key: key }).toString();
@@ -83,12 +87,14 @@ async function usdaRequest(
       429,
     );
   }
+
   if (!response.ok) {
     throw new LookupError(
       "LOOKUP_UNAVAILABLE",
       "USDA lookup is unavailable. Continue manually or try again.",
     );
   }
+
   const body = await response.text();
   if (body.length > 2_000_000) {
     throw new LookupError(
@@ -96,11 +102,13 @@ async function usdaRequest(
       "USDA returned too much data. Continue manually.",
     );
   }
+
   return JSON.parse(body) as unknown;
 }
 
 async function refresh(barcode: string): Promise<BarcodeLookup> {
   const now = new Date();
+
   // Create the coordination record once; competing upserts may race on its unique barcode.
   try {
     await BarcodeLookupModel.updateOne(
@@ -121,21 +129,25 @@ async function refresh(barcode: string): Promise<BarcodeLookup> {
     if (product) {
       return { product: productDto(product), stale: false };
     }
+
     throw new LookupError(
       "PRODUCT_NOT_FOUND",
       "Product not found in USDA. Enter details manually.",
       404,
     );
   }
+
   if (cached?.retryAfter && cached.retryAfter > now) {
     if (product) {
       return { product: productDto(product), stale: true };
     }
+
     throw new LookupError(
       "LOOKUP_UNAVAILABLE",
       "Lookup is temporarily unavailable. Continue manually or retry shortly.",
     );
   }
+
   const lease = await BarcodeLookupModel.findOneAndUpdate(
     { barcode, leaseUntil: { $lte: now } },
     { $set: { leaseUntil: new Date(now.getTime() + 20_000) } },
@@ -145,11 +157,13 @@ async function refresh(barcode: string): Promise<BarcodeLookup> {
     if (product) {
       return { product: productDto(product), stale: true };
     }
+
     throw new LookupError(
       "LOOKUP_BUSY",
       "This product is being looked up. Try again shortly, or continue manually.",
     );
   }
+
   try {
     const signal = AbortSignal.timeout(10_000);
     const variants = [
@@ -177,6 +191,7 @@ async function refresh(barcode: string): Promise<BarcodeLookup> {
         "USDA returned an inconsistent product identity.",
       );
     }
+
     const updated = await FoodProductModel.findOneAndUpdate(
       { provider: "usda", externalId: id },
       { $set: { ...mapped, checkedAt: now, providerRaw: raw } },
@@ -193,6 +208,7 @@ async function refresh(barcode: string): Promise<BarcodeLookup> {
         },
       },
     );
+
     return { product: productDto(updated), stale: false };
   } catch (error) {
     if (error instanceof LookupError && error.code === "PRODUCT_NOT_FOUND") {
@@ -208,6 +224,7 @@ async function refresh(barcode: string): Promise<BarcodeLookup> {
       );
       throw error;
     }
+
     await BarcodeLookupModel.updateOne(
       { barcode },
       { $set: { retryAfter: new Date(now.getTime() + 60_000) } },
@@ -215,9 +232,11 @@ async function refresh(barcode: string): Promise<BarcodeLookup> {
     if (product) {
       return { product: productDto(product), stale: true };
     }
+
     if (error instanceof LookupError) {
       throw error;
     }
+
     throw new LookupError(
       "LOOKUP_UNAVAILABLE",
       "USDA lookup could not finish. Continue manually or try again.",
@@ -235,8 +254,10 @@ export async function lookupBarcode(barcode: string) {
   if (existing) {
     return existing;
   }
+
   const operation = refresh(barcode);
   pending.set(barcode, operation);
+
   try {
     return await operation;
   } finally {

@@ -19,8 +19,10 @@ export const requireSession: RequestHandler = async (req, res, next) => {
     res.status(401).json({
       error: { code: "UNAUTHORIZED", message: "Please log in to continue." },
     } satisfies ApiErrorResponse);
+
     return;
   }
+
   try {
     const auth = await getAuth();
     const session = await auth.api.getSession({
@@ -33,8 +35,10 @@ export const requireSession: RequestHandler = async (req, res, next) => {
           message: "Please log in to continue.",
         },
       } satisfies ApiErrorResponse);
+
       return;
     }
+
     if (
       !["GET", "HEAD", "OPTIONS"].includes(req.method) &&
       (!req.headers.origin || !appOrigins().includes(req.headers.origin))
@@ -45,8 +49,10 @@ export const requireSession: RequestHandler = async (req, res, next) => {
           message: "Request origin is not allowed.",
         },
       } satisfies ApiErrorResponse);
+
       return;
     }
+
     res.locals.userId = session.user.id;
     next();
   } catch {

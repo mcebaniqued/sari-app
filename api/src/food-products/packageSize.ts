@@ -17,10 +17,12 @@ function measurement(value: string | undefined) {
   if (!match?.[1] || !match[2]) {
     return null;
   }
+
   const quantity = Number(match[1]);
   if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1_000_000) {
     return null;
   }
+
   const name = match[2].toLowerCase().replace(/\s/g, "");
   const unit =
     name.startsWith("kg") || name.startsWith("kilogram")
@@ -38,6 +40,7 @@ function measurement(value: string | undefined) {
               : name.startsWith("g")
                 ? "g"
                 : "l";
+
   return { quantity, unit, ...units[unit] };
 }
 
@@ -48,18 +51,22 @@ export function parsePackageSize(description: string | null | undefined) {
   if (single) {
     return { packageQuantity: single.quantity, packageUnit: single.unit };
   }
+
   const pair = description?.match(/^(.+?)\s*(?:\/\s*(.+)|\(\s*(.+)\s*\))$/);
   if (!pair) {
     return empty;
   }
+
   const left = measurement(pair[1]);
   const right = measurement(pair[2] ?? pair[3]);
   if (!left || !right) {
     return empty;
   }
+
   if (left.dimension !== right.dimension || left.imperial === right.imperial) {
     return empty;
   }
+
   const imperial = left.imperial ? left : right;
   const metric = left.imperial ? right : left;
   const imperialAmount = imperial.quantity * imperial.factor;
@@ -69,5 +76,6 @@ export function parsePackageSize(description: string | null | undefined) {
   if (Math.abs(imperialAmount - metricAmount) > tolerance) {
     return empty;
   }
+
   return { packageQuantity: imperial.quantity, packageUnit: imperial.unit };
 }

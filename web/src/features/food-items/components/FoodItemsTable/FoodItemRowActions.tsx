@@ -9,6 +9,7 @@ const actionClass =
 interface FoodItemRowActionsProps extends FoodItemActions {
   item: FoodItem;
 }
+
 export default function FoodItemRowActions({
   item,
   disabled,

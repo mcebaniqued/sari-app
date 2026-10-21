@@ -24,8 +24,10 @@ foodItemsRouter.param("id", (_req, res, next, id: string) => {
     res.status(400).json({
       error: { code: "INVALID_ID", message: "Invalid food item ID." },
     } satisfies ApiErrorResponse);
+
     return;
   }
+
   next();
 });
 
@@ -38,6 +40,7 @@ function itemNotFound(res: Response) {
 async function databaseAvailable(res: Response): Promise<boolean> {
   try {
     await connectDatabase();
+
     return true;
   } catch {
     res.status(503).json({
@@ -46,6 +49,7 @@ async function databaseAvailable(res: Response): Promise<boolean> {
         message: "Cannot reach your pantry. Please try again shortly.",
       },
     } satisfies ApiErrorResponse);
+
     return false;
   }
 }
@@ -71,6 +75,7 @@ async function resolveLink(
   if (values.productId === undefined && values.barcode === undefined) {
     return {};
   }
+
   const productId =
     values.productId === undefined
       ? existing?.productId?.toHexString()
@@ -80,10 +85,12 @@ async function resolveLink(
   if (!productId) {
     return { productId: null, barcode: barcode ?? null };
   }
+
   const product = await FoodProductModel.findById(productId);
   if (!product || (barcode && barcode !== product.barcode)) {
     return null;
   }
+
   return { productId: product._id, barcode: product.barcode };
 }
 
@@ -106,17 +113,21 @@ foodItemsRouter.post("/", async (req, res) => {
         message: result.error.issues[0]?.message ?? "Invalid food item.",
       },
     } satisfies ApiErrorResponse);
+
     return;
   }
 
   if (!(await databaseAvailable(res))) {
     return;
   }
+
   const link = await resolveLink(result.data);
   if (!link) {
     invalidLink(res);
+
     return;
   }
+
   const key = req.get("Idempotency-Key");
   if (key && !/^[a-zA-Z0-9-]{16,80}$/.test(key)) {
     res.status(400).json({
@@ -125,8 +136,10 @@ foodItemsRouter.post("/", async (req, res) => {
         message: "Invalid save request identifier.",
       },
     });
+
     return;
   }
+
   const fingerprint = createHash("sha256")
     .update(JSON.stringify(result.data))
     .digest("hex");
@@ -141,6 +154,7 @@ foodItemsRouter.post("/", async (req, res) => {
     ...(key ? { creationKey: key, creationFingerprint: fingerprint } : {}),
   };
   let document: InstanceType<typeof FoodItemModel>;
+
   try {
     document = key
       ? await FoodItemModel.findOneAndUpdate(
@@ -170,6 +184,7 @@ foodItemsRouter.post("/", async (req, res) => {
     ) {
       throw error;
     }
+
     document = await FoodItemModel.findOne({
       userId: res.locals.userId,
       creationKey: key,
@@ -185,8 +200,10 @@ foodItemsRouter.post("/", async (req, res) => {
           "This save identifier was already used for different item details. Reopen Add item to make a new entry.",
       },
     });
+
     return;
   }
+
   res.status(201).json(toDto(document));
 });
 
@@ -199,11 +216,14 @@ foodItemsRouter.get("/", async (req, res) => {
         message: "Invalid pagination, search, sort, or filter parameters.",
       },
     } satisfies ApiErrorResponse);
+
     return;
   }
+
   if (!(await databaseAvailable(res))) {
     return;
   }
+
   const { start, limit } = result.data;
   const { filter: queryFilter, sort } = foodMongoQuery(result.data);
   const filter = { ...queryFilter, userId: res.locals.userId };
@@ -223,14 +243,17 @@ foodItemsRouter.get("/:id", async (req, res) => {
   if (!(await databaseAvailable(res))) {
     return;
   }
+
   const document = await FoodItemModel.findOne({
     _id: req.params.id,
     userId: res.locals.userId,
   });
   if (!document) {
     itemNotFound(res);
+
     return;
   }
+
   res.json(toDto(document));
 });
 
@@ -243,24 +266,31 @@ foodItemsRouter.patch("/:id", async (req, res) => {
         message: result.error.issues[0]?.message ?? "Invalid food item.",
       },
     } satisfies ApiErrorResponse);
+
     return;
   }
+
   if (!(await databaseAvailable(res))) {
     return;
   }
+
   const existing = await FoodItemModel.findOne({
     _id: req.params.id,
     userId: res.locals.userId,
   });
   if (!existing) {
     itemNotFound(res);
+
     return;
   }
+
   const link = await resolveLink(result.data, existing);
   if (!link) {
     invalidLink(res);
+
     return;
   }
+
   const document = await FoodItemModel.findOneAndUpdate(
     { _id: req.params.id, userId: res.locals.userId },
     { $set: { ...result.data, ...link } },
@@ -268,8 +298,10 @@ foodItemsRouter.patch("/:id", async (req, res) => {
   );
   if (!document) {
     itemNotFound(res);
+
     return;
   }
+
   res.json(toDto(document));
 });
 
@@ -277,13 +309,16 @@ foodItemsRouter.delete("/:id", async (req, res) => {
   if (!(await databaseAvailable(res))) {
     return;
   }
+
   const document = await FoodItemModel.findOneAndDelete({
     _id: req.params.id,
     userId: res.locals.userId,
   });
   if (!document) {
     itemNotFound(res);
+
     return;
   }
+
   res.status(204).end();
 });

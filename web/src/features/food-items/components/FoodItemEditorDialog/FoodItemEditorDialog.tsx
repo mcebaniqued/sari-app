@@ -10,6 +10,7 @@ interface FoodItemEditorDialogProps {
   onClose: () => void;
   onSave: (values: CreateFoodItem) => Promise<void>;
 }
+
 export default function FoodItemEditorDialog({
   item,
   busy,

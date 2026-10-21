@@ -24,6 +24,7 @@ export default function ProductReview({
   if (!productId) {
     return null;
   }
+
   return (
     <section
       aria-label="Matched product"

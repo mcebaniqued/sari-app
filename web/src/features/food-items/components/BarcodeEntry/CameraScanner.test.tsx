@@ -38,6 +38,7 @@ function read(value: string, format = BarcodeFormat.UPC_A) {
     );
   });
 }
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
@@ -52,6 +53,7 @@ describe("camera scanning lifecycle", () => {
     const getUserMedia = vi.fn().mockResolvedValue(stream);
     vi.stubGlobal("navigator", { mediaDevices: { getUserMedia } });
     decode.mockResolvedValue({ stop });
+
     return { stream, trackStop, getUserMedia };
   }
 
@@ -83,14 +85,18 @@ describe("camera scanning lifecycle", () => {
     });
     const hints = reader.mock.calls[0]?.[0] as Map<DecodeHintType, unknown>;
     expect(hints.get(DecodeHintType.ALLOWED_LENGTHS)).toEqual([14]);
+
     for (let i = 0; i < 3; i++) {
       read("25384482", BarcodeFormat.ITF);
     }
+
     expect(onDetected).not.toHaveBeenCalled();
     expect(trackStop).not.toHaveBeenCalled();
+
     for (let i = 0; i < 3; i++) {
       read("853807005033");
     }
+
     expect(onDetected).toHaveBeenCalledExactlyOnceWith("853807005033");
   });
   it("discards an isolated valid misread when the following frames identify another barcode", async () => {
@@ -118,9 +124,11 @@ describe("camera scanning lifecycle", () => {
     await waitFor(() => {
       expect(decode).toHaveBeenCalledOnce();
     });
+
     for (let i = 0; i < 3; i++) {
       read(value, format);
     }
+
     expect(onDetected).toHaveBeenCalledExactlyOnceWith(value);
   });
   it.each([
@@ -134,9 +142,11 @@ describe("camera scanning lifecycle", () => {
     await waitFor(() => {
       expect(decode).toHaveBeenCalledOnce();
     });
+
     for (let i = 0; i < 3; i++) {
       read(value, format);
     }
+
     expect(onDetected).not.toHaveBeenCalled();
     expect(trackStop).not.toHaveBeenCalled();
   });

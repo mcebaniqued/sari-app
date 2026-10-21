@@ -42,6 +42,7 @@ describe.skipIf(!testUri)("USDA lookup persistence", () => {
     if (!testUri || !/_test(?:\?|$)/.test(testUri)) {
       throw new Error("Disposable _test database required.");
     }
+
     vi.stubEnv(
       "MONGODB_URI",
       testUri.replace(/_test(?=\?|$)/, "_barcode_test"),
@@ -107,6 +108,7 @@ describe.skipIf(!testUri)("USDA lookup persistence", () => {
       ),
     );
     vi.stubGlobal("fetch", fetcher);
+
     return fetcher;
   }
 

@@ -79,6 +79,7 @@ async function addDialog() {
     expect(screen.getByRole("button", { name: "Add item" })).toBeEnabled(),
   );
   fireEvent.click(screen.getByRole("button", { name: "Add item" }));
+
   return within(screen.getByRole("dialog", { name: "Add item" }));
 }
 

@@ -41,18 +41,22 @@ function setup() {
       />
     </MemoryRouter>,
   );
+
   return onSave;
 }
+
 function manual() {
   fireEvent.click(
     screen.getByRole("button", { name: "Enter details manually" }),
   );
 }
+
 function barcode() {
   fireEvent.click(
     screen.getByRole("button", { name: "Input barcode instead" }),
   );
 }
+
 function search(value = "012345678905") {
   barcode();
   fireEvent.change(screen.getByLabelText("Barcode number"), {
@@ -60,9 +64,11 @@ function search(value = "012345678905") {
   });
   fireEvent.click(screen.getByRole("button", { name: "Find item" }));
 }
+
 function found() {
   return screen.findByText("USDA oats");
 }
+
 function match() {
   const fetcher = vi
     .fn()
@@ -70,8 +76,10 @@ function match() {
       Promise.resolve(Response.json({ product, stale: false })),
     );
   vi.stubGlobal("fetch", fetcher);
+
   return fetcher;
 }
+
 function failure(code: string, status: number) {
   vi.stubGlobal(
     "fetch",

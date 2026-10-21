@@ -10,11 +10,14 @@ test.afterEach(async () => {
   if (!createdEmails.size) {
     return;
   }
+
   const uri = process.env.TEST_MONGODB_URI;
   if (!uri || !/\/_?[\w-]+_test(?:\?|$)/.test(uri)) {
     throw new Error("Cleanup requires an explicitly named _test database.");
   }
+
   const client = new MongoClient(uri);
+
   try {
     await client.connect();
     const db = client.db();
@@ -202,6 +205,7 @@ test("real registration, private pantry, reload, logout, and login", async ({
     page.getByRole("button", { name: "Edit Jamie's rice" }),
   ).toBeVisible();
   const other = await browser.newContext();
+
   try {
     const stranger = await other.newPage();
     await stranger.goto("http://127.0.0.1:5273/register");

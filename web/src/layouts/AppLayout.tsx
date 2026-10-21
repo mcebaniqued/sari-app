@@ -7,6 +7,7 @@ import { useAuth } from "@/features/auth/context/AuthContext";
 export default function AppLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
+
   return (
     <div className="min-h-dvh bg-page text-content">
       <a
