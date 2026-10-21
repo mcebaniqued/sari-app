@@ -10,6 +10,34 @@ const units = {
   "fl oz": { dimension: "volume", imperial: true, factor: 29.5735295625 },
 } as const;
 
+const unitAliases: Record<string, keyof typeof units> = {
+  g: "g",
+  gram: "g",
+  grams: "g",
+  kg: "kg",
+  kilogram: "kg",
+  kilograms: "kg",
+  ml: "ml",
+  milliliter: "ml",
+  milliliters: "ml",
+  millilitre: "ml",
+  millilitres: "ml",
+  l: "l",
+  liter: "l",
+  liters: "l",
+  litre: "l",
+  litres: "l",
+  oz: "oz",
+  onz: "oz",
+  ounce: "oz",
+  ounces: "oz",
+  lb: "lb",
+  lbs: "lb",
+  pound: "lb",
+  pounds: "lb",
+  floz: "fl oz",
+};
+
 function measurement(value: string | undefined) {
   const match = value?.match(
     /^\s*(\d+(?:\.\d+)?)\s*(g|grams?|kg|kilograms?|ml|millilit(?:er|re)s?|l|lit(?:er|re)s?|oz|onz|ounces?|lb|lbs|pounds?|fl\s*oz)\s*$/i,
@@ -24,22 +52,10 @@ function measurement(value: string | undefined) {
   }
 
   const name = match[2].toLowerCase().replace(/\s/g, "");
-  const unit =
-    name.startsWith("kg") || name.startsWith("kilogram")
-      ? "kg"
-      : name.startsWith("ml") || name.startsWith("millilit")
-        ? "ml"
-        : name.startsWith("fl")
-          ? "fl oz"
-          : name.startsWith("lb") || name.startsWith("pound")
-            ? "lb"
-            : name.startsWith("oz") ||
-                name === "onz" ||
-                name.startsWith("ounce")
-              ? "oz"
-              : name.startsWith("g")
-                ? "g"
-                : "l";
+  const unit = unitAliases[name];
+  if (!unit) {
+    return null;
+  }
 
   return { quantity, unit, ...units[unit] };
 }

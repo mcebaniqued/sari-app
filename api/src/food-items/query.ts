@@ -45,6 +45,7 @@ function numberPredicate(
 ): Predicate {
   switch (filter.type) {
     case "blank":
+      // Quantity is required, so a blank filter must match no documents.
       return { _id: { $exists: false } };
     case "notBlank":
       return {};
@@ -100,6 +101,7 @@ function datePredicate(
         return { expiresOn: { $gte: date, $lte: filter.dateTo } };
     }
   }
+  // Calendar filters on timestamps cover a UTC day with an exclusive upper bound.
   const from = new Date(`${date}T00:00:00.000Z`);
 
   const nextDay = (value: Date) => new Date(value.getTime() + 86_400_000);
@@ -132,6 +134,7 @@ function datePredicate(
   }
 }
 
+/** Translate an already validated whitelist of filters into MongoDB predicates. */
 export function foodMongoQuery(query: FoodItemQuery) {
   const clauses: Predicate[] = [];
   if (query.search) {
@@ -161,6 +164,7 @@ export function foodMongoQuery(query: FoodItemQuery) {
   } else {
     sort.createdAt = -1;
   }
+  // Deterministic ties keep page boundaries stable when several values are equal.
   sort._id = -1;
 
   return { filter: clauses.length ? { $and: clauses } : {}, sort };

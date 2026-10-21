@@ -27,6 +27,7 @@ function text(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+/** Select a current exact GTIN match; reject incomplete searches and ambiguous identities. */
 export function selectUsdaFood(raw: unknown, barcode: string): string {
   const response = object(raw);
   if (!Array.isArray(response.foods)) {
@@ -107,6 +108,7 @@ export function selectUsdaFood(raw: unknown, barcode: string): string {
   return String(first.fdcId);
 }
 
+/** Recheck detail identity before exposing package suggestions; serving size is never a package size. */
 export function mapUsdaFood(
   raw: unknown,
   barcode: string,

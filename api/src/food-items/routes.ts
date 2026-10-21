@@ -1,21 +1,16 @@
-import { createHash } from "node:crypto";
-
 import {
   type ApiErrorResponse,
-  type CreateFoodItem,
   createFoodItemSchema,
   foodItemIdSchema,
   foodItemQuerySchema,
-  foodItemSchema,
-  type UpdateFoodItem,
   updateFoodItemSchema,
 } from "@sari/contracts";
 import { type Response, Router } from "express";
 
 import { connectDatabase } from "../db.js";
-import { FoodProductModel } from "../food-products/model.js";
 import { FoodItemModel } from "./model.js";
 import { foodMongoQuery } from "./query.js";
+import { createFoodItem, foodItemDto, resolveProductLink } from "./service.js";
 
 export const foodItemsRouter = Router();
 
@@ -54,46 +49,6 @@ async function databaseAvailable(res: Response): Promise<boolean> {
   }
 }
 
-function toDto(document: InstanceType<typeof FoodItemModel>) {
-  return foodItemSchema.parse({
-    id: document._id.toHexString(),
-    name: document.name,
-    quantity: document.quantity,
-    unit: document.unit,
-    expiresOn: document.expiresOn,
-    productId: document.productId?.toHexString() ?? null,
-    barcode: document.barcode,
-    createdAt: document.createdAt.toISOString(),
-    updatedAt: document.updatedAt.toISOString(),
-  });
-}
-
-async function resolveLink(
-  values: CreateFoodItem | UpdateFoodItem,
-  existing?: InstanceType<typeof FoodItemModel>,
-) {
-  if (values.productId === undefined && values.barcode === undefined) {
-    return {};
-  }
-
-  const productId =
-    values.productId === undefined
-      ? existing?.productId?.toHexString()
-      : values.productId;
-  const barcode =
-    values.barcode === undefined ? existing?.barcode : values.barcode;
-  if (!productId) {
-    return { productId: null, barcode: barcode ?? null };
-  }
-
-  const product = await FoodProductModel.findById(productId);
-  if (!product || (barcode && barcode !== product.barcode)) {
-    return null;
-  }
-
-  return { productId: product._id, barcode: product.barcode };
-}
-
 function invalidLink(res: Response) {
   res.status(400).json({
     error: {
@@ -121,7 +76,7 @@ foodItemsRouter.post("/", async (req, res) => {
     return;
   }
 
-  const link = await resolveLink(result.data);
+  const link = await resolveProductLink(result.data);
   if (!link) {
     invalidLink(res);
 
@@ -140,59 +95,14 @@ foodItemsRouter.post("/", async (req, res) => {
     return;
   }
 
-  const fingerprint = createHash("sha256")
-    .update(JSON.stringify(result.data))
-    .digest("hex");
-  const input = {
-    name: result.data.name,
-    quantity: result.data.quantity,
-    unit: result.data.unit,
-    expiresOn: result.data.expiresOn,
-    productId: link.productId ?? null,
-    barcode: link.barcode ?? null,
-    userId: res.locals.userId,
-    ...(key ? { creationKey: key, creationFingerprint: fingerprint } : {}),
-  };
-  let document: InstanceType<typeof FoodItemModel>;
+  const document = await createFoodItem(
+    result.data,
+    link,
+    res.locals.userId,
+    key,
+  );
 
-  try {
-    document = key
-      ? await FoodItemModel.findOneAndUpdate(
-          { userId: res.locals.userId, creationKey: key },
-          {
-            $setOnInsert: {
-              ...input,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-          },
-          {
-            upsert: true,
-            returnDocument: "after",
-            runValidators: true,
-            timestamps: false,
-          },
-        ).select("+creationFingerprint")
-      : await FoodItemModel.create(input);
-  } catch (error) {
-    if (
-      !key ||
-      typeof error !== "object" ||
-      error === null ||
-      !("code" in error) ||
-      error.code !== 11000
-    ) {
-      throw error;
-    }
-
-    document = await FoodItemModel.findOne({
-      userId: res.locals.userId,
-      creationKey: key,
-    })
-      .select("+creationFingerprint")
-      .orFail();
-  }
-  if (key && document.creationFingerprint !== fingerprint) {
+  if (!document) {
     res.status(409).json({
       error: {
         code: "SAVE_CONFLICT",
@@ -204,7 +114,7 @@ foodItemsRouter.post("/", async (req, res) => {
     return;
   }
 
-  res.status(201).json(toDto(document));
+  res.status(201).json(foodItemDto(document));
 });
 
 foodItemsRouter.get("/", async (req, res) => {
@@ -236,7 +146,7 @@ foodItemsRouter.get("/", async (req, res) => {
       .maxTimeMS(5000),
     FoodItemModel.countDocuments(filter).maxTimeMS(5000),
   ]);
-  res.json({ items: documents.map(toDto), total, start, limit });
+  res.json({ items: documents.map(foodItemDto), total, start, limit });
 });
 
 foodItemsRouter.get("/:id", async (req, res) => {
@@ -254,7 +164,7 @@ foodItemsRouter.get("/:id", async (req, res) => {
     return;
   }
 
-  res.json(toDto(document));
+  res.json(foodItemDto(document));
 });
 
 foodItemsRouter.patch("/:id", async (req, res) => {
@@ -284,7 +194,7 @@ foodItemsRouter.patch("/:id", async (req, res) => {
     return;
   }
 
-  const link = await resolveLink(result.data, existing);
+  const link = await resolveProductLink(result.data, existing);
   if (!link) {
     invalidLink(res);
 
@@ -302,7 +212,7 @@ foodItemsRouter.patch("/:id", async (req, res) => {
     return;
   }
 
-  res.json(toDto(document));
+  res.json(foodItemDto(document));
 });
 
 foodItemsRouter.delete("/:id", async (req, res) => {
