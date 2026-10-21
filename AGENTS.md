@@ -1,7 +1,13 @@
 # Agent instructions
 
 - Read [README.md](README.md) for onboarding and [CONTRIBUTION.md](CONTRIBUTION.md) for development conventions, validation commands, and deployment details before making changes.
-- Keep README.md short and focused on developer onboarding. Put development guidance in CONTRIBUTION.md and agent instructions in AGENTS.md. Documentation must describe current facts and procedures, without implementation histories or prior test-run reports.
+
+## Documentation
+
+- Keep README.md short and focused on developer onboarding, aiming for roughly 40–60 lines. Use this order: app purpose, prerequisites, setup commands, verification, repository map, and links to further guidance.
+- Describe the app's capabilities first and summarize the stack briefly. Make essential setup commands copyable, distinguish required settings from optional integrations, and explain how to confirm the app works after startup.
+- Put detailed development, testing, API, troubleshooting, and deployment guidance in CONTRIBUTION.md or linked reference docs. Keep agent instructions in AGENTS.md and link to these guides from README.md.
+- Documentation must describe current facts and procedures, without implementation histories or prior test-run reports. Keep extensive feature lists, roadmaps, and operational details out of README.md.
 
 ## Repository workflow
 

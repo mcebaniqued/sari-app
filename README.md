@@ -1,25 +1,46 @@
 # Sari
 
-A private pantry app built with React, TypeScript, Express, and MongoDB. Shared Zod contracts connect the frontend and API through npm workspaces.
+Sari is a pantry app for tracking food, quantities, expiration dates, and optional barcode lookups.
 
-## Get started
+Built with React, TypeScript, Express, and MongoDB, using npm workspaces and shared Zod contracts.
+
+## Prerequisites
 
 Use Node.js 24 LTS, npm 11, and a local MongoDB server or an Atlas development database.
 
-1. Install dependencies from the repository root:
+## Get started
 
-   ```sh
-   npm ci --include=optional
-   ```
+Clone the repository, install dependencies, and copy the API environment template:
 
-2. Copy [api/.env.example](api/.env.example) to `api/.env`. Set `MONGODB_URI` to your development database and generate `BETTER_AUTH_SECRET` using the command in that file. The default `BETTER_AUTH_URL` works locally. `USDA_API_KEY` is optional for barcode lookup.
-3. Start the app:
+```sh
+git clone https://github.com/mcebaniqued/sari-app.git
+cd sari-app
+npm ci --include=optional
+node -e "require('node:fs').copyFileSync('api/.env.example', 'api/.env')"
+```
 
-   ```sh
-   npm run dev
-   ```
+Edit `api/.env`:
 
-Open <http://127.0.0.1:5173> and register an account. Check [API readiness](http://127.0.0.1:3001/api/v1/ready): HTTP 200 confirms MongoDB is connected. Restart the API after changing `api/.env`.
+| Setting              | Local setup                                                               |
+| -------------------- | ------------------------------------------------------------------------- |
+| `MONGODB_URI`        | Required. Use your development database; the default is local `sari_dev`. |
+| `BETTER_AUTH_SECRET` | Required. Generate a secret with the command below and paste it here.     |
+| `BETTER_AUTH_URL`    | Keep the default `http://127.0.0.1:5173`.                                 |
+| `USDA_API_KEY`       | Optional for barcode lookup. Manual entry works without it.               |
+
+```sh
+node -e "console.log(require('node:crypto').randomBytes(48).toString('base64url'))"
+```
+
+Start the app from the repository root:
+
+```sh
+npm run dev
+```
+
+## Verify it works
+
+Open <http://127.0.0.1:5173> and register an account. Add a pantry item, refresh, and confirm it remains saved. [API readiness](http://127.0.0.1:3001/api/v1/ready) returns HTTP 200 when MongoDB is connected. Restart the API after changing `api/.env`.
 
 ## Find your way around
 
@@ -28,4 +49,4 @@ Open <http://127.0.0.1:5173> and register an account. Check [API readiness](http
 - `packages/contracts/`: Shared schemas and types.
 - `e2e/`: Playwright browser tests.
 
-Run `npm run check` before submitting changes. See [CONTRIBUTION.md](CONTRIBUTION.md) for development, testing, API, and deployment details. Coding agents must follow [AGENTS.md](AGENTS.md).
+Run `npm run check` before submitting changes. See [CONTRIBUTION.md](CONTRIBUTION.md) for development, testing, API, and deployment details, or the [issue tracker](https://github.com/mcebaniqued/sari-app/issues) for bugs and requests. Coding agents must follow [AGENTS.md](AGENTS.md).
