@@ -23,6 +23,12 @@ export default function InventoryList({
   const [openId, setOpenId] = useState<string | null>(null);
   const openAction = useRef<HTMLDivElement>(null);
 
+  function focusActionTrigger() {
+    openAction.current
+      ?.querySelector<HTMLButtonElement>("[data-row-action]")
+      ?.focus();
+  }
+
   useEffect(() => {
     if (!openId) {
       return;
@@ -38,7 +44,7 @@ export default function InventoryList({
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setOpenId(null);
-        openAction.current?.querySelector("button")?.focus();
+        focusActionTrigger();
       }
     };
     const closeOnFocus = (event: FocusEvent) => {
@@ -101,6 +107,8 @@ export default function InventoryList({
               />
             ) : (
               <button
+                data-row-action
+                data-item-id={item.id}
                 type="button"
                 aria-label={`Actions for ${item.name}`}
                 aria-expanded={openId === item.id}
@@ -120,6 +128,7 @@ export default function InventoryList({
                   aria-label={`Edit ${item.name}`}
                   className="min-h-11 w-full rounded-control px-3 text-left hover:bg-surface-hover"
                   onClick={() => {
+                    focusActionTrigger();
                     setOpenId(null);
                     onEdit(item);
                   }}
@@ -131,6 +140,7 @@ export default function InventoryList({
                   aria-label={`Delete ${item.name}`}
                   className="min-h-11 w-full rounded-control px-3 text-left text-danger hover:bg-danger-subtle"
                   onClick={() => {
+                    focusActionTrigger();
                     setOpenId(null);
                     onDelete([item]);
                   }}

@@ -14,6 +14,7 @@ interface PantryToolbarProps {
   onSort: (sort: FoodItemQuery["sort"]) => void;
   filterOpen: boolean;
   filterButtonRef: Ref<HTMLButtonElement>;
+  mobileAddButtonRef: Ref<HTMLButtonElement>;
   onOpenFilters: () => void;
   onAdd: () => void;
   onClearSelection: () => void;
@@ -31,6 +32,7 @@ export default function PantryToolbar({
   onSort,
   filterOpen,
   filterButtonRef,
+  mobileAddButtonRef,
   onOpenFilters,
   onAdd,
   onClearSelection,
@@ -41,9 +43,10 @@ export default function PantryToolbar({
   const filterLabel = `Filter${activeFilters.length ? ` (${activeFilters.length})` : ""}`;
   const filterClass = `${secondary} ${activeFilters.length ? "border-brand bg-brand-subtle text-brand" : ""}`;
 
-  function addButton(className: string) {
+  function addButton(className: string, ref?: Ref<HTMLButtonElement>) {
     return (
       <button
+        ref={ref}
         type="button"
         disabled={disabled}
         onClick={onAdd}
@@ -69,6 +72,7 @@ export default function PantryToolbar({
           </div>
           {addButton(
             "inline-flex min-h-11 w-28 shrink-0 items-center justify-center gap-1 rounded-control bg-brand px-3 text-sm font-semibold text-content-inverse hover:bg-brand-hover focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50 md:hidden",
+            mobileAddButtonRef,
           )}
           <div className="col-span-2 grid grid-cols-2 gap-2 md:col-auto md:ml-auto md:flex md:shrink-0">
             <div className="hidden md:block">

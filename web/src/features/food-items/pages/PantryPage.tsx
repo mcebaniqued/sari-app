@@ -26,9 +26,54 @@ export default function PantryPage() {
   const desktopScroll = useRef<HTMLDivElement>(null);
   const desktopEnd = useRef<HTMLDivElement>(null);
   const mobileEnd = useRef<HTMLDivElement>(null);
+  const mobileInventory = useRef<HTMLElement>(null);
+  const mobileAddButton = useRef<HTMLButtonElement>(null);
   const filterButton = useRef<HTMLButtonElement>(null);
+  const pendingMobileActionFocus = useRef<{
+    kind: "edit" | "delete";
+    id: string;
+    index: number;
+  } | null>(null);
   const queryKey = JSON.stringify([inventory.query, pantry.revision]);
   const { hasMore, loading, error, loadMore } = inventory;
+
+  function restoreDialogFocusFallback() {
+    if (pendingMobileActionFocus.current) {
+      mobileAddButton.current?.focus();
+    } else {
+      filterButton.current?.focus();
+    }
+  }
+
+  useEffect(() => {
+    const pending = pendingMobileActionFocus.current;
+    if (
+      !pending ||
+      (pending.kind === "edit" ? pantry.editor : pantry.deleteTargets)
+    ) {
+      return;
+    }
+    if (inventory.loading) {
+      mobileAddButton.current?.focus();
+      return;
+    }
+    const actions = Array.from(
+      mobileInventory.current?.querySelectorAll<HTMLButtonElement>(
+        "[data-row-action]",
+      ) ?? [],
+    );
+    const sameItem =
+      pending.kind === "edit"
+        ? actions.find((action) => action.dataset.itemId === pending.id)
+        : undefined;
+    (
+      sameItem ??
+      actions[pending.index] ??
+      actions[pending.index - 1] ??
+      mobileAddButton.current
+    )?.focus();
+    pendingMobileActionFocus.current = null;
+  }, [inventory.items, inventory.loading, pantry.deleteTargets, pantry.editor]);
 
   useLayoutEffect(() => {
     if (desktopScroll.current) {
@@ -149,6 +194,7 @@ export default function PantryPage() {
           }}
           filterOpen={filterEditor !== null}
           filterButtonRef={filterButton}
+          mobileAddButtonRef={mobileAddButton}
           onOpenFilters={() => {
             setFilterEditor({});
           }}
@@ -230,6 +276,7 @@ export default function PantryPage() {
         />
       )}
       <section
+        ref={mobileInventory}
         aria-label="Food inventory"
         className={`${mobileSelecting ? "pb-[calc(env(safe-area-inset-bottom)+6rem)]" : "pb-12"} md:hidden`}
       >
@@ -265,6 +312,29 @@ export default function PantryPage() {
             selectedIds={inventory.selectedIds}
             onSelectionChange={inventory.setSelectedIds}
             {...actions}
+            onEdit={(item) => {
+              pendingMobileActionFocus.current = {
+                kind: "edit",
+                id: item.id,
+                index: inventory.items.findIndex(
+                  (entry) => entry.id === item.id,
+                ),
+              };
+              pantry.startEdit(item);
+            }}
+            onDelete={(targets) => {
+              const target = targets[0];
+              if (target) {
+                pendingMobileActionFocus.current = {
+                  kind: "delete",
+                  id: target.id,
+                  index: inventory.items.findIndex(
+                    (item) => item.id === target.id,
+                  ),
+                };
+              }
+              pantry.startDelete(targets);
+            }}
           />
         )}
         {empty && (
@@ -341,7 +411,11 @@ export default function PantryPage() {
           item={pantry.editor.item}
           busy={pantry.busy}
           onSave={pantry.saveItem}
-          onClose={pantry.closeEditor}
+          onClose={() => {
+            pendingMobileActionFocus.current = null;
+            pantry.closeEditor();
+          }}
+          onRestoreFocusFallback={restoreDialogFocusFallback}
         />
       )}
       {pantry.deleteTargets && (
@@ -350,7 +424,11 @@ export default function PantryPage() {
           error={pantry.deleteError}
           busy={pantry.busy}
           onConfirm={pantry.deleteItems}
-          onClose={pantry.closeDelete}
+          onClose={() => {
+            pendingMobileActionFocus.current = null;
+            pantry.closeDelete();
+          }}
+          onRestoreFocusFallback={restoreDialogFocusFallback}
         />
       )}
     </div>

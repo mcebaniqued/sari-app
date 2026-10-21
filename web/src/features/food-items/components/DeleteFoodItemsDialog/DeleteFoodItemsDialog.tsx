@@ -1,4 +1,5 @@
 import type { FoodItem } from "@sari/contracts";
+import { useEffect, useRef } from "react";
 import { LuTrash2 } from "react-icons/lu";
 import Modal from "@/components/Modal/Modal";
 
@@ -8,6 +9,7 @@ interface DeleteFoodItemsDialogProps {
   busy: boolean;
   onClose: () => void;
   onConfirm: () => Promise<void>;
+  onRestoreFocusFallback?: () => void;
 }
 
 export default function DeleteFoodItemsDialog({
@@ -16,7 +18,16 @@ export default function DeleteFoodItemsDialog({
   busy,
   onClose,
   onConfirm,
+  onRestoreFocusFallback,
 }: DeleteFoodItemsDialogProps) {
+  const cancelButton = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (error && !busy) {
+      cancelButton.current?.focus();
+    }
+  }, [busy, error]);
+
   return (
     <Modal
       title={
@@ -24,6 +35,7 @@ export default function DeleteFoodItemsDialog({
       }
       description="These items will be permanently removed from your pantry."
       onClose={onClose}
+      onRestoreFocusFallback={onRestoreFocusFallback}
       dismissible={!busy}
     >
       <div className="px-6 py-5">
@@ -45,6 +57,7 @@ export default function DeleteFoodItemsDialog({
       </div>
       <div className="flex justify-end gap-3 border-t border-border-default bg-surface-subtle/60 px-6 py-4">
         <button
+          ref={cancelButton}
           type="button"
           data-autofocus
           disabled={busy}

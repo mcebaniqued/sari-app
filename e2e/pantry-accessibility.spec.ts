@@ -1,5 +1,6 @@
 import { expect } from "@playwright/test";
 import {
+  bananas,
   expectAccessible,
   foodApi,
   milk,
@@ -406,6 +407,226 @@ test("mobile row actions close when focus leaves and restore focus on Escape", a
   await page.keyboard.press("Escape");
   await expect(actions).toBeFocused();
   await expect(actions).toHaveAttribute("aria-expanded", "false");
+
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Edit Milk" })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(actions).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(
+    page.getByRole("button", { name: "Select", exact: true }),
+  ).toBeFocused();
+  await expect(actions).toHaveAttribute("aria-expanded", "false");
+});
+
+test("mobile Edit returns focus to its item after Escape, Cancel, and save", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 800 });
+  await foodApi(page, [milk, rice]);
+  await page.goto("/pantry");
+  const actions = page.getByRole("button", { name: "Actions for Milk" });
+  const edit = page.getByRole("button", { name: "Edit Milk" });
+  const dialog = page.getByRole("dialog", { name: "Edit item" });
+
+  await actions.focus();
+  await page.keyboard.press("Enter");
+  await expect(actions).toHaveAttribute("aria-expanded", "true");
+  await expect(edit).toHaveAccessibleName("Edit Milk");
+  await page.keyboard.press("Tab");
+  await expect(edit).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(dialog.getByLabel(/^Food name/)).toBeFocused();
+  await expect(dialog).toHaveAttribute("aria-modal", "true");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(actions).toBeFocused();
+
+  await page.keyboard.press("Space");
+  await expect(edit).toBeVisible();
+  await edit.click();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(actions).toBeFocused();
+
+  await page.getByRole("button", { name: "Sort", exact: true }).click();
+  const sortDialog = page.getByRole("dialog", { name: "Sort items" });
+  await sortDialog.getByRole("radio", { name: "Name: A to Z" }).check();
+  await sortDialog.getByRole("button", { name: "Apply" }).click();
+  await actions.click();
+  await edit.click();
+  await dialog.getByLabel(/^Food name/).fill("Z milk");
+  await dialog.getByRole("button", { name: "Save changes" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(
+    page
+      .getByRole("list", { name: "Food inventory" })
+      .getByRole("listitem")
+      .first(),
+  ).toContainText("Rice");
+  await expect(
+    page.getByRole("button", { name: "Actions for Z milk" }),
+  ).toBeFocused();
+});
+
+test("mobile Delete cancellation restores focus and keeps dialog focus contained", async ({
+  page,
+}) => {
+  const api = await foodApi(page, [milk, rice]);
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto("/pantry");
+  const actions = page.getByRole("button", { name: "Actions for Milk" });
+  const deleteButton = page.getByRole("button", { name: "Delete Milk" });
+  const dialog = page.getByRole("dialog", { name: "Delete item?" });
+
+  await actions.focus();
+  await page.keyboard.press("Space");
+  await expect(deleteButton).toHaveAccessibleName("Delete Milk");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  await expect(deleteButton).toBeFocused();
+  await page.keyboard.press("Enter");
+  const cancel = dialog.getByRole("button", { name: "Cancel" });
+  await expect(dialog).toHaveAttribute("aria-modal", "true");
+  await expect(cancel).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(
+    dialog.getByRole("button", { name: "Confirm delete" }),
+  ).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(cancel).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(dialog).toHaveCount(0);
+  await expect(actions).toBeFocused();
+  expect(api.deleted).toEqual([]);
+
+  await actions.click();
+  await deleteButton.click();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(actions).toBeFocused();
+  expect(api.deleted).toEqual([]);
+});
+
+test("failed mobile Edit remains in the dialog and can be retried", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 800 });
+  await foodApi(page, [milk, rice]);
+  let failNextSave = true;
+  await page.route("**/api/v1/food-items/*", async (route) => {
+    if (route.request().method() === "PATCH" && failNextSave) {
+      failNextSave = false;
+      await route.fulfill({
+        status: 503,
+        json: {
+          error: { code: "DATABASE_UNAVAILABLE", message: "Please try again." },
+        },
+      });
+      return;
+    }
+    await route.fallback();
+  });
+  await page.goto("/pantry");
+  const actions = page.getByRole("button", { name: "Actions for Milk" });
+  await actions.click();
+  await page.getByRole("button", { name: "Edit Milk" }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit item" });
+  await dialog.getByLabel(/^Food name/).fill("Oat milk");
+  await dialog.getByRole("button", { name: "Save changes" }).click();
+  await expect(dialog.getByRole("alert")).toContainText("Try again");
+  await expect(dialog).toBeVisible();
+  expect(
+    await dialog.evaluate((element) =>
+      element.contains(document.activeElement),
+    ),
+  ).toBe(true);
+  await dialog.getByRole("button", { name: "Save changes" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Actions for Oat milk" }),
+  ).toBeFocused();
+});
+
+for (const { target, fallback, id, items, followupRole, followupName } of [
+  {
+    target: "Milk",
+    fallback: "Rice",
+    id: milk.id,
+    items: [milk, rice, bananas],
+    followupRole: "button",
+    followupName: "Edit Rice",
+  },
+  {
+    target: "Rice",
+    fallback: "Bananas",
+    id: rice.id,
+    items: [milk, rice, bananas],
+    followupRole: "button",
+    followupName: "Edit Bananas",
+  },
+  {
+    target: "Bananas",
+    fallback: "Rice",
+    id: bananas.id,
+    items: [milk, rice, bananas],
+    followupRole: "button",
+    followupName: "Edit Rice",
+  },
+  {
+    target: "Milk",
+    fallback: "Add item",
+    id: milk.id,
+    items: [milk],
+    followupRole: "dialog",
+    followupName: "Add item",
+  },
+] as const) {
+  test(`mobile deletion of ${target} moves focus to ${fallback}`, async ({
+    page,
+  }) => {
+    const api = await foodApi(page, [...items]);
+    await page.setViewportSize({ width: 390, height: 800 });
+    await page.goto("/pantry");
+    const actions = page.getByRole("button", { name: `Actions for ${target}` });
+    await actions.click();
+    await page.getByRole("button", { name: `Delete ${target}` }).click();
+    const dialog = page.getByRole("dialog", { name: "Delete item?" });
+    await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+    await dialog.getByRole("button", { name: "Confirm delete" }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(actions).toHaveCount(0);
+    await expect(
+      page.getByRole("button", {
+        name: fallback === "Add item" ? fallback : `Actions for ${fallback}`,
+      }),
+    ).toBeFocused();
+    expect(api.deleted).toEqual([id]);
+    await page.keyboard.press("Enter");
+    await expect(
+      page.getByRole(followupRole, { name: followupName }),
+    ).toBeVisible();
+  });
+}
+
+test("failed mobile deletion keeps focus within its dialog", async ({
+  page,
+}) => {
+  const api = await foodApi(page, [milk, rice], rice.id);
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto("/pantry");
+  const actions = page.getByRole("button", { name: "Actions for Rice" });
+  await actions.click();
+  await page.getByRole("button", { name: "Delete Rice" }).click();
+  const dialog = page.getByRole("dialog", { name: "Delete item?" });
+  await dialog.getByRole("button", { name: "Confirm delete" }).click();
+  await expect(dialog.getByRole("alert")).toContainText("could not be deleted");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(actions).toBeFocused();
+  expect(api.deleted).toEqual([rice.id]);
 });
 
 test("keyboard focus has a separated indicator on pantry controls", async ({
