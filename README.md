@@ -182,6 +182,8 @@ A reusable React Toastify notification component reports create, update, delete,
 
 Readability requires blank lines between independent declarations and meaningful steps inside functions. Keep related statements together and document non-obvious invariants. Prettier enforces formatting; manual review checks logical grouping.
 
+Keep `.json` files valid strict JSON, with configuration explanations in documentation. The root `tsconfig.json` checks Playwright configuration and browser tests; workspace configurations check application and contracts sources. API and contracts source checks include tests, while their separate `tsconfig.build.json` files exclude tests from emitted production files. The contracts source-check configuration disables emission. Shared `skipLibCheck` avoids rechecking dependency declarations in every workspace; application code and its use of those types remain checked.
+
 ESLint uses strict TypeScript type-aware rules, React Hooks checks, JSX accessibility checks, import sorting, unused import detection, and Playwright rules, with zero warnings allowed. The maintained `@htmlacademy/eslint-plugin-jsx-a11y` fork supports the project’s ESLint 10 version.
 
 The frontend routes HTTP 403 responses from pantry reads and writes to `/access-denied`, replacing the rejected route in history. Bulk deletion stops scheduling additional batches after a forbidden response and retains completed outcomes. Other errors stay with their form or recovery control. Authentication and ownership are enforced by the backend as described above. See Vercel deployment below for production setup and acceptance checks.

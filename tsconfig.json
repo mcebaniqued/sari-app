@@ -7,6 +7,5 @@
     "types": ["node"],
     "noEmit": true
   },
-  // Application sources are checked separately by their workspace tsconfigs.
   "include": ["playwright.config.ts", "e2e/**/*.ts"]
 }

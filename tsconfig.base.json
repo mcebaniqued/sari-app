@@ -7,8 +7,6 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "forceConsistentCasingInFileNames": true,
-    // Avoid rechecking dependency declarations in every workspace. Application
-    // code and its use of the declared types remain typechecked.
     "skipLibCheck": true,
     "verbatimModuleSyntax": true
   }
