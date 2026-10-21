@@ -91,3 +91,57 @@ test("empty state and recovery pages remain accessible", async ({ page }) => {
     await expectAccessible(page);
   }
 });
+
+for (const { width, sortName, actionOrder } of [
+  {
+    width: 1280,
+    sortName: "Sort: Added: Newest",
+    actionOrder: ["sort", "filter", "add"],
+  },
+  { width: 390, sortName: "Sort", actionOrder: ["add", "sort", "filter"] },
+] as const) {
+  test(`pantry toolbar follows the visible keyboard order at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await foodApi(page, [milk]);
+    await page.goto("/pantry");
+    await expect(nameCells(page)).toHaveText(["Milk"]);
+
+    const search = page.getByRole("searchbox", { name: "Search food items" });
+    const clear = page.getByRole("button", { name: "Clear search" });
+    const add = page.getByRole("button", { name: "Add item" });
+    const sort = page.getByRole("button", { name: sortName, exact: true });
+    const filter = page.getByRole("button", { name: "Filter", exact: true });
+    const actions = actionOrder.map(
+      (action) => ({ sort, filter, add })[action],
+    );
+
+    await expect(add).toHaveCount(1);
+    await search.focus();
+    for (const action of actions) {
+      await page.keyboard.press("Tab");
+      await expect(action).toBeFocused();
+    }
+    for (const action of [search, ...actions.slice(0, -1)].reverse()) {
+      await page.keyboard.press("Shift+Tab");
+      await expect(action).toBeFocused();
+    }
+
+    await search.fill("mi");
+    await expect(clear).toBeVisible();
+    await search.focus();
+    await page.keyboard.press("Tab");
+    await expect(clear).toBeFocused();
+    for (const action of actions) {
+      await page.keyboard.press("Tab");
+      await expect(action).toBeFocused();
+    }
+    for (const action of [clear, ...actions.slice(0, -1)].reverse()) {
+      await page.keyboard.press("Shift+Tab");
+      await expect(action).toBeFocused();
+    }
+    await page.keyboard.press("Shift+Tab");
+    await expect(search).toBeFocused();
+  });
+}

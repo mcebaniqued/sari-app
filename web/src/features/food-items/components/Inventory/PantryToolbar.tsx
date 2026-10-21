@@ -39,18 +39,15 @@ export default function PantryToolbar({
   const filterLabel = `Filter${activeFilters.length ? ` (${activeFilters.length})` : ""}`;
   const filterClass = `${secondary} ${activeFilters.length ? "border-brand bg-brand-subtle text-brand" : ""}`;
 
-  function filterButton() {
+  function addButton(className: string) {
     return (
       <button
         type="button"
         disabled={disabled}
-        aria-haspopup="dialog"
-        aria-expanded={filterOpen}
-        aria-pressed={activeFilters.length > 0}
-        onClick={onOpenFilters}
-        className={filterClass}
+        onClick={onAdd}
+        className={className}
       >
-        <LuListFilter aria-hidden="true" /> {filterLabel}
+        <LuPlus aria-hidden="true" /> Add item
       </button>
     );
   }
@@ -59,7 +56,7 @@ export default function PantryToolbar({
     <>
       <div aria-label="Pantry actions">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 md:flex md:min-h-11 md:items-center">
-          <div className="min-w-0 md:order-1 md:flex-1">
+          <div className="min-w-0 md:flex-1">
             <SearchBar
               label="Search food items"
               placeholder="Search items…"
@@ -68,15 +65,10 @@ export default function PantryToolbar({
               disabled={disabled}
             />
           </div>
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={onAdd}
-            className="inline-flex min-h-11 w-28 shrink-0 items-center justify-center gap-1 rounded-control bg-brand px-3 text-sm font-semibold text-content-inverse hover:bg-brand-hover focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50 md:order-3 md:w-auto"
-          >
-            <LuPlus aria-hidden="true" /> Add item
-          </button>
-          <div className="col-span-2 grid grid-cols-2 gap-2 md:order-2 md:ml-auto md:flex md:shrink-0">
+          {addButton(
+            "inline-flex min-h-11 w-28 shrink-0 items-center justify-center gap-1 rounded-control bg-brand px-3 text-sm font-semibold text-content-inverse hover:bg-brand-hover focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50 md:hidden",
+          )}
+          <div className="col-span-2 grid grid-cols-2 gap-2 md:col-auto md:ml-auto md:flex md:shrink-0">
             <div className="hidden md:block">
               <DesktopSortControl
                 sort={query.sort}
@@ -96,8 +88,21 @@ export default function PantryToolbar({
             >
               <LuArrowDownUp aria-hidden="true" /> Sort
             </button>
-            {filterButton()}
+            <button
+              type="button"
+              disabled={disabled}
+              aria-haspopup="dialog"
+              aria-expanded={filterOpen}
+              aria-pressed={activeFilters.length > 0}
+              onClick={onOpenFilters}
+              className={filterClass}
+            >
+              <LuListFilter aria-hidden="true" /> {filterLabel}
+            </button>
           </div>
+          {addButton(
+            "hidden min-h-11 shrink-0 items-center justify-center gap-1 rounded-control bg-brand px-3 text-sm font-semibold text-content-inverse hover:bg-brand-hover focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50 md:inline-flex",
+          )}
         </div>
         {selectedCount > 0 && (
           <div
