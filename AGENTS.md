@@ -6,6 +6,12 @@ Sari is a pantry app with a React frontend in `web/`, an Express API in `api/`, 
 - Keep public request/response contracts in `packages/contracts`. Keep feature-specific frontend code inside its feature; shared frontend components and utilities must not import feature code.
 - Keep database credentials and secrets backend-only. Never expose them through `VITE_` variables, logs, commits, or reports.
 
+## Context and execution efficiency
+
+- Start from the request, current diff, and affected files. Use targeted searches to locate relevant symbols before reading full files; expand investigation when dependencies, cross-package behavior, or uncertainty require it.
+- Reuse files and documentation already available in context. Keep command output bounded while preserving exit codes, errors, and diagnostic details needed to investigate failures.
+- Proceed directly on simple, well-defined tasks. For complex, ambiguous, or high-risk work, make an implementation plan when useful; do not repeat planning while an existing plan remains valid. Prefer the smallest complete solution and add abstractions, files, or workflows only for a concrete benefit.
+
 ## Repository workflow
 
 - Inspect the current branch, working tree, and diff before modifying files. Treat authorization to edit, create or switch branches, stage, commit, push, and open PRs as distinct; perform only actions authorized by the task. Permission for one does not authorize the others.
@@ -25,6 +31,7 @@ Sari is a pantry app with a React frontend in `web/`, an Express API in `api/`, 
 
 - Review every code change for purpose, readability, correctness, and impact. Use clear names and logical structure; add comments or JSDoc where reasoning, behavior, constraints, side effects, or tradeoffs are not obvious. Explain why when the code alone is insufficient, without restating obvious operations.
 - Follow existing conventions, with ESLint, Prettier, and TypeScript as the primary enforceable quality checks. Keep formatting and refactoring within the agreed scope; do not introduce unrelated style-only changes or restructure code to suit subjective preferences.
+- Prefer canonical Tailwind utilities from the configured theme and spacing scale when they express the intended value (for example, use `min-h-11.5` for `2.875rem`). Reserve arbitrary values for cases the existing scale cannot express, such as viewport calculations or selectors.
 - Separate independent declarations and meaningful steps with blank lines, keeping related statements together. Passing Prettier does not establish readability; review the logical grouping manually.
 - Follow the syntax and conventions supported by each file's parser or tooling. Add comments only where supported; otherwise, put necessary explanations in the appropriate documentation. Keep `.json` files valid strict JSON.
 - Review ignore rules, coverage exclusions, and lint/type suppressions when relevant to a change. Keep necessary exceptions narrowly scoped and explain their purpose in a supported comment or linked documentation; do not add exceptions merely to make checks pass.
@@ -32,12 +39,12 @@ Sari is a pantry app with a React frontend in `web/`, an Express API in `api/`, 
 ## Validation
 
 - Run commands from the repository root. Use `npm ci --include=optional` when installing dependencies; native build tools depend on optional packages. Root development, lint, type-check, and test scripts prepare shared contracts automatically; run `npm run contracts:build` before invoking application workspace checks directly.
-- For source or configuration changes, run relevant focused checks and `npm run check` before completion. It checks formatting, lint, types, unused code, deployment configuration, unit/component tests, and production builds.
-- For changes affecting persistence or browser behavior, run the applicable integration/browser coverage. Prefer `npm run test:integration` for disposable MongoDB and Playwright. Explicit database test URIs must name a database ending in `_test`; never use personal or production databases for tests.
+- During development, use relevant focused checks; before completing source or configuration changes, run `npm run check`. It checks formatting, lint, types, unused code, deployment configuration, unit/component tests, and production builds.
+- For changes affecting persistence or browser behavior, select the applicable integration/browser coverage. Prefer `npm run test:integration` for disposable MongoDB and Playwright. Explicit database test URIs must name a database ending in `_test`; never use personal or production databases for tests.
 - Derive expected behavior from public contracts, requirements, and acceptance criteria. Do not assume existing implementations or tests are correct merely because checks pass. Cover relevant failure paths, edge cases, boundaries, and regression risks, preferring assertions on observable behavior over internal implementation details.
 - For every bug fix, add regression tests that reproduce the bug and verify the corrected behavior. When practical, demonstrate that the regression test fails against the defective behavior before applying the fix.
 - For documentation-only changes, check formatting with `npm run format:check`, relative links, and any documented commands. Do not run application test suites unless the change affects their behavior.
-- Resolve failures caused by the change and rerun affected checks. Once required checks pass, repeat or broaden validation only when new edits, failures, or unresolved concerns justify it.
+- Investigate relevant validation failures and resolve those caused by the change. Do not repeat successful checks without a reason, such as relevant subsequent edits; do not rerun all checks blindly after a failure. Once required checks pass, broaden validation only when unresolved concerns justify it.
 
 ## Documentation
 
@@ -66,5 +73,5 @@ Sari is a pantry app with a React frontend in `web/`, an Express API in `api/`, 
 
 ## Completion reports
 
-- Summarize what changed, why, the checks actually run and their results, and any remaining limitations or manual verification. Distinguish local validation from CI results and report skipped or blocked checks explicitly.
+- Concisely report substantive findings, decisions, changes, actual validation and results, and remaining limitations or manual verification. Preserve important warnings and tradeoffs; state blockers or uncertainty clearly. Distinguish local validation from CI results and report skipped or blocked checks explicitly. Avoid repeating the request or giving an implementation narrative unless requested.
 - When applicable, include reviewable commit links and the branch, push, and PR status.
