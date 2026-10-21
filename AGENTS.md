@@ -1,6 +1,34 @@
 # Agent instructions
 
-- Read [README.md](README.md) for onboarding and [CONTRIBUTION.md](CONTRIBUTION.md) for development conventions, validation commands, and deployment details before making changes.
+Sari is a pantry app with a React frontend in `web/`, an Express API in `api/`, shared Zod schemas and API types in `packages/contracts/`, and Playwright tests in `e2e/`.
+
+- Use [README.md](README.md) for onboarding. Consult the relevant sections of [CONTRIBUTION.md](CONTRIBUTION.md) for architecture, configuration, testing, API behavior, or deployment as the task requires.
+- Keep public request/response contracts in `packages/contracts`. Keep feature-specific frontend code inside its feature; shared frontend components and utilities must not import feature code.
+- Keep database credentials and secrets backend-only. Never expose them through `VITE_` variables, logs, commits, or reports.
+
+## Repository workflow
+
+- Create a new branch for each scope or purpose. Use a descriptive branch name and the appropriate base branch; do not reuse a branch that has already been merged.
+- Keep each branch focused on its agreed scope. Record unrelated findings as actionable entries in `TODO.md` instead of implementing them in the current branch. Link an existing GitHub issue when one already tracks the work.
+- Group incremental commits by scope and purpose. Separate dependencies, configuration, implementation, test infrastructure, test coverage, fixes, and documentation when practical.
+- For audits, research, or proposals that request findings only, report without editing, committing, or pushing unless implementation is authorized. When the user requests a proposal before a substantial refactor, agree on the scope and commit breakdown before implementation.
+- Keep refactors behavior-preserving unless a behavior change is authorized. Check imports, package scripts, configuration, deployment entry points, and dynamic references before removing files or exports as unused.
+
+## Code quality
+
+- Review every code change for purpose, readability, correctness, and impact. Use clear names and logical structure; add comments or JSDoc where reasoning, behavior, constraints, side effects, or tradeoffs are not obvious. Explain why when the code alone is insufficient, without restating obvious operations.
+- Separate independent declarations and meaningful steps with blank lines, keeping related statements together. Passing Prettier does not establish readability; review the logical grouping manually.
+- Follow the syntax and conventions supported by each file's parser or tooling. Add comments only where supported; otherwise, put necessary explanations in the appropriate documentation. Keep `.json` files valid strict JSON.
+- Review ignore rules, coverage exclusions, and lint/type suppressions when relevant to a change. Keep necessary exceptions narrowly scoped and explain their purpose in a supported comment or linked documentation; do not add exceptions merely to make checks pass.
+
+## Validation
+
+- Run commands from the repository root. Use `npm ci --include=optional` when installing dependencies; native build tools depend on optional packages. Root development, lint, type-check, and test scripts prepare shared contracts automatically; run `npm run contracts:build` before invoking application workspace checks directly.
+- For source or configuration changes, run relevant focused checks and `npm run check` before completion. It checks formatting, lint, types, unused code, deployment configuration, unit/component tests, and production builds.
+- For changes affecting persistence or browser behavior, run the applicable integration/browser coverage. Prefer `npm run test:integration` for disposable MongoDB and Playwright. Explicit database test URIs must name a database ending in `_test`; never use personal or production databases for tests.
+- For every bug fix, add regression tests that reproduce the bug and verify the corrected behavior.
+- For documentation-only changes, check formatting with `npm run format:check`, relative links, and any documented commands. Do not run application test suites unless the change affects their behavior.
+- Resolve failures caused by the change and rerun affected checks. Once required checks pass, repeat or broaden validation only when new edits, failures, or unresolved concerns justify it.
 
 ## Documentation
 
@@ -8,13 +36,7 @@
 - Describe the app's capabilities first and summarize the stack briefly. Make essential setup commands copyable, distinguish required settings from optional integrations, and explain how to confirm the app works after startup.
 - Put detailed development, testing, API, troubleshooting, and deployment guidance in CONTRIBUTION.md or linked reference docs. Keep agent instructions in AGENTS.md and link to these guides from README.md.
 - Documentation must describe current facts and procedures, without implementation histories or prior test-run reports. Keep extensive feature lists, roadmaps, and operational details out of README.md.
-
-## Repository workflow
-
-- Create a new branch for each scope or purpose. Use a descriptive branch name and the appropriate base branch; do not reuse a branch that has already been merged.
-- Keep each branch focused on its agreed scope. Record unrelated findings as actionable entries in `TODO.md` instead of implementing them in the current branch. Link an existing GitHub issue when one already tracks the work.
-- Group incremental commits by scope and purpose. Separate dependencies, configuration, implementation, test infrastructure, test coverage, fixes, and documentation when practical.
-- For every bug fix, add regression tests that reproduce the bug and verify the corrected behavior.
+- Remove obsolete facts and historical narratives while preserving useful documentation. Do not delete a file merely because it is Markdown.
 
 ## Commits and issue scope
 
@@ -32,3 +54,8 @@
 - Report the validation actually performed and its results. Separate passed checks from remaining manual acceptance checks; do not imply local checks are CI results.
 - Include relevant setup requirements, known limitations, deferred scope, and links to documentation or follow-up issues. Avoid boilerplate and conversational history.
 - Link related issues. Use automatic closing keywords only when the PR fully resolves the linked issue.
+
+## Completion reports
+
+- Summarize what changed, why, the checks actually run and their results, and any remaining limitations or manual verification. Distinguish local validation from CI results and report skipped or blocked checks explicitly.
+- When applicable, include reviewable commit links and the branch, push, and PR status. Follow the current task's instructions about commits, pushes, and PR creation; do not infer one action authorizes another.
