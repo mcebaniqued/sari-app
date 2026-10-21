@@ -267,6 +267,11 @@ test("desktop Sort trigger closes an open menu without reopening or requesting",
   await expect(menu).toHaveCount(0);
   await expect(sort).toHaveAttribute("aria-expanded", "false");
   expect(api.queries).toHaveLength(initialRequests);
+
+  await sort.dblclick();
+  await expect(menu).toHaveCount(0);
+  await expect(sort).toHaveAttribute("aria-expanded", "false");
+  expect(api.queries).toHaveLength(initialRequests);
 });
 
 for (const { width, sortName, actionOrder } of [
