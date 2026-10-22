@@ -3,11 +3,13 @@ import { expirationStatus } from "../../utils/expirationStatus";
 interface ExpirationStatusProps {
   expiresOn: string | null;
   now: Date;
+  prominentLater?: boolean;
 }
 
 export default function ExpirationStatus({
   expiresOn,
   now,
+  prominentLater = false,
 }: ExpirationStatusProps) {
   const { text, treatment } = expirationStatus(expiresOn, now);
   const styles = {
@@ -15,7 +17,7 @@ export default function ExpirationStatus({
     past: "border-danger-border bg-danger-subtle text-danger",
     soon: "border-warning-border bg-warning-subtle text-warning",
     upcoming: "border-border-default bg-surface-subtle text-content",
-    later: "text-content-muted",
+    later: prominentLater ? "font-medium text-content" : "text-content-muted",
   };
   const badge =
     treatment === "past" || treatment === "soon" || treatment === "upcoming";

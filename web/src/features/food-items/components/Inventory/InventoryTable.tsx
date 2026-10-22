@@ -119,8 +119,12 @@ export default function InventoryTable({
               {item.quantity} {item.unit === "item" ? "items" : item.unit}
             </td>
             <td className="px-3 py-2">
-              <div className="flex items-center gap-2 whitespace-nowrap">
-                <ExpirationStatus expiresOn={item.expiresOn} now={now} />
+              <div className="flex items-center gap-3 whitespace-nowrap">
+                <ExpirationStatus
+                  expiresOn={item.expiresOn}
+                  now={now}
+                  prominentLater
+                />
                 {item.expiresOn && (
                   <span className="text-xs text-content-muted">
                     {formatDate(item.expiresOn)}

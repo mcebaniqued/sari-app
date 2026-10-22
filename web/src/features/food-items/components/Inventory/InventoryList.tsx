@@ -84,15 +84,15 @@ export default function InventoryList({
             <p className="mt-1 text-sm text-content-muted">
               {item.quantity} {item.unit === "item" ? "items" : item.unit}
             </p>
-            {item.expiresOn && (
-              <p className="mt-1 text-sm text-content-muted">
-                {formatDate(item.expiresOn)}
-              </p>
-            )}
+            <p className="mt-1 text-sm text-content-muted">
+              {item.expiresOn ? formatDate(item.expiresOn) : "No date"}
+            </p>
           </div>
-          <div className="max-w-full shrink-0 pt-0.5 text-right">
-            <ExpirationStatus expiresOn={item.expiresOn} now={now} />
-          </div>
+          {item.expiresOn && (
+            <div className="max-w-full shrink-0 pt-0.5 text-right">
+              <ExpirationStatus expiresOn={item.expiresOn} now={now} />
+            </div>
+          )}
           <div
             ref={openId === item.id ? openAction : undefined}
             className="relative flex size-11 shrink-0 items-center justify-center"
