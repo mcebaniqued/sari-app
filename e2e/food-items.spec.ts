@@ -575,7 +575,7 @@ test("mobile selection exits cleanly and keeps deletion contextual", async ({
   );
   await list.getByRole("checkbox", { name: "Select Milk" }).check();
   await expect(
-    list.locator("..").getByText("1 selected", { exact: true }),
+    page.getByRole("heading", { level: 1, name: "1 selected" }),
   ).toBeVisible();
   const actions = page.getByRole("toolbar", { name: "Selected items" });
   await expect(

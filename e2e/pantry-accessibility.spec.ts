@@ -424,7 +424,7 @@ test("mobile row actions close when focus leaves and restore focus on Escape", a
   await expect(actions).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(
-    page.getByRole("button", { name: "Select", exact: true }),
+    page.getByRole("button", { name: "Filter", exact: true }),
   ).toBeFocused();
   await expect(actions).toHaveAttribute("aria-expanded", "false");
 });
