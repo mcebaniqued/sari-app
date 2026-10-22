@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { LuX } from "react-icons/lu";
 import {
   appliedFilterEntries,
@@ -11,6 +12,7 @@ interface AppliedFiltersProps {
   onEdit: (field: LogicalFilterField) => void;
   onRemove: (field: LogicalFilterField) => void;
   onClear: () => void;
+  onFocusFallback: () => void;
 }
 
 export default function AppliedFilters({
@@ -19,8 +21,10 @@ export default function AppliedFilters({
   onEdit,
   onRemove,
   onClear,
+  onFocusFallback,
 }: AppliedFiltersProps) {
   const active = appliedFilterEntries(filters);
+  const editButtons = useRef(new Map<LogicalFilterField, HTMLButtonElement>());
   if (!active.length) {
     return null;
   }
@@ -32,12 +36,19 @@ export default function AppliedFilters({
     >
       <h2 className="mb-2 text-sm font-semibold">Applied filters</h2>
       <div className="flex flex-wrap items-center gap-2">
-        {active.map((entry) => (
+        {active.map((entry, index) => (
           <div
             key={entry.field}
             className="inline-flex min-h-11 items-center rounded-control border border-border-default bg-surface text-sm"
           >
             <button
+              ref={(element) => {
+                if (element) {
+                  editButtons.current.set(entry.field, element);
+                } else {
+                  editButtons.current.delete(entry.field);
+                }
+              }}
               type="button"
               disabled={disabled}
               aria-label={`Edit ${entry.label} filter`}
@@ -53,6 +64,13 @@ export default function AppliedFilters({
               disabled={disabled}
               aria-label={`Remove ${entry.label} filter`}
               onClick={() => {
+                const nextField =
+                  active[index + 1]?.field ?? active[index - 1]?.field;
+                if (nextField) {
+                  editButtons.current.get(nextField)?.focus();
+                } else {
+                  onFocusFallback();
+                }
                 onRemove(entry.field);
               }}
               className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-r-control hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50"
@@ -64,7 +82,10 @@ export default function AppliedFilters({
         <button
           type="button"
           disabled={disabled}
-          onClick={onClear}
+          onClick={() => {
+            onFocusFallback();
+            onClear();
+          }}
           className="min-h-11 rounded-control px-2 text-sm underline focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50"
         >
           Clear all

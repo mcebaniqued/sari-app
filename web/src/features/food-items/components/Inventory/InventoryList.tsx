@@ -23,6 +23,12 @@ export default function InventoryList({
   const [openId, setOpenId] = useState<string | null>(null);
   const openAction = useRef<HTMLDivElement>(null);
 
+  function focusActionTrigger() {
+    openAction.current
+      ?.querySelector<HTMLButtonElement>("[data-row-action]")
+      ?.focus();
+  }
+
   useEffect(() => {
     if (!openId) {
       return;
@@ -38,15 +44,25 @@ export default function InventoryList({
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setOpenId(null);
-        openAction.current?.querySelector("button")?.focus();
+        focusActionTrigger();
+      }
+    };
+    const closeOnFocus = (event: FocusEvent) => {
+      if (
+        event.target instanceof Node &&
+        !openAction.current?.contains(event.target)
+      ) {
+        setOpenId(null);
       }
     };
     document.addEventListener("pointerdown", closeOutside);
     document.addEventListener("keydown", closeOnEscape);
+    document.addEventListener("focusin", closeOnFocus);
 
     return () => {
       document.removeEventListener("pointerdown", closeOutside);
       document.removeEventListener("keydown", closeOnEscape);
+      document.removeEventListener("focusin", closeOnFocus);
     };
   }, [openId]);
 
@@ -78,7 +94,7 @@ export default function InventoryList({
                 aria-label={`Select ${item.name}`}
                 checked={selectedIds.has(item.id)}
                 disabled={disabled}
-                className="size-6 accent-brand"
+                className="size-4 accent-brand"
                 onChange={(event) => {
                   const next = new Set(selectedIds);
                   if (event.target.checked) {
@@ -91,6 +107,8 @@ export default function InventoryList({
               />
             ) : (
               <button
+                data-row-action
+                data-item-id={item.id}
                 type="button"
                 aria-label={`Actions for ${item.name}`}
                 aria-expanded={openId === item.id}
@@ -107,8 +125,10 @@ export default function InventoryList({
               <div className="absolute top-full right-0 z-20 w-40 rounded-panel border border-border-default bg-surface p-1 shadow-modal">
                 <button
                   type="button"
+                  aria-label={`Edit ${item.name}`}
                   className="min-h-11 w-full rounded-control px-3 text-left hover:bg-surface-hover"
                   onClick={() => {
+                    focusActionTrigger();
                     setOpenId(null);
                     onEdit(item);
                   }}
@@ -117,8 +137,10 @@ export default function InventoryList({
                 </button>
                 <button
                   type="button"
+                  aria-label={`Delete ${item.name}`}
                   className="min-h-11 w-full rounded-control px-3 text-left text-danger hover:bg-danger-subtle"
                   onClick={() => {
+                    focusActionTrigger();
                     setOpenId(null);
                     onDelete([item]);
                   }}

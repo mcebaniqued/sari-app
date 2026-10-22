@@ -7,6 +7,7 @@ interface FoodItemEditorDialogProps {
   busy: boolean;
   onClose: () => void;
   onSave: (values: CreateFoodItem) => Promise<void>;
+  onRestoreFocusFallback?: () => void;
 }
 
 export default function FoodItemEditorDialog({
@@ -14,6 +15,7 @@ export default function FoodItemEditorDialog({
   busy,
   onClose,
   onSave,
+  onRestoreFocusFallback,
 }: FoodItemEditorDialogProps) {
   return (
     <Modal
@@ -24,6 +26,7 @@ export default function FoodItemEditorDialog({
           : "Add something you have on hand."
       }
       onClose={onClose}
+      onRestoreFocusFallback={onRestoreFocusFallback}
       dismissible={!busy}
     >
       <FoodItemForm

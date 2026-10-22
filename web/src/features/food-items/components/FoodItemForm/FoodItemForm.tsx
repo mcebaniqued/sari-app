@@ -46,6 +46,18 @@ export default function FoodItemForm({
       ?.focus();
   }, [mode]);
 
+  useEffect(() => {
+    if (
+      error &&
+      !saving &&
+      !entryRef.current?.closest("dialog")?.contains(document.activeElement)
+    ) {
+      entryRef.current
+        ?.querySelector<HTMLButtonElement>('button[type="submit"]')
+        ?.focus();
+    }
+  }, [error, saving]);
+
   function switchMode(next: "manual" | "barcode") {
     barcode.cancelLookup();
     setMode(next);

@@ -35,7 +35,11 @@ function stubFoodFetch(
   let loads = 0;
   vi.stubGlobal(
     "matchMedia",
-    vi.fn(() => ({ matches: false })),
+    vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
   );
   vi.stubGlobal(
     "fetch",
@@ -62,11 +66,19 @@ function stubFoodFetch(
   };
 }
 
-async function addDialog() {
-  await waitFor(() =>
-    expect(screen.getByRole("button", { name: "Add item" })).toBeEnabled(),
-  );
-  fireEvent.click(screen.getByRole("button", { name: "Add item" }));
+async function addDialog(copy: "mobile" | "desktop" = "mobile") {
+  // jsdom does not apply responsive CSS, so both Add controls remain in its DOM.
+  await waitFor(() => {
+    const buttons = screen.getAllByRole("button", { name: "Add item" });
+    expect(buttons).toHaveLength(2);
+    buttons.forEach((button) => expect(button).toBeEnabled());
+  });
+  const buttons = screen.getAllByRole("button", { name: "Add item" });
+  const button = buttons[copy === "desktop" ? 1 : 0];
+  if (!button) {
+    throw new Error("Expected both responsive Add controls");
+  }
+  fireEvent.click(button);
 
   return within(screen.getByRole("dialog", { name: "Add item" }));
 }
@@ -87,7 +99,7 @@ describe("pantry modals and persistence", () => {
       </MemoryRouter>,
     );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    const dialog = await addDialog();
+    const dialog = await addDialog("desktop");
     fireEvent.change(dialog.getByLabelText(/^Food name/), {
       target: { value: "  Milk  " },
     });

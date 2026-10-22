@@ -24,7 +24,10 @@ describe("debounced search", () => {
       vi.advanceTimersByTime(1);
     });
     expect(onSearch).toHaveBeenCalledExactlyOnceWith("milk");
-    fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    const clear = screen.getByRole("button", { name: "Clear search" });
+    clear.focus();
+    fireEvent.click(clear);
+    expect(input).toHaveFocus();
     act(() => {
       vi.advanceTimersByTime(300);
     });

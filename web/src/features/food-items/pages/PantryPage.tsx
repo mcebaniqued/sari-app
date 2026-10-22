@@ -26,8 +26,132 @@ export default function PantryPage() {
   const desktopScroll = useRef<HTMLDivElement>(null);
   const desktopEnd = useRef<HTMLDivElement>(null);
   const mobileEnd = useRef<HTMLDivElement>(null);
+  const mobileInventory = useRef<HTMLElement>(null);
+  const mobileAddButton = useRef<HTMLButtonElement>(null);
+  const mobileSelectButton = useRef<HTMLButtonElement>(null);
+  const mobileDoneButton = useRef<HTMLButtonElement>(null);
+  const mobileSelectAllButton = useRef<HTMLButtonElement>(null);
+  const wasMobileSelecting = useRef(false);
+  const mobileBulkDelete = useRef(false);
+  const desktopSelectAll = useRef<HTMLInputElement>(null);
+  const desktopBulkDelete = useRef(false);
+  const filterButton = useRef<HTMLButtonElement>(null);
+  const pendingMobileActionFocus = useRef<{
+    kind: "edit" | "delete";
+    id: string;
+    index: number;
+  } | null>(null);
   const queryKey = JSON.stringify([inventory.query, pantry.revision]);
   const { hasMore, loading, error, loadMore } = inventory;
+  const mobileSelecting = selecting || inventory.selected.length > 0;
+
+  function restoreDesktopBulkFocus() {
+    if (desktopSelectAll.current && !desktopSelectAll.current.disabled) {
+      desktopSelectAll.current.focus();
+    } else {
+      filterButton.current?.focus();
+    }
+  }
+
+  function restoreDialogFocusFallback() {
+    if (pendingMobileActionFocus.current) {
+      mobileAddButton.current?.focus();
+    } else if (mobileBulkDelete.current) {
+      mobileDoneButton.current?.focus();
+    } else {
+      filterButton.current?.focus();
+    }
+  }
+
+  useEffect(() => {
+    if (
+      desktopBulkDelete.current &&
+      !pantry.deleteTargets &&
+      inventory.selected.length === 0 &&
+      !inventory.loading
+    ) {
+      restoreDesktopBulkFocus();
+      desktopBulkDelete.current = false;
+    }
+  }, [inventory.loading, inventory.selected.length, pantry.deleteTargets]);
+
+  useEffect(() => {
+    if (
+      mobileBulkDelete.current &&
+      !pantry.deleteTargets &&
+      !inventory.loading
+    ) {
+      mobileDoneButton.current?.focus();
+      mobileBulkDelete.current = false;
+    }
+  }, [inventory.loading, pantry.deleteTargets]);
+
+  useLayoutEffect(() => {
+    const wasSelecting = wasMobileSelecting.current;
+    wasMobileSelecting.current = mobileSelecting;
+    if (
+      wasSelecting === mobileSelecting ||
+      !window.matchMedia("(max-width: 767px)").matches
+    ) {
+      return;
+    }
+    if (mobileSelecting) {
+      mobileDoneButton.current?.focus({ preventScroll: true });
+    } else {
+      (mobileSelectButton.current ?? mobileAddButton.current)?.focus({
+        preventScroll: true,
+      });
+    }
+  }, [mobileSelecting]);
+
+  useEffect(() => {
+    if (!mobileSelecting) {
+      return;
+    }
+    const mobile = window.matchMedia("(max-width: 767px)");
+    const onViewportChange = (event: MediaQueryListEvent) => {
+      if (event.matches) {
+        mobileDoneButton.current?.focus({ preventScroll: true });
+      } else {
+        restoreDesktopBulkFocus();
+      }
+    };
+    mobile.addEventListener("change", onViewportChange);
+
+    return () => {
+      mobile.removeEventListener("change", onViewportChange);
+    };
+  }, [mobileSelecting]);
+
+  useEffect(() => {
+    const pending = pendingMobileActionFocus.current;
+    if (
+      !pending ||
+      (pending.kind === "edit" ? pantry.editor : pantry.deleteTargets)
+    ) {
+      return;
+    }
+    if (inventory.loading) {
+      mobileAddButton.current?.focus();
+      return;
+    }
+    const actions = Array.from(
+      mobileInventory.current?.querySelectorAll<HTMLButtonElement>(
+        "[data-row-action]",
+      ) ?? [],
+    );
+    const sameItem =
+      pending.kind === "edit"
+        ? actions.find((action) => action.dataset.itemId === pending.id)
+        : undefined;
+    (
+      sameItem ??
+      actions[pending.index] ??
+      actions[pending.index - 1] ??
+      mobileAddButton.current
+    )?.focus();
+    pendingMobileActionFocus.current = null;
+  }, [inventory.items, inventory.loading, pantry.deleteTargets, pantry.editor]);
 
   useLayoutEffect(() => {
     if (desktopScroll.current) {
@@ -124,53 +248,91 @@ export default function PantryPage() {
     onDelete: pantry.startDelete,
   };
   const empty = inventory.total === 0 && !inventory.loading && !inventory.error;
-  const mobileSelecting = selecting || inventory.selected.length > 0;
 
   return (
     <div className="flex min-h-0 flex-col md:h-full">
       <div className="sticky top-[var(--pantry-header-offset,0px)] z-20 -mx-4 bg-page px-4 pb-3 pt-4 transition-[top] duration-200 motion-reduce:transition-none md:static md:mx-0 md:px-0 md:pb-4 md:pt-0">
-        <h1 className="mb-3 flex items-center gap-3 text-2xl font-semibold tracking-tight md:mb-5">
-          <LuLayoutGrid
-            aria-hidden="true"
-            className="size-6 shrink-0 text-brand"
+        <div className={mobileSelecting ? "hidden md:block" : ""}>
+          <div className="mb-3 flex items-center justify-between gap-3 md:mb-5">
+            <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight">
+              <LuLayoutGrid
+                aria-hidden="true"
+                className="size-6 shrink-0 text-brand"
+              />
+              My Pantry
+            </h1>
+            {inventory.items.length > 0 && (
+              <button
+                ref={mobileSelectButton}
+                type="button"
+                onClick={() => {
+                  setSelecting(true);
+                }}
+                className="min-h-11 min-w-11 rounded-control px-2 text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-brand md:hidden"
+              >
+                Select
+              </button>
+            )}
+          </div>
+          <PantryToolbar
+            query={inventory.query}
+            disabled={pantry.busy}
+            onSearch={(search) => {
+              inventory.applyQuery({ ...inventory.query, search });
+            }}
+            onSort={(sort) => {
+              inventory.applyQuery({ ...inventory.query, sort });
+            }}
+            filterOpen={filterEditor !== null}
+            filterButtonRef={filterButton}
+            mobileAddButtonRef={mobileAddButton}
+            onOpenFilters={() => {
+              setFilterEditor({});
+            }}
+            onAdd={pantry.startAdd}
           />
-          My Pantry
-        </h1>
-        <PantryToolbar
-          query={inventory.query}
-          selectedCount={inventory.selected.length}
+        </div>
+        {mobileSelecting && (
+          <div className="flex min-h-11 items-center justify-between gap-3 md:hidden">
+            <h1
+              aria-live="polite"
+              className="text-xl font-semibold tracking-tight"
+            >
+              {inventory.selected.length} selected
+            </h1>
+            <button
+              ref={mobileDoneButton}
+              type="button"
+              onClick={() => {
+                inventory.clearSelection();
+                setSelecting(false);
+              }}
+              className="min-h-11 rounded-control px-2 text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-brand"
+            >
+              Done selecting
+            </button>
+          </div>
+        )}
+      </div>
+      <div className={mobileSelecting ? "hidden md:block" : ""}>
+        <AppliedFilters
+          filters={inventory.query.filters}
           disabled={pantry.busy}
-          onSearch={(search) => {
-            inventory.applyQuery({ ...inventory.query, search });
+          onEdit={(field) => {
+            setFilterEditor({ focusField: field });
           }}
-          onSort={(sort) => {
-            inventory.applyQuery({ ...inventory.query, sort });
+          onRemove={(field) => {
+            const filters = removeLogicalFilter(inventory.query.filters, field);
+            inventory.applyQuery({ ...inventory.query, filters });
           }}
-          filterOpen={filterEditor !== null}
-          onOpenFilters={() => {
-            setFilterEditor({});
+          onClear={() => {
+            inventory.applyQuery({ ...inventory.query, filters: {} });
           }}
-          onAdd={pantry.startAdd}
-          onClearSelection={inventory.clearSelection}
-          onDeleteSelected={() => {
-            pantry.startDelete(inventory.selected);
+          onFocusFallback={() => {
+            filterButton.current?.focus();
           }}
         />
       </div>
-      <AppliedFilters
-        filters={inventory.query.filters}
-        disabled={pantry.busy}
-        onEdit={(field) => {
-          setFilterEditor({ focusField: field });
-        }}
-        onRemove={(field) => {
-          const filters = removeLogicalFilter(inventory.query.filters, field);
-          inventory.applyQuery({ ...inventory.query, filters });
-        }}
-        onClear={() => {
-          inventory.applyQuery({ ...inventory.query, filters: {} });
-        }}
-      />
       <p role="status" aria-live="polite" className="sr-only">
         {inventory.loading
           ? "Loading items…"
@@ -182,6 +344,38 @@ export default function PantryPage() {
         aria-label="Food inventory"
         className="hidden min-h-0 flex-1 overflow-hidden rounded-panel border border-border-default bg-surface md:flex md:flex-col"
       >
+        {inventory.selected.length > 0 && (
+          <div
+            role="toolbar"
+            aria-label="Selected items"
+            className="flex min-h-14 items-center gap-3 border-b border-border-default bg-surface px-3 py-2"
+          >
+            <span className="mr-auto text-sm font-semibold" aria-live="polite">
+              {inventory.selected.length} selected
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                desktopSelectAll.current?.focus();
+                inventory.clearSelection();
+              }}
+              className="min-h-11 rounded-control px-3 text-sm font-medium hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-brand"
+            >
+              Clear selection
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                desktopBulkDelete.current = true;
+                pantry.startDelete(inventory.selected);
+              }}
+              className="inline-flex min-h-11 items-center gap-2 rounded-control border border-danger-border bg-surface px-3 text-sm font-medium text-danger hover:bg-danger-subtle focus-visible:outline-2 focus-visible:outline-brand"
+            >
+              <LuTrash2 aria-hidden="true" /> Delete (
+              {inventory.selected.length})
+            </button>
+          </div>
+        )}
         <div
           ref={desktopScroll}
           data-testid="desktop-inventory-scroll"
@@ -191,6 +385,7 @@ export default function PantryPage() {
           <InventoryTable
             items={inventory.items}
             selectedIds={inventory.selectedIds}
+            selectAllRef={desktopSelectAll}
             onSelectionChange={inventory.setSelectedIds}
             {...actions}
           />
@@ -215,6 +410,9 @@ export default function PantryPage() {
           onClose={() => {
             setFilterEditor(null);
           }}
+          onRestoreFocusFallback={() => {
+            filterButton.current?.focus();
+          }}
           onApply={(filters) => {
             inventory.applyQuery({ ...inventory.query, filters });
             setFilterEditor(null);
@@ -222,34 +420,19 @@ export default function PantryPage() {
         />
       )}
       <section
+        ref={mobileInventory}
         aria-label="Food inventory"
         className={`${mobileSelecting ? "pb-[calc(env(safe-area-inset-bottom)+6rem)]" : "pb-12"} md:hidden`}
       >
-        <div className="flex min-h-11 items-center justify-between gap-3 text-sm">
-          <p className="text-content-muted" aria-live="polite">
-            {mobileSelecting
-              ? `${inventory.selected.length} selected`
-              : inventory.total === null
+        {!mobileSelecting && (
+          <div className="flex min-h-11 items-center text-sm">
+            <p className="text-content-muted" aria-live="polite">
+              {inventory.total === null
                 ? "Loading items…"
                 : `${inventory.total} ${inventory.total === 1 ? "item" : "items"}`}
-          </p>
-          {(inventory.items.length > 0 || mobileSelecting) && (
-            <button
-              type="button"
-              onClick={() => {
-                if (mobileSelecting) {
-                  inventory.clearSelection();
-                  setSelecting(false);
-                } else {
-                  setSelecting(true);
-                }
-              }}
-              className="min-h-11 rounded-control px-2 text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-brand"
-            >
-              {mobileSelecting ? "Done selecting" : "Select"}
-            </button>
-          )}
-        </div>
+            </p>
+          </div>
+        )}
         {inventory.items.length > 0 && (
           <InventoryList
             items={inventory.items}
@@ -257,6 +440,29 @@ export default function PantryPage() {
             selectedIds={inventory.selectedIds}
             onSelectionChange={inventory.setSelectedIds}
             {...actions}
+            onEdit={(item) => {
+              pendingMobileActionFocus.current = {
+                kind: "edit",
+                id: item.id,
+                index: inventory.items.findIndex(
+                  (entry) => entry.id === item.id,
+                ),
+              };
+              pantry.startEdit(item);
+            }}
+            onDelete={(targets) => {
+              const target = targets[0];
+              if (target) {
+                pendingMobileActionFocus.current = {
+                  kind: "delete",
+                  id: target.id,
+                  index: inventory.items.findIndex(
+                    (item) => item.id === target.id,
+                  ),
+                };
+              }
+              pantry.startDelete(targets);
+            }}
           />
         )}
         {empty && (
@@ -279,6 +485,7 @@ export default function PantryPage() {
           className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-2 border-t border-border-default bg-surface px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-modal md:hidden"
         >
           <button
+            ref={mobileSelectAllButton}
             type="button"
             disabled={pantry.busy || inventory.items.length === 0}
             onClick={() => {
@@ -288,12 +495,18 @@ export default function PantryPage() {
             }}
             className="min-h-11 rounded-control px-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50"
           >
-            Select all
+            {inventory.hasMore ? "Select loaded" : "Select all"}
           </button>
           <button
             type="button"
             disabled={pantry.busy || inventory.selected.length === 0}
-            onClick={inventory.clearSelection}
+            onClick={() => {
+              (mobileSelectAllButton.current?.disabled
+                ? mobileDoneButton.current
+                : mobileSelectAllButton.current
+              )?.focus();
+              inventory.clearSelection();
+            }}
             className="min-h-11 rounded-control px-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50"
           >
             Clear
@@ -302,6 +515,7 @@ export default function PantryPage() {
             type="button"
             disabled={pantry.busy || inventory.selected.length === 0}
             onClick={() => {
+              mobileBulkDelete.current = true;
               pantry.startDelete(inventory.selected);
             }}
             className="inline-flex min-h-11 items-center gap-1 rounded-control border border-danger-border px-3 text-sm font-medium text-danger hover:bg-danger-subtle focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50"
@@ -333,7 +547,11 @@ export default function PantryPage() {
           item={pantry.editor.item}
           busy={pantry.busy}
           onSave={pantry.saveItem}
-          onClose={pantry.closeEditor}
+          onClose={() => {
+            pendingMobileActionFocus.current = null;
+            pantry.closeEditor();
+          }}
+          onRestoreFocusFallback={restoreDialogFocusFallback}
         />
       )}
       {pantry.deleteTargets && (
@@ -342,7 +560,14 @@ export default function PantryPage() {
           error={pantry.deleteError}
           busy={pantry.busy}
           onConfirm={pantry.deleteItems}
-          onClose={pantry.closeDelete}
+          onClose={() => {
+            pendingMobileActionFocus.current = null;
+            desktopBulkDelete.current = false;
+            mobileBulkDelete.current =
+              mobileBulkDelete.current && inventory.selected.length === 0;
+            pantry.closeDelete();
+          }}
+          onRestoreFocusFallback={restoreDialogFocusFallback}
         />
       )}
     </div>

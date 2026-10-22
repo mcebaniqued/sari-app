@@ -33,7 +33,7 @@ export default function MobileSortDialog({
               onChange={() => {
                 setDraft(choice.value);
               }}
-              className="size-6 accent-brand"
+              className="size-4 accent-brand"
             />
             {choice.label}
           </label>

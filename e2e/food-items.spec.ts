@@ -19,8 +19,8 @@ const manyItems = Array.from({ length: 65 }, (_, index) => ({
 async function chooseDesktopSort(page: Page, label: string) {
   await page.getByRole("button", { name: /Sort:/ }).click();
   await page
-    .getByRole("group", { name: "Sort pantry items" })
-    .getByRole("radio", { name: label })
+    .getByRole("menu", { name: "Sort pantry items" })
+    .getByRole("menuitemradio", { name: label })
     .click();
 }
 
@@ -110,6 +110,97 @@ test("desktop uses a semantic table with independent scrolling and loaded-only s
     ),
   ).toBe(true);
   await expectAccessible(page);
+});
+
+test("desktop bulk actions belong to the table container and retain focus through clearing and deletion", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 700 });
+  const api = await foodApi(page, manyItems);
+  await page.goto("/pantry");
+  await expect(nameCells(page)).toHaveCount(20);
+  const section = page.getByRole("region", { name: "Food inventory" });
+  const scroller = page.getByTestId("desktop-inventory-scroll");
+  const toolbar = section.getByRole("toolbar", { name: "Selected items" });
+  const heading = page.getByRole("columnheader", { name: "Food item" });
+  const selectAll = page.getByRole("checkbox", {
+    name: "Select all loaded items",
+  });
+  await expect(toolbar).toHaveCount(0);
+  const sectionBefore = await section.boundingBox();
+  const headingBefore = await heading.boundingBox();
+  expect(
+    Math.abs((headingBefore?.y ?? 0) - (sectionBefore?.y ?? 0)),
+  ).toBeLessThan(3);
+  await selectRow(page, manyItems[0]!.id);
+  await expect(toolbar.getByText("1 selected")).toBeVisible();
+  await expect(
+    toolbar.getByRole("button", { name: "Clear selection" }),
+  ).toBeVisible();
+  const sectionBounds = await section.boundingBox();
+  const toolbarBounds = await toolbar.boundingBox();
+  const headingBounds = await heading.boundingBox();
+  const mainToolbar = page.getByRole("group", { name: "Pantry actions" });
+  const mainBounds = await mainToolbar.boundingBox();
+  expect(
+    (sectionBounds?.y ?? 0) -
+      ((mainBounds?.y ?? 0) + (mainBounds?.height ?? 0)),
+  ).toBeGreaterThanOrEqual(14);
+  expect(toolbarBounds?.y).toBeGreaterThanOrEqual(sectionBounds?.y ?? 0);
+  expect(
+    (toolbarBounds?.y ?? 0) + (toolbarBounds?.height ?? 0),
+  ).toBeLessThanOrEqual((headingBounds?.y ?? 0) + 1);
+  const presentation = await toolbar.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      background: style.backgroundColor,
+      borderBottom: style.borderBottomWidth,
+      borderLeft: style.borderLeftWidth,
+      borderRight: style.borderRightWidth,
+      radius: style.borderTopLeftRadius,
+    };
+  });
+  expect(presentation.background).toBe(
+    await section.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    ),
+  );
+  expect(presentation.borderBottom).toBe("1px");
+  expect(presentation.borderLeft).toBe("0px");
+  expect(presentation.borderRight).toBe("0px");
+  expect(presentation.radius).toBe("0px");
+  const clear = toolbar.getByRole("button", { name: "Clear selection" });
+  const deleteSelected = toolbar.getByRole("button", { name: "Delete (1)" });
+  await clear.focus();
+  await page.keyboard.press("Tab");
+  await expect(deleteSelected).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(selectAll).toBeFocused();
+  await scroller.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect(nameCells(page)).toHaveCount(40);
+  expect(
+    Math.abs((await toolbar.boundingBox())!.y - (toolbarBounds?.y ?? 0)),
+  ).toBeLessThan(2);
+  await expect(clear).toBeVisible();
+  await clear.click();
+  await expect(toolbar).toHaveCount(0);
+  await expect(selectAll).toBeFocused();
+  await expect(selectAll).not.toBeChecked();
+  await selectRow(page, manyItems[0]!.id);
+  await toolbar.getByRole("button", { name: "Delete (1)" }).click();
+  const dialog = page.getByRole("dialog", { name: "Delete item?" });
+  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(
+    toolbar.getByRole("button", { name: "Delete (1)" }),
+  ).toBeFocused();
+  await toolbar.getByRole("button", { name: "Delete (1)" }).click();
+  await dialog.getByRole("button", { name: "Confirm delete" }).click();
+  await expect(toolbar).toHaveCount(0);
+  await expect(selectAll).toBeFocused();
+  expect(api.deleted).toEqual([manyItems[0]!.id]);
 });
 
 test("a tall desktop scroll area fetches another batch before the user can scroll", async ({
@@ -210,12 +301,12 @@ test("mobile sort and filters use draft Apply, Cancel, and Reset", async ({
   await expect(
     page.getByRole("list", { name: "Food inventory" }).getByRole("listitem"),
   ).toHaveCount(3);
-  await page.getByRole("button", { name: "Sort", exact: true }).click();
+  await page.getByRole("button", { name: /^Sort by:/ }).click();
   let dialog = page.getByRole("dialog", { name: "Sort items" });
   await dialog.getByRole("radio", { name: "Name: A to Z" }).check();
   await dialog.getByRole("button", { name: "Cancel" }).click();
   expect(api.queries.at(-1)?.get("sort")).toBe("[]");
-  await page.getByRole("button", { name: "Sort", exact: true }).click();
+  await page.getByRole("button", { name: /^Sort by:/ }).click();
   dialog = page.getByRole("dialog", { name: "Sort items" });
   await dialog.getByRole("radio", { name: "Name: A to Z" }).check();
   await dialog.getByRole("button", { name: "Apply" }).click();
@@ -371,13 +462,13 @@ test("applied chips edit and clear filters without losing search or sort", async
   const [search, add, sort, filter] = await Promise.all([
     toolbar.getByRole("searchbox").boundingBox(),
     toolbar.getByRole("button", { name: "Add item" }).boundingBox(),
-    toolbar.getByRole("button", { name: "Sort", exact: true }).boundingBox(),
+    toolbar.getByRole("button", { name: /^Sort by:/ }).boundingBox(),
     toolbar.getByRole("button", { name: "Filter", exact: true }).boundingBox(),
   ]);
   expect(Math.abs((search?.y ?? 0) - (add?.y ?? 0))).toBeLessThan(4);
   expect(Math.abs((sort?.y ?? 0) - (filter?.y ?? 0))).toBeLessThan(4);
   expect(sort?.y).toBeGreaterThan((search?.y ?? 0) + (search?.height ?? 0));
-  await page.getByRole("button", { name: "Sort", exact: true }).click();
+  await page.getByRole("button", { name: /^Sort by:/ }).click();
   await page
     .getByRole("dialog", { name: "Sort items" })
     .getByRole("radio", { name: "Name: A to Z" })
@@ -424,6 +515,7 @@ test("applied chips edit and clear filters without losing search or sort", async
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await chips.getByRole("button", { name: "Clear all" }).click();
   await expect(chips).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Filter" })).toBeFocused();
   await expect.poll(() => api.queries.at(-1)?.get("filters")).toBe("{}");
   expect(api.queries.at(-1)?.get("search")).toBe("a");
   expect(api.queries.at(-1)?.get("sort")).toContain('"name"');
@@ -443,7 +535,7 @@ test("mobile list, selection, item actions, and viewport changes share one resul
     ),
   ).toBe(true);
   await page.getByRole("button", { name: "Actions for Milk" }).click();
-  await list.getByRole("button", { name: "Edit" }).click();
+  await list.getByRole("button", { name: "Edit Milk" }).click();
   await expect(page.getByRole("dialog", { name: "Edit item" })).toBeVisible();
   await page
     .getByRole("dialog", { name: "Edit item" })
@@ -483,7 +575,7 @@ test("mobile selection exits cleanly and keeps deletion contextual", async ({
   );
   await list.getByRole("checkbox", { name: "Select Milk" }).check();
   await expect(
-    list.locator("..").getByText("1 selected", { exact: true }),
+    page.getByRole("heading", { level: 1, name: "1 selected" }),
   ).toBeVisible();
   const actions = page.getByRole("toolbar", { name: "Selected items" });
   await expect(
