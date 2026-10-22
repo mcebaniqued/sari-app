@@ -24,6 +24,7 @@ export default function DesktopSortControl({
     (choice) => choice.value === activeValue,
   );
   const activeChoice = SORT_CHOICES[activeIndex];
+  const activeLabel = activeChoice?.label ?? SORT_CHOICES[0]?.label ?? "";
 
   useEffect(() => {
     if (!open) {
@@ -61,17 +62,17 @@ export default function DesktopSortControl({
         ref={trigger}
         type="button"
         disabled={disabled}
-        aria-label={`Sort: ${activeChoice?.shortLabel ?? "Added: Newest"}`}
+        aria-label={`Sort: ${activeLabel}`}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         onClick={() => {
           setOpen((value) => !value);
         }}
-        className="inline-flex min-h-11 items-center gap-2 rounded-control border border-border-default bg-surface px-3 text-sm font-medium hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50"
+        className="inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-control border border-border-default bg-surface px-3 text-sm font-medium hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50"
       >
         <LuArrowDownUp aria-hidden="true" />
-        Sort
+        Sort: {activeLabel}
         <LuChevronDown aria-hidden="true" />
       </button>
       {open && (

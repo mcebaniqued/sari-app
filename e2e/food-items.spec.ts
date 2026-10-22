@@ -210,12 +210,12 @@ test("mobile sort and filters use draft Apply, Cancel, and Reset", async ({
   await expect(
     page.getByRole("list", { name: "Food inventory" }).getByRole("listitem"),
   ).toHaveCount(3);
-  await page.getByRole("button", { name: "Sort", exact: true }).click();
+  await page.getByRole("button", { name: /^Sort by:/ }).click();
   let dialog = page.getByRole("dialog", { name: "Sort items" });
   await dialog.getByRole("radio", { name: "Name: A to Z" }).check();
   await dialog.getByRole("button", { name: "Cancel" }).click();
   expect(api.queries.at(-1)?.get("sort")).toBe("[]");
-  await page.getByRole("button", { name: "Sort", exact: true }).click();
+  await page.getByRole("button", { name: /^Sort by:/ }).click();
   dialog = page.getByRole("dialog", { name: "Sort items" });
   await dialog.getByRole("radio", { name: "Name: A to Z" }).check();
   await dialog.getByRole("button", { name: "Apply" }).click();
@@ -371,13 +371,13 @@ test("applied chips edit and clear filters without losing search or sort", async
   const [search, add, sort, filter] = await Promise.all([
     toolbar.getByRole("searchbox").boundingBox(),
     toolbar.getByRole("button", { name: "Add item" }).boundingBox(),
-    toolbar.getByRole("button", { name: "Sort", exact: true }).boundingBox(),
+    toolbar.getByRole("button", { name: /^Sort by:/ }).boundingBox(),
     toolbar.getByRole("button", { name: "Filter", exact: true }).boundingBox(),
   ]);
   expect(Math.abs((search?.y ?? 0) - (add?.y ?? 0))).toBeLessThan(4);
   expect(Math.abs((sort?.y ?? 0) - (filter?.y ?? 0))).toBeLessThan(4);
   expect(sort?.y).toBeGreaterThan((search?.y ?? 0) + (search?.height ?? 0));
-  await page.getByRole("button", { name: "Sort", exact: true }).click();
+  await page.getByRole("button", { name: /^Sort by:/ }).click();
   await page
     .getByRole("dialog", { name: "Sort items" })
     .getByRole("radio", { name: "Name: A to Z" })

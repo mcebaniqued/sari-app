@@ -69,7 +69,7 @@ test("mobile list and action menu fit a narrow viewport", async ({ page }) => {
   ).toBeVisible();
   await expectAccessible(page);
   await page.keyboard.press("Escape");
-  const sort = page.getByRole("button", { name: "Sort", exact: true });
+  const sort = page.getByRole("button", { name: /^Sort by:/ });
   await sort.click();
   await expectAccessible(page);
   await page.keyboard.press("Escape");
@@ -280,7 +280,11 @@ for (const { width, sortName, actionOrder } of [
     sortName: "Sort: Added: Newest",
     actionOrder: ["sort", "filter", "add"],
   },
-  { width: 390, sortName: "Sort", actionOrder: ["add", "sort", "filter"] },
+  {
+    width: 390,
+    sortName: "Sort by: Added: Newest",
+    actionOrder: ["add", "sort", "filter"],
+  },
 ] as const) {
   test(`pantry toolbar follows the visible keyboard order at ${width}px`, async ({
     page,
@@ -455,7 +459,7 @@ test("mobile Edit returns focus to its item after Escape, Cancel, and save", asy
   await expect(dialog).toHaveCount(0);
   await expect(actions).toBeFocused();
 
-  await page.getByRole("button", { name: "Sort", exact: true }).click();
+  await page.getByRole("button", { name: /^Sort by:/ }).click();
   const sortDialog = page.getByRole("dialog", { name: "Sort items" });
   await sortDialog.getByRole("radio", { name: "Name: A to Z" }).check();
   await sortDialog.getByRole("button", { name: "Apply" }).click();

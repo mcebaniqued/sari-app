@@ -93,8 +93,7 @@ for (const width of [1280, 390, 320]) {
 
     await page
       .getByRole("button", {
-        name: width >= 768 ? /Sort:/ : "Sort",
-        exact: width < 768,
+        name: width >= 768 ? /^Sort:/ : /^Sort by:/,
       })
       .click();
     const sort = page
