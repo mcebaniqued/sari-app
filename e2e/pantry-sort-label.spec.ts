@@ -2,10 +2,10 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import { foodApi, milk, nameCells, test } from "./fixtures/pantry";
 
 const choices = [
-  { label: "Added: Newest", sort: [] },
-  { label: "Added: Oldest", sort: [{ colId: "createdAt", sort: "asc" }] },
   { label: "Expiration: Soonest", sort: [{ colId: "expiresOn", sort: "asc" }] },
   { label: "Expiration: Latest", sort: [{ colId: "expiresOn", sort: "desc" }] },
+  { label: "Added: Newest", sort: [{ colId: "createdAt", sort: "desc" }] },
+  { label: "Added: Oldest", sort: [{ colId: "createdAt", sort: "asc" }] },
   { label: "Name: A to Z", sort: [{ colId: "name", sort: "asc" }] },
   { label: "Name: Z to A", sort: [{ colId: "name", sort: "desc" }] },
   { label: "Quantity: Lowest", sort: [{ colId: "quantity", sort: "asc" }] },
@@ -90,29 +90,29 @@ test("desktop Sort shows only the applied choice while navigating and dismissing
   await expect(nameCells(page)).toHaveText(["Milk"]);
   const sort = page.getByRole("button", { name: /^Sort:/ });
   const menu = page.getByRole("menu", { name: "Sort pantry items" });
-  await expectSortLabel(sort, "Added: Newest", true);
+  await expectSortLabel(sort, "Expiration: Soonest", true);
   expect(JSON.parse(api.queries.at(-1)?.get("sort") ?? "null")).toEqual([]);
   const initialRequests = api.queries.length;
   await sort.focus();
   await page.keyboard.press("Enter");
   await expect(sort).toHaveAttribute("aria-expanded", "true");
-  await expectSortLabel(sort, "Added: Newest", true);
+  await expectSortLabel(sort, "Expiration: Soonest", true);
   await page.keyboard.press("ArrowDown");
   await expect(
-    menu.getByRole("menuitemradio", { name: "Added: Oldest" }),
+    menu.getByRole("menuitemradio", { name: "Expiration: Latest" }),
   ).toBeFocused();
-  await expectSortLabel(sort, "Added: Newest", true);
+  await expectSortLabel(sort, "Expiration: Soonest", true);
   expect(api.queries).toHaveLength(initialRequests);
   await page.keyboard.press("Escape");
   await expect(sort).toBeFocused();
   await expect(sort).toHaveAttribute("aria-expanded", "false");
-  await expectSortLabel(sort, "Added: Newest", true);
+  await expectSortLabel(sort, "Expiration: Soonest", true);
   expect(api.queries).toHaveLength(initialRequests);
   await page.keyboard.press("Space");
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Space");
   await expect(sort).toBeFocused();
-  await expectSortLabel(sort, "Added: Oldest", true);
+  await expectSortLabel(sort, "Expiration: Latest", true);
   await expect.poll(() => api.queries.length).toBe(initialRequests + 1);
   expect(JSON.parse(api.queries.at(-1)?.get("sort") ?? "null")).toEqual(
     choices[1].sort,
@@ -130,28 +130,28 @@ test("mobile Sort displays the applied choice while radio changes remain drafts"
   ).toBeVisible();
   const sort = page.getByRole("button", { name: /^Sort by:/ });
   const dialog = page.getByRole("dialog", { name: "Sort items" });
-  await expectSortLabel(sort, "Added: Newest", false);
+  await expectSortLabel(sort, "Expiration: Soonest", false);
   const initialRequests = api.queries.length;
   await sort.click();
   await expect(sort).toHaveAttribute("aria-expanded", "true");
-  await dialog.getByRole("radio", { name: "Added: Newest" }).focus();
+  await dialog.getByRole("radio", { name: "Expiration: Soonest" }).focus();
   for (let index = 0; index < 6; index++) {
     await page.keyboard.press("ArrowDown");
   }
   await expect(
     dialog.getByRole("radio", { name: "Quantity: Lowest" }),
   ).toBeChecked();
-  await expectSortLabel(sort, "Added: Newest", false);
+  await expectSortLabel(sort, "Expiration: Soonest", false);
   expect(api.queries).toHaveLength(initialRequests);
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(sort).toBeFocused();
-  await expectSortLabel(sort, "Added: Newest", false);
+  await expectSortLabel(sort, "Expiration: Soonest", false);
   expect(api.queries).toHaveLength(initialRequests);
   await sort.click();
   await dialog.getByRole("radio", { name: "Quantity: Lowest" }).check();
   await page.keyboard.press("Escape");
   await expect(sort).toBeFocused();
-  await expectSortLabel(sort, "Added: Newest", false);
+  await expectSortLabel(sort, "Expiration: Soonest", false);
   expect(api.queries).toHaveLength(initialRequests);
   await sort.click();
   await dialog.getByRole("radio", { name: "Quantity: Lowest" }).check();
@@ -163,15 +163,17 @@ test("mobile Sort displays the applied choice while radio changes remain drafts"
     choices[6].sort,
   );
   await sort.click();
-  await dialog.getByRole("radio", { name: "Added: Newest" }).check();
+  await dialog.getByRole("radio", { name: "Expiration: Soonest" }).check();
   await dialog.getByRole("button", { name: "Apply" }).click();
-  await expectSortLabel(sort, "Added: Newest", false);
+  await expectSortLabel(sort, "Expiration: Soonest", false);
   await expect.poll(() => api.queries.length).toBe(initialRequests + 2);
-  expect(JSON.parse(api.queries.at(-1)?.get("sort") ?? "null")).toEqual([]);
+  expect(JSON.parse(api.queries.at(-1)?.get("sort") ?? "null")).toEqual(
+    choices[0].sort,
+  );
   await sort.click();
   await dialog.getByRole("button", { name: "Apply" }).click();
   await expect(sort).toBeFocused();
-  await expectSortLabel(sort, "Added: Newest", false);
+  await expectSortLabel(sort, "Expiration: Soonest", false);
   expect(api.queries).toHaveLength(initialRequests + 2);
 });
 

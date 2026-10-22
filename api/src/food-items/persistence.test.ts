@@ -79,7 +79,7 @@ describe.skipIf(!testUri)("MongoDB food persistence", () => {
     expect(item).not.toHaveProperty("__v");
   });
 
-  it("persists defaults for a name-only request and lists the newest item first", async () => {
+  it("persists defaults for a name-only request and lists an undated item after dated items", async () => {
     const response = await agent
       .post("/api/v1/food-items")
       .send({ name: "Integration test eggs" });
@@ -88,7 +88,7 @@ describe.skipIf(!testUri)("MongoDB food persistence", () => {
     const item = foodItemSchema.parse(response.body);
     expect(item).toMatchObject({ quantity: 1, unit: "item", expiresOn: null });
     const listed = await agent.get("/api/v1/food-items");
-    expect(foodItemListSchema.parse(listed.body).items[0]).toEqual(item);
+    expect(foodItemListSchema.parse(listed.body).items.at(-1)).toEqual(item);
   });
 
   it("persists customary units on create and update without converting quantity", async () => {
@@ -304,6 +304,112 @@ describe.skipIf(!testUri)("MongoDB food persistence", () => {
       .query({ search: prefix, limit: 100, sort: tieSort });
     expect(foodItemListSchema.parse(ties.body).items.at(-1)?.id).toBe(
       literal._id.toHexString(),
+    );
+  });
+
+  it("orders expiration dates before missing dates across page boundaries", async () => {
+    const prefix = `Expiration-${new mongoose.Types.ObjectId().toHexString()}`;
+    const timestamp = new Date("2026-01-01T00:00:00.000Z");
+    const records = Array.from({ length: 26 }, (_, index) => ({
+      _id: new mongoose.Types.ObjectId(),
+      userId,
+      name: `${prefix} item ${index}`,
+      quantity: index + 1,
+      unit: "item",
+      ...(index === 25
+        ? {}
+        : {
+            expiresOn:
+              index >= 22
+                ? null
+                : `2028-01-${String(1 + Math.floor(index / 2)).padStart(2, "0")}`,
+          }),
+      createdAt: new Date(timestamp.getTime() + index * 1000),
+      updatedAt: timestamp,
+    }));
+    await FoodItemModel.collection.insertMany(records);
+    createdIds.push(...records.map((record) => record._id.toHexString()));
+    const otherUserItem = await FoodItemModel.collection.insertOne({
+      userId: new mongoose.Types.ObjectId().toHexString(),
+      name: `${prefix} other user`,
+      quantity: 100,
+      unit: "item",
+      expiresOn: "2027-01-01",
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+    createdIds.push(otherUserItem.insertedId.toHexString());
+
+    const dated = records.slice(0, 22);
+    const undated = records.slice(22);
+    const byDate = (direction: 1 | -1) =>
+      [
+        ...dated.sort(
+          (left, right) =>
+            direction *
+            ((left.expiresOn ?? "").localeCompare(right.expiresOn ?? "") ||
+              left._id.toHexString().localeCompare(right._id.toHexString())),
+        ),
+        ...undated.sort(
+          (left, right) =>
+            direction *
+            left._id.toHexString().localeCompare(right._id.toHexString()),
+        ),
+      ].map((record) => record._id.toHexString());
+    const expectedSoonest = byDate(1);
+    const expectedLatest = byDate(-1);
+
+    for (const [sort, expected] of [
+      [undefined, expectedSoonest],
+      ["[]", expectedSoonest],
+      [JSON.stringify([{ colId: "expiresOn", sort: "asc" }]), expectedSoonest],
+      [JSON.stringify([{ colId: "expiresOn", sort: "desc" }]), expectedLatest],
+    ] as const) {
+      const pages = await Promise.all(
+        [0, 20].map((start) =>
+          agent.get("/api/v1/food-items").query({
+            search: prefix,
+            start,
+            limit: 20,
+            ...(sort === undefined ? {} : { sort }),
+          }),
+        ),
+      );
+      expect(pages.map((page) => page.status)).toEqual([200, 200]);
+      const lists = pages.map((page) => foodItemListSchema.parse(page.body));
+      expect(lists.map((list) => list.total)).toEqual([26, 26]);
+      expect(
+        lists.flatMap((list) => list.items.map((item) => item.id)),
+      ).toEqual(expected);
+      expect(lists[1]?.items.at(-1)?.expiresOn).toBeNull();
+    }
+
+    const addedNewest = await agent.get("/api/v1/food-items").query({
+      search: prefix,
+      limit: 100,
+      sort: JSON.stringify([{ colId: "createdAt", sort: "desc" }]),
+    });
+    expect(
+      foodItemListSchema.parse(addedNewest.body).items.map((item) => item.id),
+    ).toEqual([...records].reverse().map((record) => record._id.toHexString()));
+
+    const filtered = await agent.get("/api/v1/food-items").query({
+      search: prefix,
+      sort: JSON.stringify([{ colId: "expiresOn", sort: "asc" }]),
+      filters: JSON.stringify({
+        quantity: { filterType: "number", type: "greaterThan", filter: 20 },
+      }),
+    });
+    expect(filtered.status).toBe(200);
+    const filteredList = foodItemListSchema.parse(filtered.body);
+    expect(filteredList.total).toBe(6);
+    const filteredIds = new Set(
+      records
+        .filter((record) => record.quantity > 20)
+        .map((record) => record._id.toHexString()),
+    );
+    expect(filteredList.items.map((item) => item.id)).toEqual(
+      expectedSoonest.filter((id) => filteredIds.has(id)),
     );
   });
 });

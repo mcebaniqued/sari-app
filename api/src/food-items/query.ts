@@ -162,10 +162,16 @@ export function foodMongoQuery(query: FoodItemQuery) {
       sort[item.colId] = item.sort === "asc" ? 1 : -1;
     }
   } else {
-    sort.createdAt = -1;
+    sort.expiresOn = 1;
   }
+  const expirationFirst =
+    query.sort.length === 0 || query.sort[0]?.colId === "expiresOn";
   // Deterministic ties keep page boundaries stable when several values are equal.
-  sort._id = -1;
+  sort._id = expirationFirst ? (sort.expiresOn ?? 1) : -1;
 
-  return { filter: clauses.length ? { $and: clauses } : {}, sort };
+  return {
+    filter: clauses.length ? { $and: clauses } : {},
+    sort,
+    expirationFirst,
+  };
 }

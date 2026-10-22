@@ -6,16 +6,6 @@ export const SORT_CHOICES: {
   sort: FoodItemQuery["sort"];
 }[] = [
   {
-    value: "default",
-    label: "Added: Newest",
-    sort: [],
-  },
-  {
-    value: "createdAt-asc",
-    label: "Added: Oldest",
-    sort: [{ colId: "createdAt", sort: "asc" }],
-  },
-  {
     value: "expiresOn-asc",
     label: "Expiration: Soonest",
     sort: [{ colId: "expiresOn", sort: "asc" }],
@@ -24,6 +14,16 @@ export const SORT_CHOICES: {
     value: "expiresOn-desc",
     label: "Expiration: Latest",
     sort: [{ colId: "expiresOn", sort: "desc" }],
+  },
+  {
+    value: "createdAt-desc",
+    label: "Added: Newest",
+    sort: [{ colId: "createdAt", sort: "desc" }],
+  },
+  {
+    value: "createdAt-asc",
+    label: "Added: Oldest",
+    sort: [{ colId: "createdAt", sort: "asc" }],
   },
   {
     value: "name-asc",
@@ -59,12 +59,5 @@ export const SORT_CHOICES: {
 
 export function sortChoiceValue(sort: FoodItemQuery["sort"]) {
   const first = sort[0];
-  if (
-    sort.length === 1 &&
-    first?.colId === "createdAt" &&
-    first.sort === "desc"
-  ) {
-    return "default";
-  }
-  return first ? `${first.colId}-${first.sort}` : "default";
+  return first ? `${first.colId}-${first.sort}` : "expiresOn-asc";
 }

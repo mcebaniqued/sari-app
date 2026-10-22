@@ -187,7 +187,6 @@ test("Amount filters the full stored inventory using an exact unit and inclusive
     .click();
   await expect(page).toHaveURL(/\/pantry$/);
   const items = [
-    { name: "Three items", quantity: 3, unit: "item" },
     { name: "Two ounces", quantity: 2, unit: "oz" },
     { name: "Five ounces", quantity: 5, unit: "oz" },
     { name: "Three pounds", quantity: 3, unit: "lb" },
@@ -196,8 +195,10 @@ test("Amount filters the full stored inventory using an exact unit and inclusive
       quantity: 3,
       unit: "kg",
     })),
+    { name: "Three items", quantity: 3, unit: "item" },
   ];
-  // Create matching items first so the newest-first initial batch contains only other units.
+  // Create the matching item last so the expiration-first initial batch of
+  // undated entries contains only other units.
   for (const item of items) {
     const response = await context.request.post("/api/v1/food-items", {
       data: item,
@@ -227,8 +228,8 @@ test("Amount filters the full stored inventory using an exact unit and inclusive
   await dialog.getByLabel("Unit").selectOption("oz");
   await dialog.getByRole("button", { name: "Apply" }).click();
   await expect(page.locator('table tbody th[scope="row"]')).toHaveText([
-    "Five ounces",
     "Two ounces",
+    "Five ounces",
   ]);
   await page.getByRole("button", { name: "Remove Amount filter" }).click();
   await expect(page.locator('table tbody th[scope="row"]')).toHaveCount(20);

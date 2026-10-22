@@ -14,7 +14,7 @@ export function foodItemDto(document: InstanceType<typeof FoodItemModel>) {
     name: document.name,
     quantity: document.quantity,
     unit: document.unit,
-    expiresOn: document.expiresOn,
+    expiresOn: document.expiresOn ?? null,
     productId: document.productId?.toHexString() ?? null,
     barcode: document.barcode,
     createdAt: document.createdAt.toISOString(),

@@ -32,6 +32,10 @@ const foodItemSchema = new Schema(
 
 foodItemSchema.index({ userId: 1, createdAt: -1, _id: -1 });
 foodItemSchema.index(
+  { userId: 1, expiresOn: 1, _id: 1 },
+  { collation: { locale: "en", strength: 2 } },
+);
+foodItemSchema.index(
   { userId: 1, creationKey: 1 },
   {
     unique: true,

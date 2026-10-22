@@ -134,17 +134,49 @@ foodItemsRouter.get("/", async (req, res) => {
   }
 
   const { start, limit } = result.data;
-  const { filter: queryFilter, sort } = foodMongoQuery(result.data);
+  const {
+    filter: queryFilter,
+    sort,
+    expirationFirst,
+  } = foodMongoQuery(result.data);
   const filter = { ...queryFilter, userId: res.locals.userId };
-  const [documents, total] = await Promise.all([
-    FoodItemModel.find(filter)
+  const findPage = (pageFilter: typeof filter, offset: number, size: number) =>
+    FoodItemModel.find(pageFilter)
       .collation({ locale: "en", strength: 2 })
       .sort(sort)
-      .skip(start)
-      .limit(limit)
-      .maxTimeMS(5000),
-    FoodItemModel.countDocuments(filter).maxTimeMS(5000),
-  ]);
+      .skip(offset)
+      .limit(size)
+      .maxTimeMS(5000);
+
+  let documents: Awaited<ReturnType<typeof findPage>>;
+  let total: number;
+  if (expirationFirst) {
+    // MongoDB sorts null before strings in ascending order. Query the two
+    // indexed segments separately so undated items remain last on every page.
+    const datedFilter = { ...filter, expiresOn: { $type: "string" as const } };
+    const undatedFilter = { ...filter, expiresOn: null };
+    const [matchingTotal, datedCount] = await Promise.all([
+      FoodItemModel.countDocuments(filter).maxTimeMS(5000),
+      FoodItemModel.countDocuments(datedFilter).maxTimeMS(5000),
+    ]);
+    total = matchingTotal;
+    const datedLimit = Math.min(limit, Math.max(datedCount - start, 0));
+    const undatedLimit = limit - datedLimit;
+    const [dated, undated] = await Promise.all([
+      datedLimit
+        ? findPage(datedFilter, start, datedLimit)
+        : Promise.resolve([]),
+      undatedLimit
+        ? findPage(undatedFilter, Math.max(start - datedCount, 0), undatedLimit)
+        : Promise.resolve([]),
+    ]);
+    documents = [...dated, ...undated];
+  } else {
+    [documents, total] = await Promise.all([
+      findPage(filter, start, limit),
+      FoodItemModel.countDocuments(filter).maxTimeMS(5000),
+    ]);
+  }
   res.json({ items: documents.map(foodItemDto), total, start, limit });
 });
 
