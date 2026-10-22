@@ -24,7 +24,7 @@ test("table, filter dialog, editor, and confirmation are keyboard accessible", a
   await expect(
     page
       .getByRole("menu", { name: "Sort pantry items" })
-      .getByRole("menuitemradio", { name: "Added: Newest" }),
+      .getByRole("menuitemradio", { name: "Expiration: Soonest" }),
   ).toBeFocused();
   await expectAccessible(page);
   await page.keyboard.press("Escape");
@@ -109,13 +109,13 @@ test("desktop sort navigation waits for deliberate selection", async ({
   await page.keyboard.press("Enter");
   await expect(sort).toHaveAttribute("aria-expanded", "true");
   const menu = page.getByRole("menu", { name: "Sort pantry items" });
-  const applied = menu.getByRole("menuitemradio", { name: "Added: Newest" });
+  const applied = menu.getByRole("menuitemradio", {
+    name: "Expiration: Soonest",
+  });
   await expect(applied).toBeFocused();
   await expect(applied).toHaveAttribute("aria-checked", "true");
 
   for (const label of [
-    "Added: Oldest",
-    "Expiration: Soonest",
     "Expiration: Latest",
     "Name: A to Z",
     "Name: Z to A",
@@ -143,7 +143,9 @@ test("desktop sort navigation waits for deliberate selection", async ({
     menu.getByRole("menuitemradio", { name: "Quantity: Highest" }),
   ).toBeFocused();
   await page.keyboard.press("Home");
-  await expect(applied).toBeFocused();
+  await expect(
+    menu.getByRole("menuitemradio", { name: "Added: Newest" }),
+  ).toBeFocused();
   await page.keyboard.press("End");
   await expect(
     menu.getByRole("menuitemradio", { name: "Unit: Z to A" }),
@@ -183,11 +185,11 @@ test("desktop sort arrows do not commit or dismiss a choice", async ({
   await page.keyboard.press("ArrowDown");
   await expect(
     page
-      .getByRole("radio", { name: "Added: Oldest" })
-      .or(page.getByRole("menuitemradio", { name: "Added: Oldest" })),
+      .getByRole("radio", { name: "Expiration: Latest" })
+      .or(page.getByRole("menuitemradio", { name: "Expiration: Latest" })),
   ).toBeFocused();
   await expect(sort).toHaveAttribute("aria-expanded", "true");
-  await expect(sort).toHaveAccessibleName("Sort: Added: Newest");
+  await expect(sort).toHaveAccessibleName("Sort: Expiration: Soonest");
   expect(api.queries).toHaveLength(initialRequests);
 });
 
@@ -239,7 +241,7 @@ test("desktop Sort trigger closes an open menu without reopening or requesting",
   await page.goto("/pantry");
   await expect(nameCells(page)).toHaveText(["Milk"]);
   const initialRequests = api.queries.length;
-  const sort = page.getByRole("button", { name: "Sort: Added: Newest" });
+  const sort = page.getByRole("button", { name: "Sort: Expiration: Soonest" });
   const menu = page.getByRole("menu", { name: "Sort pantry items" });
 
   await sort.click();
@@ -254,7 +256,7 @@ test("desktop Sort trigger closes an open menu without reopening or requesting",
   await sort.click();
   await page.keyboard.press("ArrowDown");
   await expect(
-    menu.getByRole("menuitemradio", { name: "Added: Oldest" }),
+    menu.getByRole("menuitemradio", { name: "Expiration: Latest" }),
   ).toBeFocused();
   await sort.click();
   await expect(menu).toHaveCount(0);
@@ -277,12 +279,12 @@ test("desktop Sort trigger closes an open menu without reopening or requesting",
 for (const { width, sortName, actionOrder } of [
   {
     width: 1280,
-    sortName: "Sort: Added: Newest",
+    sortName: "Sort: Expiration: Soonest",
     actionOrder: ["sort", "filter", "add"],
   },
   {
     width: 390,
-    sortName: "Sort by: Added: Newest",
+    sortName: "Sort by: Expiration: Soonest",
     actionOrder: ["add", "sort", "filter"],
   },
 ] as const) {

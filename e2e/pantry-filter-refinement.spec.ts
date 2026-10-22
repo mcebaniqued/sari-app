@@ -106,8 +106,8 @@ for (const width of [1280, 390, 320]) {
     );
     await expect(
       sort
-        .getByRole("menuitemradio", { name: "Added: Newest" })
-        .or(sort.getByRole("radio", { name: "Added: Newest" })),
+        .getByRole("menuitemradio", { name: "Expiration: Soonest" })
+        .or(sort.getByRole("radio", { name: "Expiration: Soonest" })),
     ).toBeChecked();
     await expect(
       sort

@@ -6,9 +6,9 @@ export const SORT_CHOICES: {
   sort: FoodItemQuery["sort"];
 }[] = [
   {
-    value: "default",
+    value: "createdAt-desc",
     label: "Added: Newest",
-    sort: [],
+    sort: [{ colId: "createdAt", sort: "desc" }],
   },
   {
     value: "createdAt-asc",
@@ -59,12 +59,5 @@ export const SORT_CHOICES: {
 
 export function sortChoiceValue(sort: FoodItemQuery["sort"]) {
   const first = sort[0];
-  if (
-    sort.length === 1 &&
-    first?.colId === "createdAt" &&
-    first.sort === "desc"
-  ) {
-    return "default";
-  }
-  return first ? `${first.colId}-${first.sort}` : "default";
+  return first ? `${first.colId}-${first.sort}` : "expiresOn-asc";
 }
