@@ -72,7 +72,7 @@ export default function DesktopSortControl({
         className="inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-control border border-border-default bg-surface px-3 text-sm font-medium hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50"
       >
         <LuArrowDownUp aria-hidden="true" />
-        Sort: {activeLabel}
+        {activeLabel}
         <LuChevronDown aria-hidden="true" />
       </button>
       {open && (
