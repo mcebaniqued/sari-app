@@ -78,5 +78,5 @@ test("expiration status refreshes at midnight and when the pantry regains focus"
 
   await page.clock.setFixedTime(new Date("2026-10-23T20:00:00Z"));
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-  await expect(row).toContainText("1 days past date");
+  await expect(row).toContainText("1 day past date");
 });

@@ -7,6 +7,8 @@ describe("expiration status by local calendar date", () => {
   it.each([
     [null, "No date", "none"],
     ["2026-10-18", "3 days past date", "past"],
+    ["2026-10-20", "1 day past date", "past"],
+    ["2026-09-28", "23 days past date", "past"],
     ["2026-10-21", "Today", "soon"],
     ["2026-10-22", "Tomorrow", "soon"],
     ["2026-10-23", "In 2 days", "upcoming"],

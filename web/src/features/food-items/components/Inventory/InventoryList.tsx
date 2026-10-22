@@ -75,7 +75,10 @@ export default function InventoryList({
       className="divide-y divide-border-default rounded-panel border border-border-default bg-surface"
     >
       {items.map((item) => (
-        <li key={item.id} className="flex min-w-0 items-start gap-3 px-4 py-3">
+        <li
+          key={item.id}
+          className="flex min-w-0 flex-wrap items-start gap-2 px-4 py-3"
+        >
           <div className="min-w-0 flex-1">
             <p className="wrap-anywhere font-medium">{item.name}</p>
             <p className="mt-1 text-sm text-content-muted">
@@ -87,7 +90,7 @@ export default function InventoryList({
               </p>
             )}
           </div>
-          <div className="min-w-0 max-w-28 shrink-0 pt-0.5 text-right">
+          <div className="max-w-full shrink-0 pt-0.5 text-right">
             <ExpirationStatus expiresOn={item.expiresOn} now={now} />
           </div>
           <div

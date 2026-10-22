@@ -35,11 +35,11 @@ export default function InventoryTable({
       <caption className="sr-only">Food inventory</caption>
       <colgroup>
         <col className="w-12" />
+        <col className="w-1/3" />
+        <col className="w-24" />
         <col />
-        <col className="w-34" />
-        <col className="w-40" />
-        <col className="hidden w-36 lg:table-column" />
-        <col className="w-28" />
+        <col className="hidden w-28 lg:table-column" />
+        <col className="w-24" />
       </colgroup>
       <thead className="sticky top-0 z-10 bg-surface-subtle text-left text-content-muted">
         <tr>
@@ -119,12 +119,14 @@ export default function InventoryTable({
               {item.quantity} {item.unit === "item" ? "items" : item.unit}
             </td>
             <td className="px-3 py-2">
-              <ExpirationStatus expiresOn={item.expiresOn} now={now} />
-              {item.expiresOn && (
-                <span className="block text-xs text-content-muted">
-                  {formatDate(item.expiresOn)}
-                </span>
-              )}
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <ExpirationStatus expiresOn={item.expiresOn} now={now} />
+                {item.expiresOn && (
+                  <span className="text-xs text-content-muted">
+                    {formatDate(item.expiresOn)}
+                  </span>
+                )}
+              </div>
             </td>
             <td className="hidden px-3 py-2 lg:table-cell">
               {formatDate(item.createdAt)}

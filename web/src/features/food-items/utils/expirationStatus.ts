@@ -18,7 +18,11 @@ export function expirationStatus(
   const difference = Math.round((targetDay - localDay) / 86_400_000);
 
   if (difference < 0) {
-    return { text: `${-difference} days past date`, treatment: "past" };
+    const daysPast = -difference;
+    return {
+      text: `${daysPast} ${daysPast === 1 ? "day" : "days"} past date`,
+      treatment: "past",
+    };
   }
   if (difference === 0) {
     return { text: "Today", treatment: "soon" };
