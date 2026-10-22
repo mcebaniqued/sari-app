@@ -35,7 +35,11 @@ function stubFoodFetch(
   let loads = 0;
   vi.stubGlobal(
     "matchMedia",
-    vi.fn(() => ({ matches: false })),
+    vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
   );
   vi.stubGlobal(
     "fetch",

@@ -15,7 +15,7 @@ const choices = [
 ] as const;
 
 async function expectSortLabel(sort: Locator, label: string, desktop: boolean) {
-  await expect(sort).toHaveText(desktop ? `Sort: ${label}` : label);
+  await expect(sort).toHaveText(label);
   await expect(sort).toHaveAccessibleName(
     desktop ? `Sort: ${label}` : `Sort by: ${label}`,
   );
