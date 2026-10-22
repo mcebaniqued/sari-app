@@ -3,9 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import { LuEllipsis } from "react-icons/lu";
 import { formatDate } from "@/utils/date";
 import type { FoodItemActions } from "../../types/foodItems";
+import ExpirationStatus from "./ExpirationStatus";
 
 interface InventoryListProps extends FoodItemActions {
   items: FoodItem[];
+  now: Date;
   selecting: boolean;
   selectedIds: Set<string>;
   onSelectionChange: (ids: Set<string>) => void;
@@ -13,6 +15,7 @@ interface InventoryListProps extends FoodItemActions {
 
 export default function InventoryList({
   items,
+  now,
   selecting,
   selectedIds,
   onSelectionChange,
@@ -78,11 +81,14 @@ export default function InventoryList({
             <p className="mt-1 text-sm text-content-muted">
               {item.quantity} {item.unit === "item" ? "items" : item.unit}
             </p>
-            <p className="mt-1 text-sm text-content-muted">
-              {item.expiresOn
-                ? `Expires ${formatDate(item.expiresOn)}`
-                : "No expiration date"}
-            </p>
+            {item.expiresOn && (
+              <p className="mt-1 text-sm text-content-muted">
+                {formatDate(item.expiresOn)}
+              </p>
+            )}
+          </div>
+          <div className="min-w-0 max-w-28 shrink-0 pt-0.5 text-right">
+            <ExpirationStatus expiresOn={item.expiresOn} now={now} />
           </div>
           <div
             ref={openId === item.id ? openAction : undefined}
