@@ -13,10 +13,12 @@ import InventoryList from "../components/Inventory/InventoryList";
 import InventoryTable from "../components/Inventory/InventoryTable";
 import PantryToolbar from "../components/Inventory/PantryToolbar";
 import { useInventory } from "../hooks/useInventory";
+import { useLocalDay } from "../hooks/useLocalDay";
 import { usePantryItems } from "../hooks/usePantryItems";
 
 export default function PantryPage() {
   const inventory = useInventory();
+  const localDay = useLocalDay();
   const pantry = usePantryItems(inventory.invalidate);
   const [selecting, setSelecting] = useState(false);
   const [filterEditor, setFilterEditor] = useState<{
@@ -384,6 +386,7 @@ export default function PantryPage() {
         >
           <InventoryTable
             items={inventory.items}
+            now={localDay}
             selectedIds={inventory.selectedIds}
             selectAllRef={desktopSelectAll}
             onSelectionChange={inventory.setSelectedIds}
@@ -436,6 +439,7 @@ export default function PantryPage() {
         {inventory.items.length > 0 && (
           <InventoryList
             items={inventory.items}
+            now={localDay}
             selecting={mobileSelecting}
             selectedIds={inventory.selectedIds}
             onSelectionChange={inventory.setSelectedIds}

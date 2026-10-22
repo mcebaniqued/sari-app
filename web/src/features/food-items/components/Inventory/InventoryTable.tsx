@@ -2,10 +2,12 @@ import type { FoodItem } from "@sari/contracts";
 import { type RefObject, useEffect } from "react";
 import { formatDate } from "@/utils/date";
 import type { FoodItemActions } from "../../types/foodItems";
+import ExpirationStatus from "./ExpirationStatus";
 import FoodItemRowActions from "./FoodItemRowActions";
 
 interface InventoryTableProps extends FoodItemActions {
   items: FoodItem[];
+  now: Date;
   selectedIds: Set<string>;
   selectAllRef: RefObject<HTMLInputElement | null>;
   onSelectionChange: (ids: Set<string>) => void;
@@ -13,6 +15,7 @@ interface InventoryTableProps extends FoodItemActions {
 
 export default function InventoryTable({
   items,
+  now,
   selectedIds,
   selectAllRef,
   onSelectionChange,
@@ -32,11 +35,11 @@ export default function InventoryTable({
       <caption className="sr-only">Food inventory</caption>
       <colgroup>
         <col className="w-12" />
+        <col className="w-1/3" />
+        <col className="w-24" />
         <col />
-        <col className="w-34" />
-        <col className="w-40" />
-        <col className="hidden w-36 lg:table-column" />
-        <col className="w-28" />
+        <col className="hidden w-28 lg:table-column" />
+        <col className="w-24" />
       </colgroup>
       <thead className="sticky top-0 z-10 bg-surface-subtle text-left text-content-muted">
         <tr>
@@ -67,7 +70,7 @@ export default function InventoryTable({
             Quantity
           </th>
           <th scope="col" className="border-b border-border-default px-3 py-2">
-            Expiration date
+            Expiration
           </th>
           <th
             scope="col"
@@ -116,9 +119,18 @@ export default function InventoryTable({
               {item.quantity} {item.unit === "item" ? "items" : item.unit}
             </td>
             <td className="px-3 py-2">
-              {item.expiresOn
-                ? formatDate(item.expiresOn)
-                : "No expiration date"}
+              <div className="flex items-center gap-3 whitespace-nowrap">
+                <ExpirationStatus
+                  expiresOn={item.expiresOn}
+                  now={now}
+                  prominentLater
+                />
+                {item.expiresOn && (
+                  <span className="text-xs text-content-muted">
+                    {formatDate(item.expiresOn)}
+                  </span>
+                )}
+              </div>
             </td>
             <td className="hidden px-3 py-2 lg:table-cell">
               {formatDate(item.createdAt)}
