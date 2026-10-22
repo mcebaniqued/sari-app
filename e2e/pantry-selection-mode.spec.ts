@@ -16,6 +16,31 @@ async function expectNoHorizontalOverflow(page: Page) {
   ).toBe(true);
 }
 
+function longInventory() {
+  return Array.from({ length: 40 }, (_, index) => ({
+    ...milk,
+    id: index.toString(16).padStart(24, "0"),
+    name: `Food ${index + 1}`,
+  }));
+}
+
+async function expectGlobalHeaderOffscreen(page: Page) {
+  const globalHeader = page.locator("header").first();
+
+  await expect
+    .poll(async () => {
+      const bounds = await globalHeader.boundingBox();
+      return (bounds?.y ?? 0) + (bounds?.height ?? 0);
+    })
+    .toBeLessThanOrEqual(1);
+}
+
+async function scrollDownPastHeader(page: Page) {
+  await page.mouse.wheel(0, 1_200);
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(800);
+  await expectGlobalHeaderOffscreen(page);
+}
+
 async function verifyMobileSelectionMode(page: Page, width: number) {
   await page.setViewportSize({ width, height: 700 });
   const api = await foodApi(page, [milk, rice, bananas]);
@@ -155,15 +180,133 @@ test("mobile contextual selection has no automated accessibility violations", as
   await expectAccessible(page);
 });
 
+test("entering mobile selection preserves a hidden global header and scroll position", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 500 });
+  await foodApi(page, longInventory());
+  await page.goto("/pantry");
+  const list = page.getByRole("list", { name: "Food inventory" });
+  await expect(list.getByRole("listitem")).toHaveCount(20);
+  await scrollDownPastHeader(page);
+  await page.mouse.wheel(0, 10_000);
+  await expect(list.getByRole("listitem")).toHaveCount(40);
+  await page.mouse.wheel(0, 10_000);
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        distanceFromBottom:
+          document.documentElement.scrollHeight - innerHeight - scrollY,
+        y: scrollY,
+      })),
+    )
+    .toMatchObject({ distanceFromBottom: 0 });
+  await expectGlobalHeaderOffscreen(page);
+  const select = page.getByRole("button", { name: "Select", exact: true });
+  await expect(select).toBeInViewport();
+  const before = await page.evaluate(() => scrollY);
+
+  await select.click();
+
+  const done = page.getByRole("button", { name: "Done selecting" });
+  await expect(done).toBeFocused();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "0 selected" }),
+  ).toBeVisible();
+  const after = await page.evaluate(() => {
+    const header = document.querySelector("header")?.getBoundingClientRect();
+    return {
+      headerBottom: (header?.y ?? 0) + (header?.height ?? 0),
+      max: document.documentElement.scrollHeight - innerHeight,
+      y: scrollY,
+    };
+  });
+  expect(
+    after.headerBottom,
+    JSON.stringify({ before, after }),
+  ).toBeLessThanOrEqual(1);
+  await expect
+    .poll(() => page.evaluate(() => scrollY))
+    .toBeGreaterThanOrEqual(before - 150);
+  await expect(
+    page.getByRole("toolbar", { name: "Selected items" }),
+  ).toBeInViewport();
+});
+
+test("exiting mobile selection preserves a hidden global header and scroll position", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 600 });
+  await foodApi(page, longInventory());
+  await page.goto("/pantry");
+  const list = page.getByRole("list", { name: "Food inventory" });
+  await expect(list.getByRole("listitem")).toHaveCount(20);
+  await page.getByRole("button", { name: "Select", exact: true }).click();
+  await scrollDownPastHeader(page);
+  const done = page.getByRole("button", { name: "Done selecting" });
+  const before = await page.evaluate(() => scrollY);
+
+  await done.click();
+
+  const select = page.getByRole("button", { name: "Select", exact: true });
+  await expect(select).toBeFocused();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "My Pantry" }),
+  ).toBeVisible();
+  await expectGlobalHeaderOffscreen(page);
+  await expect
+    .poll(() => page.evaluate(() => scrollY))
+    .toBeGreaterThanOrEqual(before - 150);
+});
+
+test("contextual selection preserves intentional global-header scrolling", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 600 });
+  await foodApi(page, longInventory());
+  await page.goto("/pantry");
+  const list = page.getByRole("list", { name: "Food inventory" });
+  await expect(list.getByRole("listitem")).toHaveCount(20);
+  await page.getByRole("button", { name: "Select", exact: true }).click();
+  const done = page.getByRole("button", { name: "Done selecting" });
+  await scrollDownPastHeader(page);
+
+  await page.mouse.wheel(0, -250);
+  await expect
+    .poll(async () => {
+      const bounds = await page.locator("header").first().boundingBox();
+      return bounds?.y ?? -100;
+    })
+    .toBeGreaterThanOrEqual(-1);
+  const globalHeader = await page.locator("header").first().boundingBox();
+  const contextualHeader = await done.locator("../..").boundingBox();
+  expect(contextualHeader?.y ?? 0).toBeGreaterThanOrEqual(
+    (globalHeader?.y ?? 0) + (globalHeader?.height ?? 0) - 1,
+  );
+
+  await page.mouse.wheel(0, 250);
+  await expectGlobalHeaderOffscreen(page);
+  await list.getByRole("checkbox", { name: "Select Food 10" }).check();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "1 selected" }),
+  ).toBeVisible();
+  await expectGlobalHeaderOffscreen(page);
+
+  await page.mouse.wheel(0, -2_000);
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeLessThan(80);
+  await expect
+    .poll(async () => {
+      const bounds = await page.locator("header").first().boundingBox();
+      return bounds?.y ?? -100;
+    })
+    .toBeGreaterThanOrEqual(-1);
+});
+
 test("mobile contextual header and bottom actions stay usable during long scrolling", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 500 });
-  const items = Array.from({ length: 40 }, (_, index) => ({
-    ...milk,
-    id: index.toString(16).padStart(24, "0"),
-    name: `Food ${index + 1}`,
-  }));
+  const items = longInventory();
   const api = await foodApi(page, items);
   await page.goto("/pantry");
   const list = page.getByRole("list", { name: "Food inventory" });
