@@ -2,10 +2,10 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import { foodApi, milk, nameCells, test } from "./fixtures/pantry";
 
 const choices = [
-  { label: "Added: Newest", sort: [{ colId: "createdAt", sort: "desc" }] },
-  { label: "Added: Oldest", sort: [{ colId: "createdAt", sort: "asc" }] },
   { label: "Expiration: Soonest", sort: [{ colId: "expiresOn", sort: "asc" }] },
   { label: "Expiration: Latest", sort: [{ colId: "expiresOn", sort: "desc" }] },
+  { label: "Added: Newest", sort: [{ colId: "createdAt", sort: "desc" }] },
+  { label: "Added: Oldest", sort: [{ colId: "createdAt", sort: "asc" }] },
   { label: "Name: A to Z", sort: [{ colId: "name", sort: "asc" }] },
   { label: "Name: Z to A", sort: [{ colId: "name", sort: "desc" }] },
   { label: "Quantity: Lowest", sort: [{ colId: "quantity", sort: "asc" }] },
@@ -115,7 +115,7 @@ test("desktop Sort shows only the applied choice while navigating and dismissing
   await expectSortLabel(sort, "Expiration: Latest", true);
   await expect.poll(() => api.queries.length).toBe(initialRequests + 1);
   expect(JSON.parse(api.queries.at(-1)?.get("sort") ?? "null")).toEqual(
-    choices[3].sort,
+    choices[1].sort,
   );
 });
 
@@ -135,7 +135,7 @@ test("mobile Sort displays the applied choice while radio changes remain drafts"
   await sort.click();
   await expect(sort).toHaveAttribute("aria-expanded", "true");
   await dialog.getByRole("radio", { name: "Expiration: Soonest" }).focus();
-  for (let index = 0; index < 4; index++) {
+  for (let index = 0; index < 6; index++) {
     await page.keyboard.press("ArrowDown");
   }
   await expect(
@@ -168,7 +168,7 @@ test("mobile Sort displays the applied choice while radio changes remain drafts"
   await expectSortLabel(sort, "Expiration: Soonest", false);
   await expect.poll(() => api.queries.length).toBe(initialRequests + 2);
   expect(JSON.parse(api.queries.at(-1)?.get("sort") ?? "null")).toEqual(
-    choices[2].sort,
+    choices[0].sort,
   );
   await sort.click();
   await dialog.getByRole("button", { name: "Apply" }).click();
@@ -197,7 +197,7 @@ async function verifyResponsiveSortLabels(page: Page, width: number) {
   const add = page.getByRole("button", { name: "Add item" });
   const menu = page.getByRole("menu", { name: "Sort pantry items" });
   const dialog = page.getByRole("dialog", { name: "Sort items" });
-  await expectSortLabel(sort, choices[2].label, desktop);
+  await expectSortLabel(sort, choices[0].label, desktop);
   await expect(sort.locator("svg").first()).toBeVisible();
   await expectSortLayout(page, sort, filter);
   const order = desktop ? [sort, filter, add] : [add, sort, filter];
@@ -210,9 +210,7 @@ async function verifyResponsiveSortLabels(page: Page, width: number) {
     await page.keyboard.press("Shift+Tab");
     await expect(control).toBeFocused();
   }
-  for (const choice of choices.filter(
-    (choice) => choice.label !== "Expiration: Soonest",
-  )) {
+  for (const choice of choices.slice(1)) {
     await sort.click();
     if (desktop) {
       await menu

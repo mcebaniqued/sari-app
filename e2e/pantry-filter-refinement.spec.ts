@@ -8,10 +8,10 @@ import {
 } from "./fixtures/pantry";
 
 const sortLabels = [
-  "Added: Newest",
-  "Added: Oldest",
   "Expiration: Soonest",
   "Expiration: Latest",
+  "Added: Newest",
+  "Added: Oldest",
   "Name: A to Z",
   "Name: Z to A",
   "Quantity: Lowest",

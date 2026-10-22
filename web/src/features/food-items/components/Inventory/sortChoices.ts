@@ -6,16 +6,6 @@ export const SORT_CHOICES: {
   sort: FoodItemQuery["sort"];
 }[] = [
   {
-    value: "createdAt-desc",
-    label: "Added: Newest",
-    sort: [{ colId: "createdAt", sort: "desc" }],
-  },
-  {
-    value: "createdAt-asc",
-    label: "Added: Oldest",
-    sort: [{ colId: "createdAt", sort: "asc" }],
-  },
-  {
     value: "expiresOn-asc",
     label: "Expiration: Soonest",
     sort: [{ colId: "expiresOn", sort: "asc" }],
@@ -24,6 +14,16 @@ export const SORT_CHOICES: {
     value: "expiresOn-desc",
     label: "Expiration: Latest",
     sort: [{ colId: "expiresOn", sort: "desc" }],
+  },
+  {
+    value: "createdAt-desc",
+    label: "Added: Newest",
+    sort: [{ colId: "createdAt", sort: "desc" }],
+  },
+  {
+    value: "createdAt-asc",
+    label: "Added: Oldest",
+    sort: [{ colId: "createdAt", sort: "asc" }],
   },
   {
     value: "name-asc",
