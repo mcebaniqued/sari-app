@@ -1,0 +1,55 @@
+name: Investigation / Planning / Tracking
+description: Frame an unresolved question, decision, research task, or broader coordination scope.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form when the deliverable is a decision, recommendation, artifact, or coordination outcome rather than implementation. Read the [issue-writing policy](https://github.com/mcebaniqued/sari-app/blob/staging/docs/issue-writing.md).
+
+  - type: textarea
+    id: goal-question
+    attributes:
+      label: Goal or question
+      description: State what needs to be learned, decided, planned, or tracked and why it matters.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Define the boundaries of the investigation, plan, or tracker.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-deliverable
+    attributes:
+      label: Expected deliverable or decision
+      description: Define what must exist for this issue to be complete, such as a recommendation, approved decision, design, or coordinated set of child issues.
+    validations:
+      required: true
+
+  - type: textarea
+    id: options-tradeoffs
+    attributes:
+      label: Known options and tradeoffs
+      description: Record options already identified without presenting a proposal as an approved requirement.
+
+  - type: textarea
+    id: owner-timebox
+    attributes:
+      label: Decision owner or timebox
+      description: Identify who owns the decision or when the work should conclude, when applicable.
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies or blockers
+      description: Record genuine prerequisites or unresolved decisions that prevent progress.
+
+  - type: textarea
+    id: related-work
+    attributes:
+      label: Related implementation work
+      description: Link contextual issues without implying a blocking relationship unless one exists.

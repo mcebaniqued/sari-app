@@ -1,0 +1,55 @@
+name: Technical task
+description: Define maintenance, refactoring, infrastructure, or other internal engineering work.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for internal engineering work. Do not manufacture a user story. Read the [issue-writing policy](https://github.com/mcebaniqued/sari-app/blob/staging/docs/issue-writing.md).
+
+  - type: textarea
+    id: objective-rationale
+    attributes:
+      label: Objective and rationale
+      description: Describe the engineering outcome and why the work is needed.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Define the systems, behavior, or operational area included in this task.
+    validations:
+      required: true
+
+  - type: textarea
+    id: completion-criteria
+    attributes:
+      label: Completion criteria
+      description: List measurable deliverables another person can verify independently.
+    validations:
+      required: true
+
+  - type: textarea
+    id: technical-constraints
+    attributes:
+      label: Technical constraints
+      description: Record approved compatibility, security, architecture, or operational constraints.
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Record genuine prerequisites. Use native GitHub relationships after creation when available.
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification
+      description: Add task-specific checks or evidence beyond the repository Definition of Done.
+
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: State adjacent engineering work intentionally excluded from this task.
