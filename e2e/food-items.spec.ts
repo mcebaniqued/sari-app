@@ -112,6 +112,97 @@ test("desktop uses a semantic table with independent scrolling and loaded-only s
   await expectAccessible(page);
 });
 
+test("desktop bulk actions belong to the table container and retain focus through clearing and deletion", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 700 });
+  const api = await foodApi(page, manyItems);
+  await page.goto("/pantry");
+  await expect(nameCells(page)).toHaveCount(20);
+  const section = page.getByRole("region", { name: "Food inventory" });
+  const scroller = page.getByTestId("desktop-inventory-scroll");
+  const toolbar = section.getByRole("toolbar", { name: "Selected items" });
+  const heading = page.getByRole("columnheader", { name: "Food item" });
+  const selectAll = page.getByRole("checkbox", {
+    name: "Select all loaded items",
+  });
+  await expect(toolbar).toHaveCount(0);
+  const sectionBefore = await section.boundingBox();
+  const headingBefore = await heading.boundingBox();
+  expect(
+    Math.abs((headingBefore?.y ?? 0) - (sectionBefore?.y ?? 0)),
+  ).toBeLessThan(3);
+  await selectRow(page, manyItems[0]!.id);
+  await expect(toolbar.getByText("1 selected")).toBeVisible();
+  await expect(
+    toolbar.getByRole("button", { name: "Clear selection" }),
+  ).toBeVisible();
+  const sectionBounds = await section.boundingBox();
+  const toolbarBounds = await toolbar.boundingBox();
+  const headingBounds = await heading.boundingBox();
+  const mainToolbar = page.getByRole("group", { name: "Pantry actions" });
+  const mainBounds = await mainToolbar.boundingBox();
+  expect(
+    (sectionBounds?.y ?? 0) -
+      ((mainBounds?.y ?? 0) + (mainBounds?.height ?? 0)),
+  ).toBeGreaterThanOrEqual(14);
+  expect(toolbarBounds?.y).toBeGreaterThanOrEqual(sectionBounds?.y ?? 0);
+  expect(
+    (toolbarBounds?.y ?? 0) + (toolbarBounds?.height ?? 0),
+  ).toBeLessThanOrEqual((headingBounds?.y ?? 0) + 1);
+  const presentation = await toolbar.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      background: style.backgroundColor,
+      borderBottom: style.borderBottomWidth,
+      borderLeft: style.borderLeftWidth,
+      borderRight: style.borderRightWidth,
+      radius: style.borderTopLeftRadius,
+    };
+  });
+  expect(presentation.background).toBe(
+    await section.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    ),
+  );
+  expect(presentation.borderBottom).toBe("1px");
+  expect(presentation.borderLeft).toBe("0px");
+  expect(presentation.borderRight).toBe("0px");
+  expect(presentation.radius).toBe("0px");
+  const clear = toolbar.getByRole("button", { name: "Clear selection" });
+  const deleteSelected = toolbar.getByRole("button", { name: "Delete (1)" });
+  await clear.focus();
+  await page.keyboard.press("Tab");
+  await expect(deleteSelected).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(selectAll).toBeFocused();
+  await scroller.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect(nameCells(page)).toHaveCount(40);
+  expect(
+    Math.abs((await toolbar.boundingBox())!.y - (toolbarBounds?.y ?? 0)),
+  ).toBeLessThan(2);
+  await expect(clear).toBeVisible();
+  await clear.click();
+  await expect(toolbar).toHaveCount(0);
+  await expect(selectAll).toBeFocused();
+  await expect(selectAll).not.toBeChecked();
+  await selectRow(page, manyItems[0]!.id);
+  await toolbar.getByRole("button", { name: "Delete (1)" }).click();
+  const dialog = page.getByRole("dialog", { name: "Delete item?" });
+  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(
+    toolbar.getByRole("button", { name: "Delete (1)" }),
+  ).toBeFocused();
+  await toolbar.getByRole("button", { name: "Delete (1)" }).click();
+  await dialog.getByRole("button", { name: "Confirm delete" }).click();
+  await expect(toolbar).toHaveCount(0);
+  await expect(selectAll).toBeFocused();
+  expect(api.deleted).toEqual([manyItems[0]!.id]);
+});
+
 test("a tall desktop scroll area fetches another batch before the user can scroll", async ({
   page,
 }) => {

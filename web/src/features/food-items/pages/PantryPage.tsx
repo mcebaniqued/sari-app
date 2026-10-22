@@ -28,6 +28,8 @@ export default function PantryPage() {
   const mobileEnd = useRef<HTMLDivElement>(null);
   const mobileInventory = useRef<HTMLElement>(null);
   const mobileAddButton = useRef<HTMLButtonElement>(null);
+  const desktopSelectAll = useRef<HTMLInputElement>(null);
+  const desktopBulkDelete = useRef(false);
   const filterButton = useRef<HTMLButtonElement>(null);
   const pendingMobileActionFocus = useRef<{
     kind: "edit" | "delete";
@@ -37,6 +39,14 @@ export default function PantryPage() {
   const queryKey = JSON.stringify([inventory.query, pantry.revision]);
   const { hasMore, loading, error, loadMore } = inventory;
 
+  function restoreDesktopBulkFocus() {
+    if (desktopSelectAll.current && !desktopSelectAll.current.disabled) {
+      desktopSelectAll.current.focus();
+    } else {
+      filterButton.current?.focus();
+    }
+  }
+
   function restoreDialogFocusFallback() {
     if (pendingMobileActionFocus.current) {
       mobileAddButton.current?.focus();
@@ -44,6 +54,18 @@ export default function PantryPage() {
       filterButton.current?.focus();
     }
   }
+
+  useEffect(() => {
+    if (
+      desktopBulkDelete.current &&
+      !pantry.deleteTargets &&
+      inventory.selected.length === 0 &&
+      !inventory.loading
+    ) {
+      restoreDesktopBulkFocus();
+      desktopBulkDelete.current = false;
+    }
+  }, [inventory.loading, inventory.selected.length, pantry.deleteTargets]);
 
   useEffect(() => {
     const pending = pendingMobileActionFocus.current;
@@ -184,7 +206,6 @@ export default function PantryPage() {
         </h1>
         <PantryToolbar
           query={inventory.query}
-          selectedCount={inventory.selected.length}
           disabled={pantry.busy}
           onSearch={(search) => {
             inventory.applyQuery({ ...inventory.query, search });
@@ -199,10 +220,6 @@ export default function PantryPage() {
             setFilterEditor({});
           }}
           onAdd={pantry.startAdd}
-          onClearSelection={inventory.clearSelection}
-          onDeleteSelected={() => {
-            pantry.startDelete(inventory.selected);
-          }}
         />
       </div>
       <AppliedFilters
@@ -233,6 +250,38 @@ export default function PantryPage() {
         aria-label="Food inventory"
         className="hidden min-h-0 flex-1 overflow-hidden rounded-panel border border-border-default bg-surface md:flex md:flex-col"
       >
+        {inventory.selected.length > 0 && (
+          <div
+            role="toolbar"
+            aria-label="Selected items"
+            className="flex min-h-14 items-center gap-3 border-b border-border-default bg-surface px-3 py-2"
+          >
+            <span className="mr-auto text-sm font-semibold" aria-live="polite">
+              {inventory.selected.length} selected
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                desktopSelectAll.current?.focus();
+                inventory.clearSelection();
+              }}
+              className="min-h-11 rounded-control px-3 text-sm font-medium hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-brand"
+            >
+              Clear selection
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                desktopBulkDelete.current = true;
+                pantry.startDelete(inventory.selected);
+              }}
+              className="inline-flex min-h-11 items-center gap-2 rounded-control border border-danger-border bg-surface px-3 text-sm font-medium text-danger hover:bg-danger-subtle focus-visible:outline-2 focus-visible:outline-brand"
+            >
+              <LuTrash2 aria-hidden="true" /> Delete (
+              {inventory.selected.length})
+            </button>
+          </div>
+        )}
         <div
           ref={desktopScroll}
           data-testid="desktop-inventory-scroll"
@@ -242,6 +291,7 @@ export default function PantryPage() {
           <InventoryTable
             items={inventory.items}
             selectedIds={inventory.selectedIds}
+            selectAllRef={desktopSelectAll}
             onSelectionChange={inventory.setSelectedIds}
             {...actions}
           />
@@ -426,6 +476,7 @@ export default function PantryPage() {
           onConfirm={pantry.deleteItems}
           onClose={() => {
             pendingMobileActionFocus.current = null;
+            desktopBulkDelete.current = false;
             pantry.closeDelete();
           }}
           onRestoreFocusFallback={restoreDialogFocusFallback}

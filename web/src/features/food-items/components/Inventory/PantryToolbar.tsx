@@ -1,6 +1,6 @@
 import type { FoodItemQuery } from "@sari/contracts";
 import { type Ref, useState } from "react";
-import { LuArrowDownUp, LuListFilter, LuPlus, LuTrash2 } from "react-icons/lu";
+import { LuArrowDownUp, LuListFilter, LuPlus } from "react-icons/lu";
 import SearchBar from "@/components/SearchBar/SearchBar";
 import DesktopSortControl from "./DesktopSortControl";
 import { appliedFilterEntries } from "./filterModel";
@@ -9,7 +9,6 @@ import { SORT_CHOICES, sortChoiceValue } from "./sortChoices";
 
 interface PantryToolbarProps {
   query: Pick<FoodItemQuery, "search" | "sort" | "filters">;
-  selectedCount: number;
   disabled: boolean;
   onSearch: (search: string) => void;
   onSort: (sort: FoodItemQuery["sort"]) => void;
@@ -18,8 +17,6 @@ interface PantryToolbarProps {
   mobileAddButtonRef: Ref<HTMLButtonElement>;
   onOpenFilters: () => void;
   onAdd: () => void;
-  onClearSelection: () => void;
-  onDeleteSelected: () => void;
 }
 
 const secondary =
@@ -27,7 +24,6 @@ const secondary =
 
 export default function PantryToolbar({
   query,
-  selectedCount,
   disabled,
   onSearch,
   onSort,
@@ -36,8 +32,6 @@ export default function PantryToolbar({
   mobileAddButtonRef,
   onOpenFilters,
   onAdd,
-  onClearSelection,
-  onDeleteSelected,
 }: PantryToolbarProps) {
   const [mobileSortOpen, setMobileSortOpen] = useState(false);
   const activeFilters = appliedFilterEntries(query.filters);
@@ -118,31 +112,6 @@ export default function PantryToolbar({
             "hidden min-h-11 shrink-0 items-center justify-center gap-1 rounded-control bg-brand px-3 text-sm font-semibold text-content-inverse hover:bg-brand-hover focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50 md:inline-flex",
           )}
         </div>
-        {selectedCount > 0 && (
-          <div
-            role="toolbar"
-            aria-label="Selected items"
-            className="hidden min-h-11 items-center gap-3 rounded-control border border-brand bg-brand-subtle px-3 md:flex"
-          >
-            <span className="mr-auto text-sm font-semibold" aria-live="polite">
-              {selectedCount} selected
-            </span>
-            <button
-              type="button"
-              onClick={onClearSelection}
-              className={`${secondary} border-transparent`}
-            >
-              Clear selection
-            </button>
-            <button
-              type="button"
-              onClick={onDeleteSelected}
-              className="inline-flex min-h-11 items-center gap-2 rounded-control border border-danger-border bg-surface px-3 text-sm font-medium text-danger hover:bg-danger-subtle focus-visible:outline-2 focus-visible:outline-brand"
-            >
-              <LuTrash2 aria-hidden="true" /> Delete ({selectedCount})
-            </button>
-          </div>
-        )}
       </div>
       {mobileSortOpen && (
         <MobileSortDialog

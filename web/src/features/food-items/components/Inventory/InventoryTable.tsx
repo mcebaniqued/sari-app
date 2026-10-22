@@ -1,5 +1,5 @@
 import type { FoodItem } from "@sari/contracts";
-import { useEffect, useRef } from "react";
+import { type RefObject, useEffect } from "react";
 import { formatDate } from "@/utils/date";
 import type { FoodItemActions } from "../../types/foodItems";
 import FoodItemRowActions from "./FoodItemRowActions";
@@ -7,24 +7,25 @@ import FoodItemRowActions from "./FoodItemRowActions";
 interface InventoryTableProps extends FoodItemActions {
   items: FoodItem[];
   selectedIds: Set<string>;
+  selectAllRef: RefObject<HTMLInputElement | null>;
   onSelectionChange: (ids: Set<string>) => void;
 }
 
 export default function InventoryTable({
   items,
   selectedIds,
+  selectAllRef,
   onSelectionChange,
   ...actions
 }: InventoryTableProps) {
-  const selectAll = useRef<HTMLInputElement>(null);
   const selectedCount = items.filter((item) => selectedIds.has(item.id)).length;
   const allSelected = items.length > 0 && selectedCount === items.length;
 
   useEffect(() => {
-    if (selectAll.current) {
-      selectAll.current.indeterminate = selectedCount > 0 && !allSelected;
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = selectedCount > 0 && !allSelected;
     }
-  }, [allSelected, selectedCount]);
+  }, [allSelected, selectedCount, selectAllRef]);
 
   return (
     <table className="w-full table-fixed border-collapse text-sm">
@@ -41,7 +42,7 @@ export default function InventoryTable({
         <tr>
           <th scope="col" className="border-b border-border-default px-3 py-2">
             <input
-              ref={selectAll}
+              ref={selectAllRef}
               type="checkbox"
               aria-label="Select all loaded items"
               checked={allSelected}
