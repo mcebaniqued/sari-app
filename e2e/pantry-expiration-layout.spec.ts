@@ -120,21 +120,34 @@ for (const width of [320, 390, 440]) {
 
     const list = page.getByRole("list", { name: "Food inventory" });
     const row = list.getByRole("listitem").filter({ hasText: "Old oats" });
+    const content = row.getByText("Old oats", { exact: true }).locator("..");
     const badge = row.getByText("23 days past date", { exact: true });
     const action = row.getByRole("button", { name: "Actions for Old oats" });
-    const [rowBox, badgeBox, actionBox] = await Promise.all([
+    const [rowBox, contentBox, badgeBox, actionBox] = await Promise.all([
       row.boundingBox(),
+      content.boundingBox(),
       badge.boundingBox(),
       action.boundingBox(),
     ]);
 
     expect(await textLineCount(badge)).toBe(1);
+    expect((contentBox?.x ?? 0) + (contentBox?.width ?? 0)).toBeLessThanOrEqual(
+      badgeBox?.x ?? 0,
+    );
     expect((badgeBox?.x ?? 0) + (badgeBox?.width ?? 0)).toBeLessThanOrEqual(
       actionBox?.x ?? 0,
     );
+    expect(Math.abs((badgeBox?.y ?? 0) - (actionBox?.y ?? 0))).toBeLessThan(8);
+    expect(contentBox?.x ?? 0).toBeGreaterThanOrEqual(rowBox?.x ?? 0);
+    expect(badgeBox?.x ?? 0).toBeGreaterThanOrEqual(rowBox?.x ?? 0);
     expect((actionBox?.x ?? 0) + (actionBox?.width ?? 0)).toBeLessThanOrEqual(
       (rowBox?.x ?? 0) + (rowBox?.width ?? 0),
     );
+    expect(
+      await row.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth + 1,
+      ),
+    ).toBe(true);
     await expect(row).toContainText("Sep 28, 2026");
     await expect(row).toContainText("2 l");
     await expect(
