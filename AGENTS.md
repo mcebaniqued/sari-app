@@ -15,6 +15,7 @@ Sari is a pantry app with a React frontend in `web/`, an Express API in `api/`, 
 ## Repository workflow
 
 - Inspect the current branch, working tree, and diff before modifying files. Treat authorization to edit, create or switch branches, stage, commit, push, and open PRs as distinct; perform only actions authorized by the task. Permission for one does not authorize the others.
+- Before any authorized creation or rewrite of a GitHub issue, follow [docs/issue-writing.md](docs/issue-writing.md): check for duplicates and overlapping ownership, choose the correct category, follow its title and content conventions, preserve approved requirements and historical decisions, identify genuine blockers and existing relationships, and do not invent implementation requirements or GitHub references.
 - When branch creation is authorized, create a new branch for each scope or purpose using a descriptive name and the appropriate base branch; do not reuse a merged branch. Do not automatically create or switch branches merely because a new task was requested.
 - Keep each branch focused on its agreed scope. Report unrelated findings without implementing them or expanding the scope. When tracking updates are authorized, record actionable entries in `TODO.md` or link existing GitHub issues; check for existing entries and issues before creating duplicates.
 - Group incremental commits by scope and purpose. Separate dependencies, configuration, implementation, test infrastructure, test coverage, fixes, and documentation when practical.

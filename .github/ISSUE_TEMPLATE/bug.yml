@@ -1,0 +1,71 @@
+name: Bug / Defect
+description: Report confirmed behavior that violates an established expectation or contract.
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for a confirmed defect. If the expected behavior is not established yet, use the investigation form instead. Read the [issue-writing policy](https://github.com/mcebaniqued/sari-app/blob/staging/docs/issue-writing.md).
+
+  - type: textarea
+    id: problem-impact
+    attributes:
+      label: Problem and impact
+      description: Summarize the defect and explain who or what it affects.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual behavior
+      description: Describe what happens now, including relevant error messages or state.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected behavior
+      description: State the established requirement or contract that is not being met.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction-evidence
+    attributes:
+      label: Reproduction steps or evidence
+      description: Provide repeatable steps or independently verifiable evidence. Remove credentials, personal data, and other secrets.
+      placeholder: |
+        1. Go to…
+        2. Perform…
+        3. Observe…
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria for resolution
+      description: Define the observable results that will demonstrate the defect is resolved without regression.
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Affected environment
+      description: Add the branch, version, browser, device, operating system, or other environment details when relevant.
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Screenshots or sanitized logs
+      description: Attach useful diagnostics after removing credentials, personal data, tokens, and other secrets.
+
+  - type: textarea
+    id: regression-constraints
+    attributes:
+      label: Regression scenarios, constraints, or dependencies
+      description: Add important related coverage, approved constraints, or genuine prerequisites.

@@ -1,0 +1,53 @@
+name: Feature / User story
+description: Propose user-facing functionality with a clear need and testable outcome.
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for user-facing functionality. Read the [issue-writing policy](https://github.com/mcebaniqued/sari-app/blob/staging/docs/issue-writing.md) before submitting.
+
+  - type: textarea
+    id: user-need
+    attributes:
+      label: User need and intended outcome
+      description: Describe the problem or need, who experiences it when relevant, and the value or outcome sought. A formal “As a…” sentence is optional.
+      placeholder: Pantry users need to… so that…
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: List observable, independently verifiable results, including important boundaries or failure behavior.
+      placeholder: |
+        - The user can…
+        - When…, the application…
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context or existing behavior
+      description: Add current behavior, evidence, or background that helps reviewers understand the request.
+
+  - type: textarea
+    id: constraints-dependencies
+    attributes:
+      label: Constraints and dependencies
+      description: Record approved constraints and genuine prerequisites. Use native GitHub relationships after creation when available.
+
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: State nearby behavior this issue intentionally will not change.
+
+  - type: textarea
+    id: verification-scenarios
+    attributes:
+      label: Specific verification scenarios
+      description: Add scenarios that clarify acceptance beyond the criteria above. Given–When–Then is optional.
