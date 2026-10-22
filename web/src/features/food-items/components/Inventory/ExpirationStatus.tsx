@@ -24,7 +24,7 @@ export default function ExpirationStatus({
 
   return (
     <span
-      className={`${badge ? "inline-block rounded-control border px-1.5 py-0.5 text-xs font-medium leading-5 whitespace-nowrap max-[280px]:wrap-anywhere max-[280px]:whitespace-normal" : "text-sm"} ${styles[treatment]}`}
+      className={`${badge ? "inline-block max-w-full wrap-anywhere rounded-control border px-1.5 py-0.5 text-xs font-medium leading-5 whitespace-normal" : "text-sm"} ${styles[treatment]}`}
     >
       {text}
     </span>

@@ -79,7 +79,7 @@ export default function InventoryList({
           key={item.id}
           className="flex min-w-0 flex-wrap items-start gap-2 px-4 py-3"
         >
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 basis-1/3 grow shrink-0">
             <p className="wrap-anywhere font-medium">{item.name}</p>
             <p className="mt-1 text-sm text-content-muted">
               {item.quantity} {item.unit === "item" ? "items" : item.unit}

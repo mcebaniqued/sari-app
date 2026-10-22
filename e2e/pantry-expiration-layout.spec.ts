@@ -180,44 +180,74 @@ for (const width of [320, 390, 440]) {
   });
 }
 
-test("enlarged mobile text keeps the card content readable", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 320, height: 800 });
-  await page.clock.setFixedTime(new Date("2026-10-21T20:00:00Z"));
-  await foodApi(page, items);
-  await page.goto("/pantry");
-  await page.evaluate(() => {
-    document.documentElement.style.fontSize = "200%";
+for (const [width, textSize] of [
+  [320, 200],
+  [320, 250],
+  [390, 200],
+  [440, 200],
+] as const) {
+  test(`enlarged mobile text keeps the card content readable at ${width}px and ${textSize}%`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width, height: 800 });
+    await page.clock.setFixedTime(new Date("2026-10-21T20:00:00Z"));
+    await foodApi(page, items);
+    await page.goto("/pantry");
+    await page.evaluate((size) => {
+      document.documentElement.style.fontSize = `${size}%`;
+    }, textSize);
+
+    const row = page
+      .getByRole("list", { name: "Food inventory" })
+      .getByRole("listitem")
+      .filter({ hasText: "Old oats" });
+    const content = row.getByText("Old oats", { exact: true }).locator("..");
+    const badge = row.getByText("23 days past date", { exact: true });
+    const action = row.getByRole("button", { name: "Actions for Old oats" });
+    const [rowBox, contentBox, badgeBox, actionBox] = await Promise.all([
+      row.boundingBox(),
+      content.boundingBox(),
+      badge.boundingBox(),
+      action.boundingBox(),
+    ]);
+
+    expect(contentBox?.width ?? 0).toBeGreaterThanOrEqual(80);
+    await expect(badge).toBeVisible();
+    expect(
+      (contentBox?.x ?? 0) + (contentBox?.width ?? 0) <= (badgeBox?.x ?? 0) ||
+        (contentBox?.y ?? 0) + (contentBox?.height ?? 0) <=
+          (badgeBox?.y ?? 0) ||
+        (badgeBox?.y ?? 0) + (badgeBox?.height ?? 0) <= (contentBox?.y ?? 0),
+    ).toBe(true);
+    expect(
+      (badgeBox?.x ?? 0) + (badgeBox?.width ?? 0) <= (actionBox?.x ?? 0) ||
+        (badgeBox?.y ?? 0) + (badgeBox?.height ?? 0) <= (actionBox?.y ?? 0) ||
+        (actionBox?.y ?? 0) + (actionBox?.height ?? 0) <= (badgeBox?.y ?? 0),
+    ).toBe(true);
+    expect((rowBox?.x ?? 0) + (rowBox?.width ?? 0)).toBeLessThanOrEqual(width);
+    expect((badgeBox?.x ?? 0) + (badgeBox?.width ?? 0)).toBeLessThanOrEqual(
+      (rowBox?.x ?? 0) + (rowBox?.width ?? 0),
+    );
+    expect((actionBox?.x ?? 0) + (actionBox?.width ?? 0)).toBeLessThanOrEqual(
+      (rowBox?.x ?? 0) + (rowBox?.width ?? 0),
+    );
+    expect(
+      await row.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth + 1,
+      ),
+    ).toBe(true);
+    await expect(row).toContainText("Sep 28, 2026");
+    await expect(row).toContainText("2 l");
+    await page.screenshot({
+      path: testInfo.outputPath("enlarged-page.png"),
+      fullPage: true,
+    });
+
+    await action.click();
+    await expect(
+      row.getByRole("button", { name: "Edit Old oats" }),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(action).toBeFocused();
   });
-
-  const row = page
-    .getByRole("list", { name: "Food inventory" })
-    .getByRole("listitem")
-    .filter({ hasText: "Old oats" });
-  const content = row.getByText("Old oats", { exact: true }).locator("..");
-  const badge = row.getByText("23 days past date", { exact: true });
-  const action = row.getByRole("button", { name: "Actions for Old oats" });
-  const [rowBox, contentBox, badgeBox, actionBox] = await Promise.all([
-    row.boundingBox(),
-    content.boundingBox(),
-    badge.boundingBox(),
-    action.boundingBox(),
-  ]);
-
-  expect(contentBox?.width ?? 0).toBeGreaterThanOrEqual(80);
-  expect(await textLineCount(badge)).toBe(1);
-  expect(
-    (badgeBox?.x ?? 0) + (badgeBox?.width ?? 0) <= (actionBox?.x ?? 0) ||
-      (badgeBox?.y ?? 0) + (badgeBox?.height ?? 0) <= (actionBox?.y ?? 0) ||
-      (actionBox?.y ?? 0) + (actionBox?.height ?? 0) <= (badgeBox?.y ?? 0),
-  ).toBe(true);
-  expect((rowBox?.x ?? 0) + (rowBox?.width ?? 0)).toBeLessThanOrEqual(320);
-  expect((badgeBox?.x ?? 0) + (badgeBox?.width ?? 0)).toBeLessThanOrEqual(
-    (rowBox?.x ?? 0) + (rowBox?.width ?? 0),
-  );
-  expect((actionBox?.x ?? 0) + (actionBox?.width ?? 0)).toBeLessThanOrEqual(
-    (rowBox?.x ?? 0) + (rowBox?.width ?? 0),
-  );
-  await expect(row).toContainText("Sep 28, 2026");
-});
+}
