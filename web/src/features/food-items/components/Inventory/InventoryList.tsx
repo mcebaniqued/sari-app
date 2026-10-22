@@ -94,7 +94,7 @@ export default function InventoryList({
                 aria-label={`Select ${item.name}`}
                 checked={selectedIds.has(item.id)}
                 disabled={disabled}
-                className="size-6 accent-brand"
+                className="size-4 accent-brand"
                 onChange={(event) => {
                   const next = new Set(selectedIds);
                   if (event.target.checked) {

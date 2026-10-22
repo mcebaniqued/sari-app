@@ -45,7 +45,7 @@ export default function InventoryTable({
               type="checkbox"
               aria-label="Select all loaded items"
               checked={allSelected}
-              className="size-6 accent-brand"
+              className="size-4 accent-brand"
               disabled={items.length === 0 || actions.disabled}
               onChange={(event) => {
                 onSelectionChange(
@@ -91,7 +91,7 @@ export default function InventoryTable({
                 type="checkbox"
                 aria-label={`Select ${item.name}`}
                 checked={selectedIds.has(item.id)}
-                className="size-6 accent-brand"
+                className="size-4 accent-brand"
                 disabled={actions.disabled}
                 onChange={(event) => {
                   const next = new Set(selectedIds);
