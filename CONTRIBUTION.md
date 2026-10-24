@@ -85,6 +85,18 @@ Playwright starts isolated servers on ports 3101 (API) and 5273 (frontend), leav
 
 Husky runs lint-staged before commits. GitHub Actions runs the validation command and browser tests on pull requests and pushes to `main` and `staging`. CI starts a disposable MongoDB 8 service for persistence tests and does not require Atlas credentials.
 
+## Branch and pull request workflow
+
+`main` is the production and release branch, and `staging` is the integration branch. Both are protected. Start scoped `feat/*`, `fix/*`, `refactor/*`, `chore/*`, or `docs/*` branches from the current `staging` branch and open their pull requests back to `staging`.
+
+Protected-branch pull requests must pass the GitHub Actions `validate` check, be current with their base branch, and have all review conversations resolved. The solo-maintainer workflow does not require an approving review or self-approval. Do not routinely bypass pull request or required-check rules, force-push, or delete protected branches.
+
+Use squash merging for ordinary feature, fix, refactor, maintenance, and documentation pull requests. Promote a validated `staging` revision through a separate pull request to `main`, using a merge commit to preserve branch ancestry. No promotion is automated.
+
+An urgent production hotfix may use an exceptional pull request from a scoped branch directly to `main`. After it is merged and verified, synchronize the hotfix back into `staging` through a separate pull request so later releases retain the change.
+
+If a broken workflow or repository rule prevents every compliant pull request from merging, prefer repairing it through the normal protected-branch workflow. When that is impossible, a repository administrator may make the smallest temporary server-side rule change needed for recovery after recording the current configuration and impact. Restore and verify the intended protection immediately afterward. Emergency recovery does not authorize force pushes, branch deletion, unrelated bypasses, deployments, or production data changes.
+
 ## Code quality
 
 Readability requires blank lines between independent declarations and meaningful steps inside functions. Keep related statements together and document non-obvious invariants. Prettier enforces formatting; manual review checks logical grouping.
@@ -220,7 +232,7 @@ The `staging` Git branch deploys the **preview** environment:
 
 Git deployments are enabled for all four projects. Pushes to `staging` update `sari-api-preview` and the protected `sari-web-preview` frontend. Pushes to `main` update the production `sari-api` and `sari-web` projects. Ignored Build Step settings skip other branches in each project. The preview frontend's domain is assigned to the `staging` Preview branch; the preview API uses its Production target with `staging` as its production branch, while retaining only preview database credentials. Vercel's environment label does not determine which database the API uses.
 
-CI runs on pushes to both branches and on pull requests. Wait for CI and both deployments to succeed before testing a pushed revision. Frontend and API deployments finish independently; there is no atomic deployment or CI gate in Vercel. Keep API changes compatible with the preceding frontend during rollout. Release through a separate `staging` → `main` PR: `main` requires a PR, the `validate` check, and resolved conversations, including for administrators. No staging-to-main merge is automated.
+CI runs on pushes to both branches and on pull requests. Wait for CI and both deployments to succeed before testing a pushed revision. Frontend and API deployments finish independently; there is no atomic deployment or CI gate in Vercel. Keep API changes compatible with the preceding frontend during rollout. Follow the protected-branch promotion process above for releases.
 
 Keep `VITE_API_BASE_URL=/api/v1` so browser requests remain same-origin. Set the API project's production `BETTER_AUTH_URL` to `https://sari-web.vercel.app`, use a dedicated production `BETTER_AUTH_SECRET`, and configure `MONGODB_URI` and optional `USDA_API_KEY` as backend secrets. Do not give preview deployments production database credentials.
 
