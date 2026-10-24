@@ -1,6 +1,6 @@
 # Development guide
 
-Start with the [quick onboarding guide](README.md). This guide covers architecture, configuration, tests, API behavior, and deployment. Open work is tracked in [TODO.md](TODO.md).
+Start with the [quick onboarding guide](README.md). This guide covers architecture, configuration, tests, API behavior, and deployment. Open work is tracked in [GitHub Issues](https://github.com/mcebaniqued/sari-app/issues).
 
 ## Stack and layout
 
@@ -116,7 +116,7 @@ Names are required, trimmed, and limited to 80 characters each. Email addresses 
 
 Add `BETTER_AUTH_SECRET` (at least 32 random characters) and `BETTER_AUTH_URL` (the frontend origin) to `api/.env`; see `api/.env.example` for generation instructions. Local development defaults to `http://127.0.0.1:5173`. During local development, both `localhost` and `127.0.0.1` are accepted on the configured port. Other hostnames require an exact origin in `AUTH_TRUSTED_ORIGINS`, comma-separated. Production accepts only explicitly configured origins. Secrets must stay out of `VITE_` variables and source control. Production requires a stable secret and an HTTPS frontend URL. Session cookies are HttpOnly, SameSite=Lax, Secure in production, and valid for seven days without sliding refresh. Protected requests check MongoDB; cookie caching is disabled so revocation and expiration take effect immediately.
 
-Authentication endpoints live under `/api/v1/auth`: `POST /sign-up/email`, `POST /sign-in/email`, `GET /get-session`, and `POST /sign-out`. Other Better Auth HTTP endpoints are not exposed. Better Auth mounts before Express's JSON parser and manages password hashing, cookies, CSRF checks, and database-backed rate limiting (10 login attempts and 5 registration attempts per minute per client IP). The server overwrites its internal IP header with Express's socket-derived address. If deployed behind a proxy, configure a trusted proxy/IP policy for that platform before enabling forwarded client IPs. The MongoDB adapter manages authentication collections and supports standalone local MongoDB without transactions. Required production indexes are tracked for verification in `TODO.md`.
+Authentication endpoints live under `/api/v1/auth`: `POST /sign-up/email`, `POST /sign-in/email`, `GET /get-session`, and `POST /sign-out`. Other Better Auth HTTP endpoints are not exposed. Better Auth mounts before Express's JSON parser and manages password hashing, cookies, CSRF checks, and database-backed rate limiting (10 login attempts and 5 registration attempts per minute per client IP). The server overwrites its internal IP header with Express's socket-derived address. If deployed behind a proxy, configure a trusted proxy/IP policy for that platform before enabling forwarded client IPs. The MongoDB adapter manages authentication collections and supports standalone local MongoDB without transactions. Required production indexes are tracked for verification in [#101](https://github.com/mcebaniqued/sari-app/issues/101).
 
 All food-item endpoints require a session and return `401` when missing or expired. Cookie-authenticated writes also require an allowed `Origin` header. Authentication and pantry responses use `Cache-Control: no-store`. Health and readiness remain public. Authenticated `403` responses still open the access-denied page.
 
