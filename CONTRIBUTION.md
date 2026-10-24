@@ -97,6 +97,149 @@ An urgent production hotfix may use an exceptional pull request from a scoped br
 
 If a broken workflow or repository rule prevents every compliant pull request from merging, prefer repairing it through the normal protected-branch workflow. When that is impossible, a repository administrator may make the smallest temporary server-side rule change needed for recovery after recording the current configuration and impact. Restore and verify the intended protection immediately afterward. Emergency recovery does not authorize force pushes, branch deletion, unrelated bypasses, deployments, or production data changes.
 
+## Release management
+
+Sari releases are on demand. Weekends are the preferred review and promotion window, but they are not deadlines: there is no mandatory weekly release, minimum feature count, placeholder release, or version increment for a skipped week. Release only when an integrated revision is ready. A critical production fix may use the exceptional hotfix workflow above outside the preferred window.
+
+The `staging` branch and its deployments form the beta environment. Use `https://sari-web-preview.vercel.app` to validate integrated functionality, regressions, frontend/API behavior, responsive behavior, accessibility, and release readiness. Identify beta revisions by their commit SHA or Vercel deployment identifier; beta deployments do not receive formal release tags. The [Vercel deployment](#vercel-deployment) section defines the separate preview and production projects, credentials, and databases.
+
+The `main` branch and `https://sari-web.vercel.app` are production. Promote only an accepted beta revision through the protected `staging` → `main` merge-commit process established by [PR #125](https://github.com/mcebaniqued/sari-app/pull/125) and documented above. Do not add long-lived `release/*` branches, GitFlow, or other permanent environment branches. A passing CI run or merged promotion pull request does not by itself establish that production deployed successfully.
+
+### Release candidates and beta acceptance
+
+Select a candidate by its full `staging` commit SHA. Compare it with the current production revision and review the included features, fixes, maintenance, and possible regressions. The following commands record the revisions and provide a reviewable summary; run them from a clean checkout and retain the resolved SHAs with the release evidence:
+
+```sh
+git fetch origin main staging --tags
+RELEASE_CANDIDATE=$(git rev-parse origin/staging)
+PRODUCTION_REVISION=$(git rev-parse origin/main)
+git log --oneline --decorate "$PRODUCTION_REVISION..$RELEASE_CANDIDATE"
+git diff --stat "$PRODUCTION_REVISION..$RELEASE_CANDIDATE"
+```
+
+Confirm that required CI passed and both beta frontend and API deployments completed successfully. Exercise the major user workflows and the functionality changed by the candidate, including applicable responsive and accessibility checks. Review frontend/API compatibility and every unresolved defect; fix and retest release-blocking defects before promotion.
+
+Temporarily freeze the selected candidate during final acceptance. Do not merge more changes into `staging` until promotion finishes. If `staging` changes or the release must include another change, the previous acceptance no longer applies: select the new SHA and repeat the affected CI, deployment, review, and beta checks.
+
+### Release checklist
+
+Before promotion:
+
+- [ ] Record the full candidate SHA and the current production SHA.
+- [ ] Review the commits and diff from production to the candidate; confirm the intended features, fixes, and maintenance are present and no unintended changes are included.
+- [ ] Confirm the required CI checks passed for the candidate.
+- [ ] Confirm the beta frontend and API deployments completed successfully for the candidate.
+- [ ] Complete applicable manual beta acceptance, major-workflow, responsive, accessibility, and changed-functionality checks.
+- [ ] Confirm the frontend and API compatibility expectations for the non-atomic rollout.
+- [ ] Record unresolved defects and decide whether each blocks the release; correct and retest every blocker.
+- [ ] Freeze the accepted candidate for final validation.
+
+During promotion:
+
+- [ ] Open a pull request from `staging` to `main` and confirm it contains the accepted candidate and only the intended changes.
+- [ ] Preserve branch protections, require successful validation, and resolve review concerns. Do not use routine bypasses.
+- [ ] If the candidate changes, stop and repeat the affected acceptance checks before merging.
+- [ ] Merge with a merge commit so branch ancestry is preserved.
+
+After promotion:
+
+- [ ] Record the expected `main` merge commit and confirm it contains the accepted candidate.
+- [ ] Wait for the production frontend and API deployments independently; verify each reports the expected revision.
+- [ ] Verify `/api/v1/health` and `/api/v1/ready` through `https://sari-web.vercel.app`.
+- [ ] Smoke-test registration or login, Pantry access, persistence after refresh, and the functionality changed by the release.
+- [ ] Record failed checks and known limitations. A failed check prevents successful publication until it is resolved or handled through the failure process below.
+- [ ] After successful production verification, assign the CalVer version, create and push the tag, and publish the matching GitHub Release.
+
+The frontend and API are separate Vercel projects and do not deploy atomically. Their completion times can differ, passing CI does not prove either production deployment succeeded, and beta validation cannot prove every production-only setting. API changes may need to remain compatible with both the preceding and new frontend during rollout. Database-schema and shared-contract changes may require additional safeguards. [Issue #101](https://github.com/mcebaniqued/sari-app/issues/101) remains authoritative for unresolved coordinated-release verification and operational safeguards; this checklist does not claim those concerns or the current production configuration are verified.
+
+### Calendar versions and publication
+
+Production releases use `vYYYY.MM.DD[.N]`, based on the actual successful production-verification date in `America/Los_Angeles`:
+
+| Release event                                 | Version                          |
+| --------------------------------------------- | -------------------------------- |
+| First release on October 25, 2026             | `v2026.10.25`                    |
+| Second release on October 25, 2026            | `v2026.10.25.1`                  |
+| Third release on October 25, 2026             | `v2026.10.25.2`                  |
+| First release on November 1, 2026             | `v2026.11.01`                    |
+| First release after one or more skipped weeks | The actual verified release date |
+
+The first release on a Los Angeles calendar date omits the sequence. Start the second at `.1` and increment it for each additional verified release that date. Development, beta, merge, and deployment-start dates do not determine the version. Do not reserve a version before verification, increment for a skipped week, or retroactively version historical deployments without verifiable evidence.
+
+After all production checks pass, fetch `main` and all tags, then set `RELEASE_COMMIT` to the full commit reported by the verified production deployments and `RELEASE_TAG` to the next valid CalVer value. The two `rev-parse` commands must identify the intended production commit; stop if the deployment, local `origin/main`, or recorded promotion result disagrees.
+
+```sh
+git fetch origin main --tags
+RELEASE_COMMIT="paste-verified-production-commit"
+RELEASE_TAG="vYYYY.MM.DD"
+git rev-parse "$RELEASE_COMMIT^{commit}"
+git rev-parse "origin/main^{commit}"
+test "$(git rev-parse "$RELEASE_COMMIT^{commit}")" = "$(git rev-parse "origin/main^{commit}")"
+git merge-base --is-ancestor "$RELEASE_COMMIT" origin/main
+```
+
+Check that the chosen tag does not already exist. Because the fetch imports remote tags, the guard stops if the tag is already taken; select the next valid same-day sequence instead. Never delete, reuse, move, or force-update a published release tag.
+
+```sh
+if git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+  echo "Tag already exists; select the next valid CalVer value."
+  exit 1
+fi
+```
+
+After the guard succeeds, create an annotated tag on the explicit verified commit. Review the tagged SHA before pushing the exact tag ref. Do not use `--force`.
+
+```sh
+git tag --annotate "$RELEASE_TAG" "$RELEASE_COMMIT" --message "Sari $RELEASE_TAG"
+git rev-list -n 1 "$RELEASE_TAG"
+git push origin "refs/tags/$RELEASE_TAG"
+```
+
+In GitHub Releases, draft a release using the existing pushed tag and confirm GitHub shows the same commit. Publish only after that check. Use this concise structure, omitting empty sections:
+
+```md
+## Highlights
+
+- User-visible feature or outcome ([#issue](issue-url), [PR #number](pr-url))
+
+## Improvements
+
+- Improvement included in this production revision
+
+## Fixes
+
+- Corrected production behavior
+
+## Operational notes
+
+- Noteworthy deployment or compatibility information
+
+## Known limitations
+
+- Relevant limitation that remains after release
+```
+
+Release notes describe only changes actually included and verified in production. Use the candidate comparison, merged pull requests, and related issues to build the manifest; the `staging` → `main` promotion pull request alone is not a complete feature-level manifest. Preserve the chronological GitHub Release history.
+
+Git tags and GitHub Releases are the authoritative production release identifiers. Existing SemVer-style npm workspace versions serve package metadata and are not synchronized to CalVer unless a future concrete requirement establishes a separate policy.
+
+### Development and production tracking
+
+GitHub Issues remain the development backlog, while GitHub Releases record production history. A development issue may close when its acceptance criteria are satisfied and its implementation is merged into `staging`; record or link the merged pull request when closing it. Because `main` is the default branch, closing keywords in a pull request merged only into `staging` do not automatically close its linked issue, so complete that development-tracking step explicitly.
+
+Issue closure means development completion, not production availability. Beta acceptance is evidence attached to the candidate, and the corresponding GitHub Release identifies what reached verified production. Do not add issue states, labels, milestones, project boards, or a separate release tracker solely to mirror those release stages.
+
+### Failures, regressions, and hotfixes
+
+- If beta acceptance fails or a regression is found before promotion, track the defect at the appropriate severity, correct it through the normal `staging` workflow, select the resulting SHA, and repeat affected acceptance checks.
+- If `staging` changes after final candidate acceptance, invalidate that acceptance and revalidate the new candidate before promotion.
+- If either production deployment or a production check fails after the merge to `main`, do not assign a version or publish a successful release. Record the failure and use the smallest branch-protected correction or recovery path; do not claim rollback is automatic or atomic.
+- If a regression appears after a release was verified and published, preserve its tag and release record. Track and deliver the correction normally or use the exceptional hotfix workflow when urgency requires it.
+- An emergency hotfix may promote outside the preferred window through the documented scoped pull request to `main`. Verify production, assign CalVer from the actual Los Angeles verification date, publish only after success, and synchronize the verified hotfix back into `staging` through a separate pull request.
+- A failed release attempt receives no version unless a production revision was successfully verified and published. Never repoint an existing tag to represent a retry or correction.
+
+Production data changes, migrations, restores, destructive operations, credential changes, deployments, and repository-rule recovery require their own explicit authorization. Release documentation does not authorize them.
+
 ## Code quality
 
 Readability requires blank lines between independent declarations and meaningful steps inside functions. Keep related statements together and document non-obvious invariants. Prettier enforces formatting; manual review checks logical grouping.
