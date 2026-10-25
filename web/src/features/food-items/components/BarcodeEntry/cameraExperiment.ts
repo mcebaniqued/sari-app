@@ -22,6 +22,11 @@ export interface CameraZoomControl {
   current: number;
 }
 
+export interface CameraZoomOption {
+  label: string;
+  value: number;
+}
+
 interface NumericRange {
   min?: number;
   max?: number;
@@ -183,6 +188,49 @@ export async function applyCameraZoom(
   );
 
   return { requested: zoom, actual };
+}
+
+function zoomValuesMatch(left: number, right: number) {
+  return Math.abs(left - right) < 0.000_001;
+}
+
+export function cameraZoomOptions(
+  zoom: CameraZoomControl,
+  initialZoom: number,
+): CameraZoomOption[] {
+  const supportedPresets = [1, 1.5, 2]
+    .filter((value) => {
+      if (value < zoom.min || value > zoom.max) {
+        return false;
+      }
+      if (zoom.step === undefined) {
+        return true;
+      }
+
+      const stepsFromMinimum = (value - zoom.min) / zoom.step;
+
+      return zoomValuesMatch(stepsFromMinimum, Math.round(stepsFromMinimum));
+    })
+    .map((value) => ({ label: `${value}×`, value }));
+  const initialMatchesPreset = supportedPresets.some(({ value }) =>
+    zoomValuesMatch(value, initialZoom),
+  );
+  const initialIsSupported =
+    Number.isFinite(initialZoom) &&
+    initialZoom >= zoom.min &&
+    initialZoom <= zoom.max;
+
+  return [
+    ...(!initialIsSupported || initialMatchesPreset
+      ? []
+      : [
+          {
+            label: `Default (${Number(initialZoom.toFixed(2))}×)`,
+            value: initialZoom,
+          },
+        ]),
+    ...supportedPresets,
+  ];
 }
 
 export function cameraDiagnosticReading(

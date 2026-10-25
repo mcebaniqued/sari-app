@@ -8,6 +8,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -129,7 +130,7 @@ describe("camera scanning lifecycle", () => {
       expect.any(HTMLVideoElement),
       expect.any(Function),
     );
-    expect(screen.queryByRole("slider", { name: "Camera zoom" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Camera zoom" })).toBeNull();
     expect(applyConstraints).not.toHaveBeenCalled();
   });
 
@@ -158,17 +159,56 @@ describe("camera scanning lifecycle", () => {
     });
     render(<CameraScanner onDetected={vi.fn()} onType={vi.fn()} />);
 
-    const slider = await screen.findByRole("slider", { name: "Camera zoom" });
+    const zoomControls = await screen.findByRole("group", {
+      name: "Camera zoom",
+    });
     expect(screen.getByText("Current zoom: 1×")).toBeInTheDocument();
-    fireEvent.change(slider, { target: { value: "2.5" } });
+    expect(
+      within(zoomControls).getByRole("button", { name: "1×" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(within(zoomControls).getByRole("button", { name: "1.5×" }));
 
     await waitFor(() => {
       expect(applyConstraints).toHaveBeenCalledExactlyOnceWith({
-        advanced: [{ zoom: 2.5 }],
+        advanced: [{ zoom: 1.5 }],
       });
     });
-    expect(await screen.findByText("Current zoom: 2.5×")).toBeInTheDocument();
+    expect(await screen.findByText("Current zoom: 1.5×")).toBeInTheDocument();
+    expect(
+      within(zoomControls).getByRole("button", { name: "1.5×" }),
+    ).toHaveAttribute("aria-pressed", "true");
     expect(decode).toHaveBeenCalledOnce();
+  });
+
+  it("offers a distinct default and filters presets outside the reported range", async () => {
+    window.history.replaceState({}, "", "/?cameraDiagnostics=1");
+    const { track } = camera();
+    Object.assign(track, {
+      applyConstraints: vi.fn().mockResolvedValue(undefined),
+      getCapabilities: () => ({
+        zoom: { min: 1.25, max: 1.75, step: 0.25 },
+      }),
+      getSettings: () => ({ zoom: 1.25 }),
+    });
+    render(<CameraScanner onDetected={vi.fn()} onType={vi.fn()} />);
+
+    const zoomControls = await screen.findByRole("group", {
+      name: "Camera zoom",
+    });
+    expect(
+      within(zoomControls).getByRole("button", {
+        name: "Default (1.25×)",
+      }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      within(zoomControls).getByRole("button", { name: "1.5×" }),
+    ).toBeEnabled();
+    expect(
+      within(zoomControls).queryByRole("button", { name: "1×" }),
+    ).toBeNull();
+    expect(
+      within(zoomControls).queryByRole("button", { name: "2×" }),
+    ).toBeNull();
   });
 
   it("continues scanning when a diagnostic zoom constraint is rejected", async () => {
@@ -186,10 +226,7 @@ describe("camera scanning lifecycle", () => {
     const onDetected = vi.fn();
     render(<CameraScanner onDetected={onDetected} onType={vi.fn()} />);
 
-    fireEvent.change(
-      await screen.findByRole("slider", { name: "Camera zoom" }),
-      { target: { value: "2" } },
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "2×" }));
     expect(
       await screen.findByText(/Zoom adjustment wasn't applied/),
     ).toBeInTheDocument();
@@ -210,14 +247,19 @@ describe("camera scanning lifecycle", () => {
     });
     render(<CameraScanner onDetected={vi.fn()} onType={vi.fn()} />);
 
-    fireEvent.change(
-      await screen.findByRole("slider", { name: "Camera zoom" }),
-      { target: { value: "2" } },
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "2×" }));
 
     expect(
       await screen.findByText(/Camera kept zoom at 1× instead of 2×\./),
     ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "1×" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "2×" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
     expect(decode).toHaveBeenCalledOnce();
   });
 
@@ -638,7 +680,7 @@ describe("camera scanning lifecycle", () => {
       screen.getByRole("option", { name: "Default rear camera preference" }),
     ).toBeInTheDocument();
     expect(decode).toHaveBeenCalledOnce();
-    expect(screen.queryByRole("slider", { name: "Camera zoom" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Camera zoom" })).toBeNull();
   });
 
   it("reports acquisition errors without hiding the manual-entry fallback", async () => {

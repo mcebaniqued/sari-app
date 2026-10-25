@@ -80,6 +80,7 @@ export default function CameraScanner({ onDetected, onType }: Props) {
   const [selectedDeviceId, setSelectedDeviceId] = useState("");
   const [cameras, setCameras] = useState<CameraOption[]>([]);
   const [zoom, setZoom] = useState<CameraZoomControl>();
+  const [initialZoom, setInitialZoom] = useState<number>();
   const [zoomMessage, setZoomMessage] = useState("");
 
   const detected = useEffectEvent(onDetected);
@@ -259,6 +260,7 @@ export default function CameraScanner({ onDetected, onType }: Props) {
           if (availableZoom) {
             diagnosticZoomTrackRef.current = track;
             setZoom(availableZoom);
+            setInitialZoom(availableZoom.current);
           }
           const deviceIdentities = new Map<string, string>();
           let nextDeviceIdentity = 1;
@@ -543,6 +545,7 @@ export default function CameraScanner({ onDetected, onType }: Props) {
           cameras={cameras}
           selectedDeviceId={selectedDeviceId}
           strategy={strategy}
+          initialZoom={initialZoom}
           zoom={zoom}
           zoomMessage={zoomMessage}
           onCameraChange={(deviceId) => {
@@ -550,6 +553,7 @@ export default function CameraScanner({ onDetected, onType }: Props) {
             diagnosticZoomRequestRef.current += 1;
             diagnosticZoomTrackRef.current = null;
             setZoom(undefined);
+            setInitialZoom(undefined);
             setZoomMessage("");
             setSelectedDeviceId(deviceId);
           }}
@@ -564,6 +568,7 @@ export default function CameraScanner({ onDetected, onType }: Props) {
             diagnosticZoomRequestRef.current += 1;
             diagnosticZoomTrackRef.current = null;
             setZoom(undefined);
+            setInitialZoom(undefined);
             setZoomMessage("");
             setStrategy(nextStrategy);
           }}

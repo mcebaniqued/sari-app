@@ -2,12 +2,14 @@ import { LuChevronDown } from "react-icons/lu";
 import {
   type CameraOption,
   type CameraZoomControl,
+  cameraZoomOptions,
   type CaptureStrategy,
   captureStrategyLabels,
 } from "./cameraExperiment";
 
 interface Props {
   cameras: CameraOption[];
+  initialZoom: number | undefined;
   selectedDeviceId: string;
   strategy: CaptureStrategy;
   zoom: CameraZoomControl | undefined;
@@ -24,6 +26,7 @@ function formatZoom(value: number) {
 
 export default function CameraDiagnostics({
   cameras,
+  initialZoom,
   selectedDeviceId,
   strategy,
   zoom,
@@ -33,6 +36,11 @@ export default function CameraDiagnostics({
   onStrategyChange,
   onZoomChange,
 }: Props) {
+  const zoomOptions =
+    zoom && initialZoom !== undefined
+      ? cameraZoomOptions(zoom, initialZoom)
+      : [];
+
   return (
     <details
       open
@@ -93,35 +101,37 @@ export default function CameraDiagnostics({
             />
           </span>
         </label>
-        {zoom && (
-          <div>
-            <label
-              htmlFor="camera-zoom"
-              className="mb-1 block text-xs font-medium"
-            >
-              Camera zoom
-            </label>
-            <input
-              id="camera-zoom"
-              type="range"
-              min={zoom.min}
-              max={zoom.max}
-              step={zoom.step ?? "any"}
-              value={zoom.current}
-              onChange={(event) => {
-                onZoomChange(event.currentTarget.valueAsNumber);
-              }}
-              aria-describedby="camera-zoom-status"
-              className="min-h-11.5 w-full accent-brand"
-            />
+        {zoom && zoomOptions.length > 0 && (
+          <fieldset aria-describedby="camera-zoom-status">
+            <legend className="mb-1 text-xs font-medium">Camera zoom</legend>
+            <div className="flex flex-wrap gap-2">
+              {zoomOptions.map((option) => {
+                const selected =
+                  Math.abs(zoom.current - option.value) < 0.000_001;
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => {
+                      onZoomChange(option.value);
+                    }}
+                    className={`inline-flex min-h-11.5 items-center justify-center rounded-control border px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${selected ? "border-brand bg-brand text-content-inverse" : "border-border-control bg-surface text-brand hover:bg-surface-hover"}`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
             <output
               id="camera-zoom-status"
-              className="block text-xs text-content-muted"
+              className="mt-1 block text-xs text-content-muted"
             >
               Current zoom: {formatZoom(zoom.current)}×
               {zoomMessage ? ` — ${zoomMessage}` : ""}
             </output>
-          </div>
+          </fieldset>
         )}
         <button
           type="button"

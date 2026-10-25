@@ -7,6 +7,7 @@ import {
   cameraDiagnosticsEnabled,
   cameraVideoConstraints,
   cameraZoomControl,
+  cameraZoomOptions,
   changedCameraSettings,
   diagnosticCameraLabel,
 } from "./cameraExperiment";
@@ -174,6 +175,29 @@ describe("camera experiment", () => {
         getSettings: () => ({}),
       } as unknown as MediaStreamTrack),
     ).toBeUndefined();
+  });
+
+  it("offers only supported preset zoom values and preserves a distinct initial default", () => {
+    expect(
+      cameraZoomOptions(
+        { min: 1.25, max: 1.75, step: 0.25, current: 1.25 },
+        1.25,
+      ),
+    ).toEqual([
+      { label: "Default (1.25×)", value: 1.25 },
+      { label: "1.5×", value: 1.5 },
+    ]);
+    expect(
+      cameraZoomOptions({ min: 1, max: 2, step: 0.5, current: 1.5 }, 1.5),
+    ).toEqual([
+      { label: "1×", value: 1 },
+      { label: "1.5×", value: 1.5 },
+      { label: "2×", value: 2 },
+    ]);
+    expect(cameraZoomOptions({ min: 1.5, max: 2, current: 1.5 }, 1)).toEqual([
+      { label: "1.5×", value: 1.5 },
+      { label: "2×", value: 2 },
+    ]);
   });
 
   it("identifies only settings that changed between periodic samples", () => {
