@@ -7,6 +7,7 @@ import type {
 import express, { type ErrorRequestHandler, type Response } from "express";
 import { requireSession } from "./auth/requireSession.js";
 import { authRouter } from "./auth/routes.js";
+import { cameraDiagnosticsRouter } from "./camera-diagnostics/routes.js";
 import { connectDatabase } from "./db.js";
 import { foodItemsRouter } from "./food-items/routes.js";
 import { foodProductsRouter } from "./food-products/routes.js";
@@ -61,6 +62,7 @@ app.get(
 
 app.use("/api/v1/food-items", requireSession, foodItemsRouter);
 app.use("/api/v1/food-products", requireSession, foodProductsRouter);
+app.use("/api/v1/camera-diagnostics", requireSession, cameraDiagnosticsRouter);
 
 app.use((_req, res: Response<ApiErrorResponse>) => {
   res

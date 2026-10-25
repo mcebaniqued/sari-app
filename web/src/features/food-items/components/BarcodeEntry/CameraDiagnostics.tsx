@@ -1,30 +1,25 @@
 import { LuChevronDown } from "react-icons/lu";
 import {
-  type CameraDiagnosticSnapshot,
   type CameraOption,
   type CaptureStrategy,
   captureStrategyLabels,
 } from "./cameraExperiment";
 
 interface Props {
-  attempts: number;
-  candidateReads: number;
   cameras: CameraOption[];
   selectedDeviceId: string;
-  snapshot: CameraDiagnosticSnapshot | null;
   strategy: CaptureStrategy;
   onCameraChange: (deviceId: string) => void;
+  onManualMarker: () => void;
   onStrategyChange: (strategy: CaptureStrategy) => void;
 }
 
 export default function CameraDiagnostics({
-  attempts,
-  candidateReads,
   cameras,
   selectedDeviceId,
-  snapshot,
   strategy,
   onCameraChange,
+  onManualMarker,
   onStrategyChange,
 }: Props) {
   return (
@@ -36,8 +31,8 @@ export default function CameraDiagnostics({
         Camera diagnostics
       </summary>
       <p className="mt-2 text-xs text-content-muted">
-        Temporary local-only experiment. Change one setting at a time; camera
-        frames and these details are not sent anywhere.
+        Temporary preview experiment. Structured events go to protected Sari
+        preview logs; camera frames and barcode values are never sent.
       </p>
       <div className="mt-3 grid gap-3">
         <label>
@@ -87,35 +82,14 @@ export default function CameraDiagnostics({
             />
           </span>
         </label>
+        <button
+          type="button"
+          onClick={onManualMarker}
+          className="inline-flex min-h-11.5 w-full items-center justify-center rounded-control border border-border-control bg-surface px-3 py-2 text-sm font-medium text-brand hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+        >
+          Camera switched / image sharpened
+        </button>
       </div>
-      <dl className="mt-3 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs">
-        <dt className="font-medium">Requested</dt>
-        <dd>{captureStrategyLabels[strategy]}</dd>
-        <dt className="font-medium">Selected camera</dt>
-        <dd className="min-w-0 break-words">
-          {snapshot?.cameraLabel ?? "Waiting for camera"}
-        </dd>
-        <dt className="font-medium">Capture resolution</dt>
-        <dd>{snapshot?.captureResolution ?? "Waiting for camera"}</dd>
-        <dt className="font-medium">Video resolution</dt>
-        <dd>{snapshot?.videoResolution ?? "Waiting for camera"}</dd>
-        <dt className="font-medium">Frame rate</dt>
-        <dd>{snapshot?.frameRate ?? "Waiting for camera"}</dd>
-        <dt className="font-medium">Facing mode</dt>
-        <dd>{snapshot?.facingMode ?? "Waiting for camera"}</dd>
-        <dt className="font-medium">Resolution range</dt>
-        <dd>{snapshot?.resolutionCapability ?? "Waiting for camera"}</dd>
-        <dt className="font-medium">Frame-rate range</dt>
-        <dd>{snapshot?.frameRateCapability ?? "Waiting for camera"}</dd>
-        <dt className="font-medium">Focus modes</dt>
-        <dd>{snapshot?.focusModes ?? "Waiting for camera"}</dd>
-        <dt className="font-medium">Zoom range</dt>
-        <dd>{snapshot?.zoomCapability ?? "Waiting for camera"}</dd>
-        <dt className="font-medium">Decode callbacks</dt>
-        <dd>{attempts}</dd>
-        <dt className="font-medium">Matching reads</dt>
-        <dd>{candidateReads} / 3</dd>
-      </dl>
     </details>
   );
 }

@@ -1,3 +1,8 @@
+import type {
+  CameraDiagnosticCapabilities,
+  CameraDiagnosticSettings,
+} from "@sari/contracts";
+
 export type CaptureStrategy = "baseline" | "prefer-hd";
 
 export interface CameraOption {
@@ -5,16 +10,9 @@ export interface CameraOption {
   label: string;
 }
 
-export interface CameraDiagnosticSnapshot {
-  cameraLabel: string;
-  captureResolution: string;
-  videoResolution: string;
-  frameRate: string;
-  facingMode: string;
-  resolutionCapability: string;
-  frameRateCapability: string;
-  focusModes: string;
-  zoomCapability: string;
+export interface CameraDiagnosticReading {
+  rawDeviceId?: string;
+  settings: CameraDiagnosticSettings;
 }
 
 interface NumericRange {
@@ -48,27 +46,48 @@ export function cameraVideoConstraints(
     : camera;
 }
 
-function describeNumber(value: number | undefined) {
-  return value === undefined ? "Not reported" : String(Math.round(value));
-}
-
-function describeRange(value: unknown) {
+function numericRange(value: unknown) {
   if (!value || typeof value !== "object") {
-    return "Not reported";
+    return undefined;
   }
 
   const { min, max } = value as NumericRange;
-  if (typeof min !== "number" || typeof max !== "number") {
-    return "Not reported";
+  if (
+    typeof min !== "number" ||
+    !Number.isFinite(min) ||
+    min < 0 ||
+    typeof max !== "number" ||
+    !Number.isFinite(max) ||
+    max < min ||
+    max > 100_000
+  ) {
+    return undefined;
   }
 
-  return min === max ? String(min) : `${min}–${max}`;
+  return { min, max };
 }
 
-function describeModes(value: unknown) {
-  return Array.isArray(value) && value.every((mode) => typeof mode === "string")
-    ? value.join(", ")
-    : "Not reported";
+function boundedNumber(
+  value: unknown,
+  { integer = false, max = 100_000, positive = false } = {},
+) {
+  if (
+    typeof value !== "number" ||
+    !Number.isFinite(value) ||
+    value < (positive ? Number.EPSILON : 0) ||
+    value > max ||
+    (integer && !Number.isInteger(value))
+  ) {
+    return undefined;
+  }
+
+  return value;
+}
+
+function boundedString(value: unknown) {
+  return typeof value === "string" && value.trim()
+    ? value.trim().slice(0, 64)
+    : undefined;
 }
 
 function readCameraValue<T>(read: () => T, fallback: T) {
@@ -79,47 +98,118 @@ function readCameraValue<T>(read: () => T, fallback: T) {
   }
 }
 
-export function cameraDiagnosticSnapshot(
+export function cameraDiagnosticReading(
   track: MediaStreamTrack,
   video: HTMLVideoElement,
-): CameraDiagnosticSnapshot {
+  deviceIdentity?: string,
+): CameraDiagnosticReading {
   const inspectableTrack = track as unknown as {
-    getCapabilities?: () => MediaTrackCapabilities;
     getSettings?: () => MediaTrackSettings;
   };
-  const settings = readCameraValue(
+  const reported = readCameraValue(
     () => inspectableTrack.getSettings?.() ?? {},
     {},
-  );
+  ) as MediaTrackSettings & Record<string, unknown>;
+  const width = boundedNumber(reported.width, {
+    integer: true,
+    max: 16_384,
+    positive: true,
+  });
+  const height = boundedNumber(reported.height, {
+    integer: true,
+    max: 16_384,
+    positive: true,
+  });
+  const videoWidth = boundedNumber(video.videoWidth, {
+    integer: true,
+    max: 16_384,
+  });
+  const videoHeight = boundedNumber(video.videoHeight, {
+    integer: true,
+    max: 16_384,
+  });
+  const frameRate = boundedNumber(reported.frameRate, {
+    max: 1_000,
+    positive: true,
+  });
+  const focusDistance = boundedNumber(reported.focusDistance);
+  const zoom = boundedNumber(reported.zoom, { max: 1_000 });
+
+  return {
+    ...(typeof reported.deviceId === "string" && reported.deviceId
+      ? { rawDeviceId: reported.deviceId }
+      : {}),
+    settings: {
+      ...(width === undefined ? {} : { width }),
+      ...(height === undefined ? {} : { height }),
+      ...(videoWidth === undefined ? {} : { videoWidth }),
+      ...(videoHeight === undefined ? {} : { videoHeight }),
+      ...(frameRate === undefined ? {} : { frameRate }),
+      ...(boundedString(reported.facingMode)
+        ? { facingMode: boundedString(reported.facingMode) }
+        : {}),
+      ...(boundedString(reported.focusMode)
+        ? { focusMode: boundedString(reported.focusMode) }
+        : {}),
+      ...(focusDistance === undefined ? {} : { focusDistance }),
+      ...(zoom === undefined ? {} : { zoom }),
+      ...(deviceIdentity ? { deviceIdentity } : {}),
+    },
+  };
+}
+
+export function cameraDiagnosticCapabilities(
+  track: MediaStreamTrack,
+): CameraDiagnosticCapabilities {
+  const inspectableTrack = track as unknown as {
+    getCapabilities?: () => MediaTrackCapabilities;
+  };
   const capabilities = readCameraValue(
     () => inspectableTrack.getCapabilities?.() ?? {},
     {},
   ) as MediaTrackCapabilities & Record<string, unknown>;
-  const captureResolution =
-    settings.width === undefined || settings.height === undefined
-      ? "Not reported"
-      : `${settings.width} × ${settings.height}`;
-  const videoResolution =
-    video.videoWidth && video.videoHeight
-      ? `${video.videoWidth} × ${video.videoHeight}`
-      : "Not reported";
-  const width = describeRange(capabilities.width);
-  const height = describeRange(capabilities.height);
+  const focusModes = Array.isArray(capabilities.focusMode)
+    ? capabilities.focusMode
+        .filter((mode): mode is string => typeof mode === "string")
+        .map((mode) => mode.trim().slice(0, 64))
+        .filter(Boolean)
+        .slice(0, 10)
+    : undefined;
 
   return {
-    cameraLabel: track.label.trim() ? track.label : "Not reported",
-    captureResolution,
-    videoResolution,
-    frameRate: describeNumber(settings.frameRate),
-    facingMode: settings.facingMode ?? "Not reported",
-    resolutionCapability:
-      width === "Not reported" && height === "Not reported"
-        ? "Not reported"
-        : `${width} × ${height}`,
-    frameRateCapability: describeRange(capabilities.frameRate),
-    focusModes: describeModes(capabilities.focusMode),
-    zoomCapability: describeRange(capabilities.zoom),
+    ...(numericRange(capabilities.width)
+      ? { width: numericRange(capabilities.width) }
+      : {}),
+    ...(numericRange(capabilities.height)
+      ? { height: numericRange(capabilities.height) }
+      : {}),
+    ...(numericRange(capabilities.frameRate)
+      ? { frameRate: numericRange(capabilities.frameRate) }
+      : {}),
+    ...(numericRange(capabilities.zoom)
+      ? { zoom: numericRange(capabilities.zoom) }
+      : {}),
+    ...(numericRange(capabilities.focusDistance)
+      ? { focusDistance: numericRange(capabilities.focusDistance) }
+      : {}),
+    ...(focusModes?.length ? { focusModes } : {}),
   };
+}
+
+export function changedCameraSettings(
+  previous: CameraDiagnosticSettings,
+  current: CameraDiagnosticSettings,
+) {
+  return (
+    Object.keys({
+      ...previous,
+      ...current,
+    }) as (keyof CameraDiagnosticSettings)[]
+  ).filter((field) => previous[field] !== current[field]);
+}
+
+export function diagnosticCameraLabel(track: MediaStreamTrack) {
+  return track.label.trim().slice(0, 120) || "Not reported";
 }
 
 export async function availableVideoInputs(media: MediaDevices) {

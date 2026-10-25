@@ -1,4 +1,8 @@
 import {
+  type CameraDiagnosticBatch,
+  cameraDiagnosticBatchSchema,
+} from "@sari/contracts";
+import {
   act,
   fireEvent,
   render,
@@ -36,6 +40,34 @@ function read(value: string, format = BarcodeFormat.UPC_A) {
       { stop },
     );
   });
+}
+
+function miss() {
+  const callback = decode.mock.calls[0]?.[2] as (
+    result: undefined,
+    error: undefined,
+    controls: { stop: () => void },
+  ) => void;
+  act(() => {
+    callback(undefined, undefined, { stop });
+  });
+}
+
+function captureDiagnosticBatches() {
+  const batches: CameraDiagnosticBatch[] = [];
+  const fetch = vi.fn((_input: string, init?: RequestInit) => {
+    if (typeof init?.body !== "string") {
+      throw new TypeError("Expected a serialized diagnostic batch.");
+    }
+
+    const body: unknown = JSON.parse(init.body);
+    batches.push(cameraDiagnosticBatchSchema.parse(body));
+
+    return Promise.resolve(new Response(null, { status: 204 }));
+  });
+  vi.stubGlobal("fetch", fetch);
+
+  return { batches, fetch };
 }
 
 afterEach(() => {
@@ -365,6 +397,7 @@ describe("camera scanning lifecycle", () => {
 
   it("keeps baseline acquisition unchanged until the user opts into the resolution experiment", async () => {
     window.history.replaceState({}, "", "/?cameraDiagnostics=1");
+    const { batches, fetch } = captureDiagnosticBatches();
     const { getUserMedia, trackStop } = camera();
     render(<CameraScanner onDetected={vi.fn()} onType={vi.fn()} />);
     await waitFor(() => {
@@ -374,7 +407,7 @@ describe("camera scanning lifecycle", () => {
       audio: false,
       video: { facingMode: { ideal: "environment" } },
     });
-    expect(screen.getByText("1280 × 720")).toBeInTheDocument();
+    expect(screen.getByText("Camera diagnostics")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Capture strategy"), {
       target: { value: "prefer-hd" },
@@ -392,6 +425,15 @@ describe("camera scanning lifecycle", () => {
         height: { ideal: 1080 },
       },
     });
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalled();
+    });
+    expect(batches.flatMap((batch) => batch.events)).toContainEqual(
+      expect.objectContaining({
+        type: "session-cancelled",
+        reason: "strategy-change",
+      }),
+    );
   });
 
   it("lists permission-exposed cameras and changes only the selected source", async () => {
@@ -469,11 +511,40 @@ describe("camera scanning lifecycle", () => {
     vi.stubGlobal("navigator", { mediaDevices: { getUserMedia } });
     render(<CameraScanner onDetected={vi.fn()} onType={vi.fn()} />);
 
-    expect(await screen.findAllByText("Not reported")).not.toHaveLength(0);
+    expect(
+      await screen.findByRole("button", {
+        name: "Camera switched / image sharpened",
+      }),
+    ).toBeEnabled();
     expect(
       screen.getByRole("option", { name: "Default rear camera preference" }),
     ).toBeInTheDocument();
     expect(decode).toHaveBeenCalledOnce();
+  });
+
+  it("reports acquisition errors without hiding the manual-entry fallback", async () => {
+    window.history.replaceState({}, "", "/?cameraDiagnostics=1");
+    const { batches, fetch } = captureDiagnosticBatches();
+    const { getUserMedia } = camera();
+    getUserMedia.mockRejectedValue(
+      new DOMException("Denied", "NotAllowedError"),
+    );
+    render(<CameraScanner onDetected={vi.fn()} onType={vi.fn()} />);
+
+    expect(await screen.findByText(/Allow camera access/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalled();
+    });
+    expect(batches.flatMap((batch) => batch.events)).toContainEqual(
+      expect.objectContaining({
+        type: "session-error",
+        stage: "acquisition",
+        errorName: "NotAllowedError",
+      }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Enter barcode manually" }),
+    ).toBeEnabled();
   });
 
   it("stops a stale permission result after the diagnostic strategy changes", async () => {
@@ -531,6 +602,106 @@ describe("camera scanning lifecycle", () => {
 
     expect(staleStop).toHaveBeenCalled();
     expect(activeStop).not.toHaveBeenCalled();
-    expect(screen.getByText("Active camera")).toBeInTheDocument();
+    expect(decode).toHaveBeenCalledOnce();
+  });
+
+  it("sends an ordered timeline for settings changes and decoder outcomes without barcode values", async () => {
+    vi.useFakeTimers();
+    window.history.replaceState({}, "", "/?cameraDiagnostics=1");
+    const { batches, fetch } = captureDiagnosticBatches();
+    const { track } = camera();
+    let settings = {
+      width: 640,
+      height: 480,
+      frameRate: 30,
+      facingMode: "environment",
+      zoom: 1,
+      deviceId: "raw-camera-a",
+    };
+    track.getSettings = () => settings;
+    const onDetected = vi.fn();
+    render(<CameraScanner onDetected={onDetected} onType={vi.fn()} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(decode).toHaveBeenCalledOnce();
+
+    const video = screen.getByLabelText<HTMLVideoElement>(
+      "Barcode camera preview",
+    );
+    Object.defineProperties(video, {
+      videoWidth: { configurable: true, value: 640 },
+      videoHeight: { configurable: true, value: 480 },
+      readyState: { configurable: true, value: 1 },
+    });
+    fireEvent.loadedMetadata(video);
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Camera switched / image sharpened",
+      }),
+    );
+    settings = {
+      ...settings,
+      width: 1920,
+      height: 1080,
+      zoom: 2,
+      deviceId: "raw-camera-b",
+    };
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    miss();
+    read("853807005033");
+    read("853807005034");
+    read("853807005033");
+    read("853807005033");
+    read("853807005033");
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(onDetected).toHaveBeenCalledExactlyOnceWith("853807005033");
+    expect(fetch).toHaveBeenCalled();
+    const events = batches.flatMap((batch) => batch.events);
+    expect(events.map((event) => event.type)).toEqual(
+      expect.arrayContaining([
+        "session-started",
+        "camera-acquired",
+        "video-ready",
+        "decoder-started",
+        "manual-marker",
+        "settings-changed",
+        "decode-summary",
+        "first-valid-read",
+        "matching-reset",
+        "matching-progress",
+        "session-completed",
+      ]),
+    );
+    expect(events.map((event) => event.sequence)).toEqual(
+      [...events]
+        .map((event) => event.sequence)
+        .sort((left, right) => left - right),
+    );
+    const settingsEvent = events.find(
+      (event) => event.type === "settings-changed",
+    );
+    expect(settingsEvent?.changedFields).toEqual(
+      expect.arrayContaining(["width", "height", "zoom", "deviceIdentity"]),
+    );
+    expect(settingsEvent?.settings.deviceIdentity).toBe("camera-2");
+    const summaryEvent = events.find(
+      (event) => event.type === "decode-summary",
+    );
+    expect(summaryEvent).toMatchObject({
+      attempts: 6,
+      noResult: 1,
+      invalid: 1,
+      valid: 4,
+    });
+    expect(JSON.stringify(batches)).not.toContain("853807005033");
+    expect(JSON.stringify(batches)).not.toContain("raw-camera");
   });
 });

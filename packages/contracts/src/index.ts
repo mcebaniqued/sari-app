@@ -9,6 +9,13 @@ export {
   type RegisterInput,
   registerSchema,
 } from "./auth.js";
+export {
+  type CameraDiagnosticBatch,
+  cameraDiagnosticBatchSchema,
+  type CameraDiagnosticCapabilities,
+  type CameraDiagnosticEvent,
+  type CameraDiagnosticSettings,
+} from "./camera-diagnostics.js";
 export { type FoodItemQuery, foodItemQuerySchema } from "./food-item-query.js";
 export {
   type CreateFoodItem,

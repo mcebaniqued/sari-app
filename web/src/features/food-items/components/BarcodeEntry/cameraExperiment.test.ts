@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   availableVideoInputs,
+  cameraDiagnosticCapabilities,
+  cameraDiagnosticReading,
   cameraDiagnosticsEnabled,
-  cameraDiagnosticSnapshot,
   cameraVideoConstraints,
+  changedCameraSettings,
+  diagnosticCameraLabel,
 } from "./cameraExperiment";
 
 describe("camera experiment", () => {
@@ -27,7 +30,7 @@ describe("camera experiment", () => {
     });
   });
 
-  it("reports only useful camera settings and optional capabilities", () => {
+  it("reports bounded camera settings without transmitting the raw device ID", () => {
     const track = {
       label: "Back Camera",
       getSettings: () => ({
@@ -48,17 +51,26 @@ describe("camera experiment", () => {
     } as unknown as MediaStreamTrack;
     const video = { videoWidth: 1920, videoHeight: 1080 } as HTMLVideoElement;
 
-    expect(cameraDiagnosticSnapshot(track, video)).toEqual({
-      cameraLabel: "Back Camera",
-      captureResolution: "1920 × 1080",
-      videoResolution: "1920 × 1080",
-      frameRate: "30",
-      facingMode: "environment",
-      resolutionCapability: "320–1920 × 240–1080",
-      frameRateCapability: "1–60",
-      focusModes: "continuous, manual",
-      zoomCapability: "1–5",
+    expect(cameraDiagnosticReading(track, video, "camera-1")).toEqual({
+      rawDeviceId: "not-shown",
+      settings: {
+        width: 1920,
+        height: 1080,
+        videoWidth: 1920,
+        videoHeight: 1080,
+        frameRate: 29.97,
+        facingMode: "environment",
+        deviceIdentity: "camera-1",
+      },
     });
+    expect(cameraDiagnosticCapabilities(track)).toEqual({
+      width: { min: 320, max: 1920 },
+      height: { min: 240, max: 1080 },
+      frameRate: { min: 1, max: 60 },
+      focusModes: ["continuous", "manual"],
+      zoom: { min: 1, max: 5 },
+    });
+    expect(diagnosticCameraLabel(track)).toBe("Back Camera");
   });
 
   it("uses label fallbacks and tolerates failed device enumeration", async () => {
@@ -84,7 +96,7 @@ describe("camera experiment", () => {
     ).toEqual([]);
   });
 
-  it("treats failed optional inspection methods as unreported diagnostics", () => {
+  it("treats failed optional inspection methods as empty diagnostics", () => {
     const track = {
       label: "",
       getSettings: () => {
@@ -96,20 +108,24 @@ describe("camera experiment", () => {
     } as unknown as MediaStreamTrack;
 
     expect(
-      cameraDiagnosticSnapshot(track, {
+      cameraDiagnosticReading(track, {
         videoWidth: 0,
         videoHeight: 0,
       } as HTMLVideoElement),
     ).toEqual({
-      cameraLabel: "Not reported",
-      captureResolution: "Not reported",
-      videoResolution: "Not reported",
-      frameRate: "Not reported",
-      facingMode: "Not reported",
-      resolutionCapability: "Not reported",
-      frameRateCapability: "Not reported",
-      focusModes: "Not reported",
-      zoomCapability: "Not reported",
+      settings: { videoWidth: 0, videoHeight: 0 },
     });
+    expect(cameraDiagnosticCapabilities(track)).toEqual({});
+    expect(diagnosticCameraLabel(track)).toBe("Not reported");
+  });
+
+  it("identifies only settings that changed between periodic samples", () => {
+    expect(
+      changedCameraSettings(
+        { width: 640, height: 480, zoom: 1, deviceIdentity: "camera-1" },
+        { width: 1920, height: 1080, zoom: 2, deviceIdentity: "camera-2" },
+      ),
+    ).toEqual(["width", "height", "zoom", "deviceIdentity"]);
+    expect(changedCameraSettings({ width: 640 }, { width: 640 })).toEqual([]);
   });
 });

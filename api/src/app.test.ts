@@ -76,6 +76,18 @@ describe("API infrastructure", () => {
     });
   });
 
+  it("requires authentication before accepting camera diagnostics", async () => {
+    const response = await request(app)
+      .post("/api/v1/camera-diagnostics")
+      .set("Origin", "http://127.0.0.1:5173")
+      .send({});
+
+    expect(response.status).toBe(401);
+    expect(apiErrorResponseSchema.parse(response.body).error.code).toBe(
+      "UNAUTHORIZED",
+    );
+  });
+
   it("rejects oversized request bodies", async () => {
     const response = await request(app)
       .post("/api/v1/missing")
