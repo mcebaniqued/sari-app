@@ -166,12 +166,17 @@ Production releases use `vYYYY.MM.DD[.N]`, based on the actual successful produc
 
 The first release on a Los Angeles calendar date omits the sequence. Start the second at `.1` and increment it for each additional verified release that date. Development, beta, merge, and deployment-start dates do not determine the version. Do not reserve a version before verification, increment for a skipped week, or retroactively version historical deployments without verifiable evidence.
 
-After all production checks pass, set `RELEASE_COMMIT` to the full commit reported by the verified production deployments and `RELEASE_TAG` to the next valid CalVer value. The guarded command sequence fetches `main` and all tags, resolves the proposed commit, and creates the tag only when that commit exactly matches `origin/main` and the tag is unused. A fetch failure, invalid or mismatched commit, or existing tag reports the problem without closing an interactive Git Bash session.
+After all production checks pass, set `RELEASE_COMMIT` to the full commit reported by the verified production deployments. The commands derive the Los Angeles release date and initialize `RELEASE_TAG` for the first release that day; append the required positive sequence for a later same-day release. The guarded sequence rejects malformed tags and dates other than the current Los Angeles date, fetches `main` and all tags, resolves the proposed commit, and creates the tag only when that commit exactly matches `origin/main` and the tag is unused. A validation or Git failure reports the problem without closing an interactive Git Bash session.
 
 ```sh
 RELEASE_COMMIT="paste-verified-production-commit"
-RELEASE_TAG="vYYYY.MM.DD"
-if ! git fetch origin main --tags; then
+RELEASE_DATE=$(TZ=America/Los_Angeles date +%Y.%m.%d)
+RELEASE_TAG="v$RELEASE_DATE" # Append .1, .2, and so on for later same-day releases.
+if [[ ! "$RELEASE_TAG" =~ ^v[0-9]{4}\.(0[1-9]|1[0-2])\.(0[1-9]|[12][0-9]|3[01])(\.[1-9][0-9]*)?$ ]]; then
+  echo "Release tag is not a valid CalVer value; do not create a release tag."
+elif [ "${RELEASE_TAG:1:10}" != "$RELEASE_DATE" ]; then
+  echo "Release tag does not use the current Los Angeles date; do not create a release tag."
+elif ! git fetch origin main --tags; then
   echo "Fetch failed; do not create a release tag."
 elif ! RESOLVED_RELEASE_COMMIT=$(git rev-parse "$RELEASE_COMMIT^{commit}"); then
   echo "Release commit is invalid; do not create a release tag."
@@ -184,8 +189,9 @@ else
   read -r -p "Type that commit SHA to create and push $RELEASE_TAG: " CONFIRMED_RELEASE_COMMIT
   if [ "$CONFIRMED_RELEASE_COMMIT" != "$RESOLVED_RELEASE_COMMIT" ]; then
     echo "Confirmation did not match; no tag was created."
+  elif ! git tag --annotate "$RELEASE_TAG" "$RESOLVED_RELEASE_COMMIT" --message "Sari $RELEASE_TAG"; then
+    echo "Tag creation failed; no tag was pushed."
   else
-    git tag --annotate "$RELEASE_TAG" "$RESOLVED_RELEASE_COMMIT" --message "Sari $RELEASE_TAG"
     git rev-list -n 1 "$RELEASE_TAG"
     git push origin "refs/tags/$RELEASE_TAG"
   fi
