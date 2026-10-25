@@ -107,7 +107,7 @@ The `main` branch and `https://sari-web.vercel.app` are production. Promote only
 
 ### Release candidates and beta acceptance
 
-Select a candidate by its full `staging` commit SHA. Compare it with the current production revision and review the included features, fixes, maintenance, and possible regressions. The following commands record the revisions and provide a reviewable summary; run them from a clean checkout and retain the resolved SHAs with the release evidence:
+Select a candidate by its full `staging` commit SHA. Compare it with the current production revision and review the included features, fixes, maintenance, and possible regressions. The command examples in this section use POSIX shell syntax; on Windows, run them in Git Bash rather than PowerShell. Run them from a clean checkout and retain the resolved SHAs with the release evidence:
 
 ```sh
 git fetch origin main staging --tags
@@ -166,34 +166,33 @@ Production releases use `vYYYY.MM.DD[.N]`, based on the actual successful produc
 
 The first release on a Los Angeles calendar date omits the sequence. Start the second at `.1` and increment it for each additional verified release that date. Development, beta, merge, and deployment-start dates do not determine the version. Do not reserve a version before verification, increment for a skipped week, or retroactively version historical deployments without verifiable evidence.
 
-After all production checks pass, fetch `main` and all tags, then set `RELEASE_COMMIT` to the full commit reported by the verified production deployments and `RELEASE_TAG` to the next valid CalVer value. The two `rev-parse` commands must identify the intended production commit; stop if the deployment, local `origin/main`, or recorded promotion result disagrees.
+After all production checks pass, set `RELEASE_COMMIT` to the full commit reported by the verified production deployments and `RELEASE_TAG` to the next valid CalVer value. The guarded command sequence fetches `main` and all tags, resolves the proposed commit, and creates the tag only when that commit exactly matches `origin/main` and the tag is unused. A fetch failure, invalid or mismatched commit, or existing tag reports the problem without closing an interactive Git Bash session.
 
 ```sh
-git fetch origin main --tags
 RELEASE_COMMIT="paste-verified-production-commit"
 RELEASE_TAG="vYYYY.MM.DD"
-git rev-parse "$RELEASE_COMMIT^{commit}"
-git rev-parse "origin/main^{commit}"
-test "$(git rev-parse "$RELEASE_COMMIT^{commit}")" = "$(git rev-parse "origin/main^{commit}")"
-git merge-base --is-ancestor "$RELEASE_COMMIT" origin/main
-```
-
-Check that the chosen tag does not already exist. Because the fetch imports remote tags, the guard stops if the tag is already taken; select the next valid same-day sequence instead. Never delete, reuse, move, or force-update a published release tag.
-
-```sh
-if git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+if ! git fetch origin main --tags; then
+  echo "Fetch failed; do not create a release tag."
+elif ! RESOLVED_RELEASE_COMMIT=$(git rev-parse "$RELEASE_COMMIT^{commit}"); then
+  echo "Release commit is invalid; do not create a release tag."
+elif [ "$RESOLVED_RELEASE_COMMIT" != "$(git rev-parse "origin/main^{commit}")" ]; then
+  echo "Release commit does not match origin/main; do not create a release tag."
+elif git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
   echo "Tag already exists; select the next valid CalVer value."
-  exit 1
+else
+  echo "Verified production commit: $RESOLVED_RELEASE_COMMIT"
+  read -r -p "Type that commit SHA to create and push $RELEASE_TAG: " CONFIRMED_RELEASE_COMMIT
+  if [ "$CONFIRMED_RELEASE_COMMIT" != "$RESOLVED_RELEASE_COMMIT" ]; then
+    echo "Confirmation did not match; no tag was created."
+  else
+    git tag --annotate "$RELEASE_TAG" "$RESOLVED_RELEASE_COMMIT" --message "Sari $RELEASE_TAG"
+    git rev-list -n 1 "$RELEASE_TAG"
+    git push origin "refs/tags/$RELEASE_TAG"
+  fi
 fi
 ```
 
-After the guard succeeds, create an annotated tag on the explicit verified commit. Review the tagged SHA before pushing the exact tag ref. Do not use `--force`.
-
-```sh
-git tag --annotate "$RELEASE_TAG" "$RELEASE_COMMIT" --message "Sari $RELEASE_TAG"
-git rev-list -n 1 "$RELEASE_TAG"
-git push origin "refs/tags/$RELEASE_TAG"
-```
+The confirmation must match the displayed verified SHA before the tag is created or pushed. If any guard reports a problem, correct it and run the complete sequence again. Because the fetch imports remote tags, an existing tag is never reused; select the next valid same-day sequence instead. Never delete, reuse, move, or force-update a published release tag, and do not add `--force` to the push.
 
 In GitHub Releases, draft a release using the existing pushed tag and confirm GitHub shows the same commit. Publish only after that check. Use this concise structure, omitting empty sections:
 
