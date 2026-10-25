@@ -69,7 +69,9 @@ export default function CameraScanner({ onDetected, onType }: Props) {
 
   const [guidance, setGuidance] = useState(0);
   const [error, setError] = useState("");
-  const [strategy, setStrategy] = useState<CaptureStrategy>("baseline");
+  const [strategy, setStrategy] = useState<CaptureStrategy>(
+    diagnosticsEnabled ? "baseline" : "prefer-hd",
+  );
   const [selectedDeviceId, setSelectedDeviceId] = useState("");
   const [cameras, setCameras] = useState<CameraOption[]>([]);
 

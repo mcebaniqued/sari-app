@@ -103,6 +103,28 @@ describe("camera scanning lifecycle", () => {
     return { stream, track, trackStop, getUserMedia };
   }
 
+  it("prefers 1080p for normal sessions and decodes the negotiated stream unchanged", async () => {
+    const { getUserMedia, stream } = camera();
+    render(<CameraScanner onDetected={vi.fn()} onType={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(decode).toHaveBeenCalledOnce();
+    });
+    expect(getUserMedia).toHaveBeenCalledExactlyOnceWith({
+      audio: false,
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+      },
+    });
+    expect(decode).toHaveBeenCalledWith(
+      stream,
+      expect.any(HTMLVideoElement),
+      expect.any(Function),
+    );
+  });
+
   it("requires repeated matching reads before accepting and stopping the camera", async () => {
     const { trackStop } = camera();
     const onDetected = vi.fn();
@@ -395,7 +417,7 @@ describe("camera scanning lifecycle", () => {
     ).toBeEnabled();
   });
 
-  it("keeps baseline acquisition unchanged until the user opts into the resolution experiment", async () => {
+  it("keeps diagnostic baseline distinct until the user selects the resolution experiment", async () => {
     window.history.replaceState({}, "", "/?cameraDiagnostics=1");
     const { batches, fetch } = captureDiagnosticBatches();
     const { getUserMedia, trackStop } = camera();
