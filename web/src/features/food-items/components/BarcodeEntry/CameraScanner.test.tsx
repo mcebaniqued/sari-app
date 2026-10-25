@@ -39,6 +39,7 @@ function read(value: string, format = BarcodeFormat.UPC_A) {
 }
 
 afterEach(() => {
+  window.history.replaceState({}, "", "/");
   vi.unstubAllGlobals();
   vi.useRealTimers();
   vi.clearAllMocks();
@@ -48,12 +49,26 @@ describe("camera scanning lifecycle", () => {
   function camera() {
     vi.stubGlobal("isSecureContext", true);
     const trackStop = vi.fn();
-    const stream = { getTracks: () => [{ stop: trackStop }] };
+    const track = {
+      label: "Back Camera",
+      stop: trackStop,
+      getCapabilities: () => ({}),
+      getSettings: () => ({
+        width: 1280,
+        height: 720,
+        frameRate: 30,
+        facingMode: "environment",
+      }),
+    };
+    const stream = {
+      getTracks: () => [track],
+      getVideoTracks: () => [track],
+    };
     const getUserMedia = vi.fn().mockResolvedValue(stream);
     vi.stubGlobal("navigator", { mediaDevices: { getUserMedia } });
     decode.mockResolvedValue({ stop });
 
-    return { stream, trackStop, getUserMedia };
+    return { stream, track, trackStop, getUserMedia };
   }
 
   it("requires repeated matching reads before accepting and stopping the camera", async () => {
@@ -346,5 +361,176 @@ describe("camera scanning lifecycle", () => {
     expect(
       screen.getByRole("button", { name: "Enter barcode manually" }),
     ).toBeEnabled();
+  });
+
+  it("keeps baseline acquisition unchanged until the user opts into the resolution experiment", async () => {
+    window.history.replaceState({}, "", "/?cameraDiagnostics=1");
+    const { getUserMedia, trackStop } = camera();
+    render(<CameraScanner onDetected={vi.fn()} onType={vi.fn()} />);
+    await waitFor(() => {
+      expect(getUserMedia).toHaveBeenCalledOnce();
+    });
+    expect(getUserMedia).toHaveBeenNthCalledWith(1, {
+      audio: false,
+      video: { facingMode: { ideal: "environment" } },
+    });
+    expect(screen.getByText("1280 × 720")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Capture strategy"), {
+      target: { value: "prefer-hd" },
+    });
+
+    await waitFor(() => {
+      expect(getUserMedia).toHaveBeenCalledTimes(2);
+    });
+    expect(trackStop).toHaveBeenCalled();
+    expect(getUserMedia).toHaveBeenNthCalledWith(2, {
+      audio: false,
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+      },
+    });
+  });
+
+  it("lists permission-exposed cameras and changes only the selected source", async () => {
+    window.history.replaceState({}, "", "/?cameraDiagnostics=1");
+    const { getUserMedia } = camera();
+    const enumerateDevices = vi.fn().mockResolvedValue([
+      { kind: "audioinput", deviceId: "microphone", label: "Phone mic" },
+      { kind: "videoinput", deviceId: "wide", label: "Back Camera" },
+      { kind: "videoinput", deviceId: "alternate", label: "Back Camera 2" },
+    ]);
+    vi.stubGlobal("navigator", {
+      mediaDevices: { enumerateDevices, getUserMedia },
+    });
+    render(<CameraScanner onDetected={vi.fn()} onType={vi.fn()} />);
+    expect(
+      await screen.findByRole("option", { name: "Back Camera 2" }),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Camera source"), {
+      target: { value: "alternate" },
+    });
+
+    await waitFor(() => {
+      expect(getUserMedia).toHaveBeenCalledTimes(2);
+    });
+    expect(getUserMedia).toHaveBeenNthCalledWith(2, {
+      audio: false,
+      video: { deviceId: { exact: "alternate" } },
+    });
+  });
+
+  it("reports an unavailable selected camera without silently changing sources", async () => {
+    window.history.replaceState({}, "", "/?cameraDiagnostics=1");
+    const { getUserMedia, stream, trackStop } = camera();
+    getUserMedia
+      .mockResolvedValueOnce(stream)
+      .mockRejectedValueOnce(
+        new DOMException("Unavailable", "OverconstrainedError"),
+      );
+    const enumerateDevices = vi
+      .fn()
+      .mockResolvedValue([
+        { kind: "videoinput", deviceId: "alternate", label: "Back Camera 2" },
+      ]);
+    vi.stubGlobal("navigator", {
+      mediaDevices: { enumerateDevices, getUserMedia },
+    });
+    render(<CameraScanner onDetected={vi.fn()} onType={vi.fn()} />);
+    expect(
+      await screen.findByRole("option", { name: "Back Camera 2" }),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Camera source"), {
+      target: { value: "alternate" },
+    });
+
+    expect(
+      await screen.findByText(/That camera setup isn't available/),
+    ).toBeInTheDocument();
+    expect(trackStop).toHaveBeenCalled();
+    expect(getUserMedia).toHaveBeenCalledTimes(2);
+    expect(
+      screen.getByRole("button", { name: "Enter barcode manually" }),
+    ).toBeEnabled();
+  });
+
+  it("keeps diagnostics usable when optional camera inspection APIs are absent", async () => {
+    window.history.replaceState({}, "", "/?cameraDiagnostics=1");
+    const { getUserMedia, track } = camera();
+    Object.assign(track, {
+      getCapabilities: undefined,
+      getSettings: undefined,
+      label: "",
+    });
+    vi.stubGlobal("navigator", { mediaDevices: { getUserMedia } });
+    render(<CameraScanner onDetected={vi.fn()} onType={vi.fn()} />);
+
+    expect(await screen.findAllByText("Not reported")).not.toHaveLength(0);
+    expect(
+      screen.getByRole("option", { name: "Default rear camera preference" }),
+    ).toBeInTheDocument();
+    expect(decode).toHaveBeenCalledOnce();
+  });
+
+  it("stops a stale permission result after the diagnostic strategy changes", async () => {
+    window.history.replaceState({}, "", "/?cameraDiagnostics=1");
+    vi.stubGlobal("isSecureContext", true);
+    const staleStop = vi.fn();
+    const activeStop = vi.fn();
+    const staleTrack = {
+      label: "Stale camera",
+      stop: staleStop,
+      getCapabilities: () => ({}),
+      getSettings: () => ({}),
+    };
+    const activeTrack = {
+      label: "Active camera",
+      stop: activeStop,
+      getCapabilities: () => ({}),
+      getSettings: () => ({ width: 1920, height: 1080 }),
+    };
+    const staleStream = {
+      getTracks: () => [staleTrack],
+      getVideoTracks: () => [staleTrack],
+    };
+    const activeStream = {
+      getTracks: () => [activeTrack],
+      getVideoTracks: () => [activeTrack],
+    };
+    let resolveStale: ((stream: typeof staleStream) => void) | undefined;
+    const getUserMedia = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveStale = resolve;
+          }),
+      )
+      .mockResolvedValueOnce(activeStream);
+    vi.stubGlobal("navigator", { mediaDevices: { getUserMedia } });
+    decode.mockResolvedValue({ stop });
+    render(<CameraScanner onDetected={vi.fn()} onType={vi.fn()} />);
+    await waitFor(() => {
+      expect(getUserMedia).toHaveBeenCalledOnce();
+    });
+
+    fireEvent.change(screen.getByLabelText("Capture strategy"), {
+      target: { value: "prefer-hd" },
+    });
+    await waitFor(() => {
+      expect(decode).toHaveBeenCalledOnce();
+    });
+    await act(async () => {
+      resolveStale?.(staleStream);
+      await Promise.resolve();
+    });
+
+    expect(staleStop).toHaveBeenCalled();
+    expect(activeStop).not.toHaveBeenCalled();
+    expect(screen.getByText("Active camera")).toBeInTheDocument();
   });
 });
