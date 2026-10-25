@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  applyCameraZoom,
   availableVideoInputs,
   cameraDiagnosticCapabilities,
   cameraDiagnosticReading,
   cameraDiagnosticsEnabled,
   cameraVideoConstraints,
+  cameraZoomControl,
   changedCameraSettings,
   diagnosticCameraLabel,
 } from "./cameraExperiment";
@@ -117,6 +119,61 @@ describe("camera experiment", () => {
     });
     expect(cameraDiagnosticCapabilities(track)).toEqual({});
     expect(diagnosticCameraLabel(track)).toBe("Not reported");
+  });
+
+  it("exposes only usable zoom controls and applies a bounded track constraint", async () => {
+    let zoom = 1;
+    const applyConstraints = vi.fn((constraints: MediaTrackConstraints) => {
+      const requested = (
+        constraints.advanced?.[0] as MediaTrackConstraintSet & {
+          zoom?: number;
+        }
+      ).zoom;
+      if (requested === undefined) {
+        return Promise.reject(new TypeError("Expected a zoom constraint."));
+      }
+
+      zoom = requested;
+
+      return Promise.resolve();
+    });
+    const track = {
+      applyConstraints,
+      getCapabilities: () => ({ zoom: { min: 1, max: 4, step: 0.5 } }),
+      getSettings: () => ({ zoom }),
+    } as unknown as MediaStreamTrack;
+
+    expect(cameraZoomControl(track)).toEqual({
+      min: 1,
+      max: 4,
+      step: 0.5,
+      current: 1,
+    });
+    await expect(
+      applyCameraZoom(track, 8, { min: 1, max: 4 }),
+    ).resolves.toEqual({
+      requested: 4,
+      actual: 4,
+    });
+    expect(applyConstraints).toHaveBeenCalledExactlyOnceWith({
+      advanced: [{ zoom: 4 }],
+    });
+  });
+
+  it("does not offer zoom without a variable range, readable setting, and constraint support", () => {
+    expect(
+      cameraZoomControl({
+        getCapabilities: () => ({ zoom: { min: 1, max: 1 } }),
+        getSettings: () => ({ zoom: 1 }),
+      } as unknown as MediaStreamTrack),
+    ).toBeUndefined();
+    expect(
+      cameraZoomControl({
+        applyConstraints: vi.fn(),
+        getCapabilities: () => ({ zoom: { min: 1, max: 4 } }),
+        getSettings: () => ({}),
+      } as unknown as MediaStreamTrack),
+    ).toBeUndefined();
   });
 
   it("identifies only settings that changed between periodic samples", () => {

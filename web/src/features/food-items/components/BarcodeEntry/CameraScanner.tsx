@@ -5,12 +5,15 @@ import {
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import CameraDiagnostics from "./CameraDiagnostics";
 import {
+  applyCameraZoom,
   availableVideoInputs,
   cameraDiagnosticCapabilities,
   cameraDiagnosticReading,
   cameraDiagnosticsEnabled,
   type CameraOption,
   cameraVideoConstraints,
+  type CameraZoomControl,
+  cameraZoomControl,
   type CaptureStrategy,
   changedCameraSettings,
   diagnosticCameraLabel,
@@ -62,6 +65,8 @@ interface Props {
 export default function CameraScanner({ onDetected, onType }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const diagnosticSessionRef = useRef<CameraDiagnosticSession | null>(null);
+  const diagnosticZoomTrackRef = useRef<MediaStreamTrack | null>(null);
+  const diagnosticZoomRequestRef = useRef(0);
 
   const diagnosticsEnabled = cameraDiagnosticsEnabled(
     globalThis.location.search,
@@ -74,6 +79,8 @@ export default function CameraScanner({ onDetected, onType }: Props) {
   );
   const [selectedDeviceId, setSelectedDeviceId] = useState("");
   const [cameras, setCameras] = useState<CameraOption[]>([]);
+  const [zoom, setZoom] = useState<CameraZoomControl>();
+  const [zoomMessage, setZoomMessage] = useState("");
 
   const detected = useEffectEvent(onDetected);
   const slowScan = guidance === 2 && !error;
@@ -85,6 +92,53 @@ export default function CameraScanner({ onDetected, onType }: Props) {
       type: "session-cancelled",
       reason,
     });
+  };
+
+  const changeDiagnosticZoom = async (requested: number) => {
+    const track = diagnosticZoomTrackRef.current;
+    const availableZoom = zoom;
+    if (!track || !availableZoom) {
+      return;
+    }
+
+    const request = diagnosticZoomRequestRef.current + 1;
+    diagnosticZoomRequestRef.current = request;
+    setZoomMessage("");
+    try {
+      const result = await applyCameraZoom(track, requested, availableZoom);
+      if (
+        diagnosticZoomTrackRef.current !== track ||
+        diagnosticZoomRequestRef.current !== request
+      ) {
+        return;
+      }
+
+      const verifiedZoom = cameraZoomControl(track);
+      if (verifiedZoom) {
+        setZoom(verifiedZoom);
+      }
+      if (result.actual === undefined) {
+        setZoomMessage("The browser did not report the resulting zoom.");
+
+        return;
+      }
+
+      const tolerance = Math.max(availableZoom.step ?? 0, 0.01) / 2;
+      if (Math.abs(result.actual - result.requested) > tolerance) {
+        setZoomMessage(
+          `Camera kept zoom at ${result.actual}× instead of ${result.requested}×.`,
+        );
+      }
+    } catch {
+      if (
+        diagnosticZoomTrackRef.current === track &&
+        diagnosticZoomRequestRef.current === request
+      ) {
+        setZoomMessage(
+          "Zoom adjustment wasn't applied. Scanning can continue.",
+        );
+      }
+    }
   };
 
   useEffect(() => {
@@ -201,6 +255,11 @@ export default function CameraScanner({ onDetected, onType }: Props) {
           throw new Error("Camera unavailable");
         }
         if (diagnosticsEnabled) {
+          const availableZoom = cameraZoomControl(track);
+          if (availableZoom) {
+            diagnosticZoomTrackRef.current = track;
+            setZoom(availableZoom);
+          }
           const deviceIdentities = new Map<string, string>();
           let nextDeviceIdentity = 1;
           const readSettings = () => {
@@ -248,6 +307,14 @@ export default function CameraScanner({ onDetected, onType }: Props) {
           timers.push(
             setInterval(() => {
               const currentSettings = readSettings();
+              const currentZoom = cameraZoomControl(track);
+              if (diagnosticZoomTrackRef.current === track && currentZoom) {
+                setZoom((previousZoom) =>
+                  previousZoom?.current === currentZoom.current
+                    ? previousZoom
+                    : currentZoom,
+                );
+              }
               const changedFields = changedCameraSettings(
                 previousSettings,
                 currentSettings,
@@ -434,6 +501,13 @@ export default function CameraScanner({ onDetected, onType }: Props) {
       if (diagnosticSessionRef.current === diagnosticSession) {
         diagnosticSessionRef.current = null;
       }
+      if (
+        stream?.getVideoTracks()[0] &&
+        diagnosticZoomTrackRef.current === stream.getVideoTracks()[0]
+      ) {
+        diagnosticZoomTrackRef.current = null;
+        diagnosticZoomRequestRef.current += 1;
+      }
       stop();
     };
   }, [diagnosticsEnabled, selectedDeviceId, strategy]);
@@ -469,8 +543,14 @@ export default function CameraScanner({ onDetected, onType }: Props) {
           cameras={cameras}
           selectedDeviceId={selectedDeviceId}
           strategy={strategy}
+          zoom={zoom}
+          zoomMessage={zoomMessage}
           onCameraChange={(deviceId) => {
             cancelDiagnosticSession("camera-change");
+            diagnosticZoomRequestRef.current += 1;
+            diagnosticZoomTrackRef.current = null;
+            setZoom(undefined);
+            setZoomMessage("");
             setSelectedDeviceId(deviceId);
           }}
           onManualMarker={() => {
@@ -481,7 +561,14 @@ export default function CameraScanner({ onDetected, onType }: Props) {
           }}
           onStrategyChange={(nextStrategy) => {
             cancelDiagnosticSession("strategy-change");
+            diagnosticZoomRequestRef.current += 1;
+            diagnosticZoomTrackRef.current = null;
+            setZoom(undefined);
+            setZoomMessage("");
             setStrategy(nextStrategy);
+          }}
+          onZoomChange={(nextZoom) => {
+            void changeDiagnosticZoom(nextZoom);
           }}
         />
       )}

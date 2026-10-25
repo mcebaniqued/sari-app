@@ -15,9 +15,27 @@ export interface CameraDiagnosticReading {
   settings: CameraDiagnosticSettings;
 }
 
+export interface CameraZoomControl {
+  min: number;
+  max: number;
+  step?: number;
+  current: number;
+}
+
 interface NumericRange {
   min?: number;
   max?: number;
+  step?: number;
+}
+
+interface ZoomTrack {
+  applyConstraints?: MediaStreamTrack["applyConstraints"];
+  getCapabilities?: () => MediaTrackCapabilities & {
+    zoom?: NumericRange;
+  };
+  getSettings?: () => MediaTrackSettings & {
+    zoom?: number;
+  };
 }
 
 export const captureStrategyLabels: Record<CaptureStrategy, string> = {
@@ -96,6 +114,75 @@ function readCameraValue<T>(read: () => T, fallback: T) {
   } catch {
     return fallback;
   }
+}
+
+export function cameraZoomControl(
+  track: MediaStreamTrack,
+): CameraZoomControl | undefined {
+  const zoomTrack = track as unknown as ZoomTrack;
+  if (
+    typeof zoomTrack.applyConstraints !== "function" ||
+    typeof zoomTrack.getCapabilities !== "function" ||
+    typeof zoomTrack.getSettings !== "function"
+  ) {
+    return undefined;
+  }
+
+  const capabilities = readCameraValue(
+    () => zoomTrack.getCapabilities?.().zoom,
+    undefined,
+  );
+  const range = numericRange(capabilities);
+  const current = boundedNumber(
+    readCameraValue(() => zoomTrack.getSettings?.().zoom, undefined),
+    { max: 1_000 },
+  );
+  if (
+    !range ||
+    range.min === range.max ||
+    current === undefined ||
+    current < range.min ||
+    current > range.max
+  ) {
+    return undefined;
+  }
+
+  const step = boundedNumber(capabilities?.step, {
+    max: range.max - range.min,
+    positive: true,
+  });
+
+  return {
+    ...range,
+    ...(step === undefined ? {} : { step }),
+    current,
+  };
+}
+
+export async function applyCameraZoom(
+  track: MediaStreamTrack,
+  requested: number,
+  range: Pick<CameraZoomControl, "min" | "max">,
+) {
+  if (!Number.isFinite(requested)) {
+    throw new TypeError("Zoom must be a finite number.");
+  }
+
+  const zoom = Math.min(range.max, Math.max(range.min, requested));
+  await track.applyConstraints({
+    advanced: [
+      {
+        zoom,
+      } as MediaTrackConstraintSet,
+    ],
+  });
+  const zoomTrack = track as unknown as ZoomTrack;
+  const actual = boundedNumber(
+    readCameraValue(() => zoomTrack.getSettings?.().zoom, undefined),
+    { max: 1_000 },
+  );
+
+  return { requested: zoom, actual };
 }
 
 export function cameraDiagnosticReading(

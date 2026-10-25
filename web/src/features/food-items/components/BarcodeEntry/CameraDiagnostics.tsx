@@ -1,6 +1,7 @@
 import { LuChevronDown } from "react-icons/lu";
 import {
   type CameraOption,
+  type CameraZoomControl,
   type CaptureStrategy,
   captureStrategyLabels,
 } from "./cameraExperiment";
@@ -9,18 +10,28 @@ interface Props {
   cameras: CameraOption[];
   selectedDeviceId: string;
   strategy: CaptureStrategy;
+  zoom: CameraZoomControl | undefined;
+  zoomMessage: string;
   onCameraChange: (deviceId: string) => void;
   onManualMarker: () => void;
   onStrategyChange: (strategy: CaptureStrategy) => void;
+  onZoomChange: (zoom: number) => void;
+}
+
+function formatZoom(value: number) {
+  return Number(value.toFixed(2)).toString();
 }
 
 export default function CameraDiagnostics({
   cameras,
   selectedDeviceId,
   strategy,
+  zoom,
+  zoomMessage,
   onCameraChange,
   onManualMarker,
   onStrategyChange,
+  onZoomChange,
 }: Props) {
   return (
     <details
@@ -82,6 +93,36 @@ export default function CameraDiagnostics({
             />
           </span>
         </label>
+        {zoom && (
+          <div>
+            <label
+              htmlFor="camera-zoom"
+              className="mb-1 block text-xs font-medium"
+            >
+              Camera zoom
+            </label>
+            <input
+              id="camera-zoom"
+              type="range"
+              min={zoom.min}
+              max={zoom.max}
+              step={zoom.step ?? "any"}
+              value={zoom.current}
+              onChange={(event) => {
+                onZoomChange(event.currentTarget.valueAsNumber);
+              }}
+              aria-describedby="camera-zoom-status"
+              className="min-h-11.5 w-full accent-brand"
+            />
+            <output
+              id="camera-zoom-status"
+              className="block text-xs text-content-muted"
+            >
+              Current zoom: {formatZoom(zoom.current)}×
+              {zoomMessage ? ` — ${zoomMessage}` : ""}
+            </output>
+          </div>
+        )}
         <button
           type="button"
           onClick={onManualMarker}

@@ -104,7 +104,13 @@ describe("camera scanning lifecycle", () => {
   }
 
   it("prefers 1080p for normal sessions and decodes the negotiated stream unchanged", async () => {
-    const { getUserMedia, stream } = camera();
+    const { getUserMedia, stream, track } = camera();
+    const applyConstraints = vi.fn();
+    Object.assign(track, {
+      applyConstraints,
+      getCapabilities: () => ({ zoom: { min: 1, max: 4 } }),
+      getSettings: () => ({ zoom: 1 }),
+    });
     render(<CameraScanner onDetected={vi.fn()} onType={vi.fn()} />);
 
     await waitFor(() => {
@@ -123,6 +129,96 @@ describe("camera scanning lifecycle", () => {
       expect.any(HTMLVideoElement),
       expect.any(Function),
     );
+    expect(screen.queryByRole("slider", { name: "Camera zoom" })).toBeNull();
+    expect(applyConstraints).not.toHaveBeenCalled();
+  });
+
+  it("applies diagnostic zoom to the acquired track and shows verified readback", async () => {
+    window.history.replaceState({}, "", "/?cameraDiagnostics=1");
+    const { track } = camera();
+    let zoom = 1;
+    const applyConstraints = vi.fn((constraints: MediaTrackConstraints) => {
+      const requested = (
+        constraints.advanced?.[0] as MediaTrackConstraintSet & {
+          zoom?: number;
+        }
+      ).zoom;
+      if (requested === undefined) {
+        return Promise.reject(new TypeError("Expected a zoom constraint."));
+      }
+
+      zoom = requested;
+
+      return Promise.resolve();
+    });
+    Object.assign(track, {
+      applyConstraints,
+      getCapabilities: () => ({ zoom: { min: 1, max: 4, step: 0.5 } }),
+      getSettings: () => ({ zoom }),
+    });
+    render(<CameraScanner onDetected={vi.fn()} onType={vi.fn()} />);
+
+    const slider = await screen.findByRole("slider", { name: "Camera zoom" });
+    expect(screen.getByText("Current zoom: 1×")).toBeInTheDocument();
+    fireEvent.change(slider, { target: { value: "2.5" } });
+
+    await waitFor(() => {
+      expect(applyConstraints).toHaveBeenCalledExactlyOnceWith({
+        advanced: [{ zoom: 2.5 }],
+      });
+    });
+    expect(await screen.findByText("Current zoom: 2.5×")).toBeInTheDocument();
+    expect(decode).toHaveBeenCalledOnce();
+  });
+
+  it("continues scanning when a diagnostic zoom constraint is rejected", async () => {
+    window.history.replaceState({}, "", "/?cameraDiagnostics=1");
+    const { track } = camera();
+    Object.assign(track, {
+      applyConstraints: vi
+        .fn()
+        .mockRejectedValue(
+          new DOMException("Unsupported", "OverconstrainedError"),
+        ),
+      getCapabilities: () => ({ zoom: { min: 1, max: 4 } }),
+      getSettings: () => ({ zoom: 1 }),
+    });
+    const onDetected = vi.fn();
+    render(<CameraScanner onDetected={onDetected} onType={vi.fn()} />);
+
+    fireEvent.change(
+      await screen.findByRole("slider", { name: "Camera zoom" }),
+      { target: { value: "2" } },
+    );
+    expect(
+      await screen.findByText(/Zoom adjustment wasn't applied/),
+    ).toBeInTheDocument();
+
+    read("012345678905");
+    read("012345678905");
+    read("012345678905");
+    expect(onDetected).toHaveBeenCalledExactlyOnceWith("012345678905");
+  });
+
+  it("reports a zoom request that the camera ignores without interrupting scanning", async () => {
+    window.history.replaceState({}, "", "/?cameraDiagnostics=1");
+    const { track } = camera();
+    Object.assign(track, {
+      applyConstraints: vi.fn().mockResolvedValue(undefined),
+      getCapabilities: () => ({ zoom: { min: 1, max: 4 } }),
+      getSettings: () => ({ zoom: 1 }),
+    });
+    render(<CameraScanner onDetected={vi.fn()} onType={vi.fn()} />);
+
+    fireEvent.change(
+      await screen.findByRole("slider", { name: "Camera zoom" }),
+      { target: { value: "2" } },
+    );
+
+    expect(
+      await screen.findByText(/Camera kept zoom at 1× instead of 2×\./),
+    ).toBeInTheDocument();
+    expect(decode).toHaveBeenCalledOnce();
   });
 
   it("requires repeated matching reads before accepting and stopping the camera", async () => {
@@ -542,6 +638,7 @@ describe("camera scanning lifecycle", () => {
       screen.getByRole("option", { name: "Default rear camera preference" }),
     ).toBeInTheDocument();
     expect(decode).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("slider", { name: "Camera zoom" })).toBeNull();
   });
 
   it("reports acquisition errors without hiding the manual-entry fallback", async () => {
