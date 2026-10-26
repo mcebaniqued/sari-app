@@ -35,12 +35,12 @@ test("production retains same-origin API proxy before the SPA fallback", () => {
   ]);
 });
 
-test("preview sends same-origin API requests through the protected proxy", () => {
+test("preview uses the isolated API", () => {
   const result = loadConfig("preview", "https://sari-api-preview.vercel.app");
   assert.equal(result.status, 0, result.stderr);
   assert.equal(
     JSON.parse(result.stdout).rewrites[0].destination,
-    "/api/proxy/v1/:path*",
+    "https://sari-api-preview.vercel.app/api/v1/:path*",
   );
 });
 
