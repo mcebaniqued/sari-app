@@ -26,7 +26,12 @@ if (
 // Keep environment-dependent routes outside the exported object so Git
 // preflight defers their evaluation to the build-time config compiler.
 const rewrites = [
-  { source: "/api/v1/:path*", destination: `${api.origin}/api/v1/:path*` },
+  {
+    source: "/api/v1/:path*",
+    destination: preview
+      ? "/api/proxy/v1/:path*"
+      : `${api.origin}/api/v1/:path*`,
+  },
   { source: "/(.*)", destination: "/index.html" },
 ];
 
