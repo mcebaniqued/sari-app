@@ -56,6 +56,28 @@ describe("camera scanning lifecycle", () => {
     return { stream, trackStop, getUserMedia };
   }
 
+  it("prefers 1080p and decodes the negotiated stream unchanged", async () => {
+    const { getUserMedia, stream } = camera();
+    render(<CameraScanner onDetected={vi.fn()} onType={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(decode).toHaveBeenCalledOnce();
+    });
+    expect(getUserMedia).toHaveBeenCalledExactlyOnceWith({
+      audio: false,
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+      },
+    });
+    expect(decode).toHaveBeenCalledWith(
+      stream,
+      expect.any(HTMLVideoElement),
+      expect.any(Function),
+    );
+  });
+
   it("requires repeated matching reads before accepting and stopping the camera", async () => {
     const { trackStop } = camera();
     const onDetected = vi.fn();
