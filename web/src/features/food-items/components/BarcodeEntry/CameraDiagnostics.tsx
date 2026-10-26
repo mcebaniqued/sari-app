@@ -50,8 +50,8 @@ export default function CameraDiagnostics({
         Camera diagnostics
       </summary>
       <p className="mt-2 text-xs text-content-muted">
-        Temporary preview experiment. Structured events go to protected Sari
-        preview logs; camera frames and barcode values are never sent.
+        Temporary preview experiment. Structured events stay in this browser
+        until exported; camera frames and barcode values are never collected.
       </p>
       <div className="mt-3 grid gap-3">
         <label>

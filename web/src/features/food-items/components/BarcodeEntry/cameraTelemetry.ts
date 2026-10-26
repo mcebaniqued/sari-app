@@ -2,6 +2,7 @@ import type {
   CameraDiagnosticBatch,
   CameraDiagnosticEvent,
 } from "@sari/contracts";
+import { storeCameraDiagnosticBatch } from "./cameraDiagnosticExport";
 
 type CameraDiagnosticEventInput = CameraDiagnosticEvent extends infer Event
   ? Event extends CameraDiagnosticEvent
@@ -42,29 +43,13 @@ function newSessionId() {
   return `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}`;
 }
 
-async function sendCameraDiagnosticBatch(batch: CameraDiagnosticBatch) {
-  const response = await fetch("/api/v1/camera-diagnostics", {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(batch),
-    credentials: "same-origin",
-    keepalive: true,
-  });
-  if (!response.ok) {
-    throw new Error(`Diagnostic delivery failed (${response.status}).`);
-  }
-}
-
 export class CameraDiagnosticSession {
   readonly id: string;
 
   private readonly batchSize: number;
   private readonly flushDelayMs: number;
   private readonly now: () => number;
-  private readonly send: SendBatch;
+  private readonly send: SendBatch | undefined;
   private readonly startedAt: number;
   private closed = false;
   private events: CameraDiagnosticEvent[] = [];
@@ -78,7 +63,7 @@ export class CameraDiagnosticSession {
     this.batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE;
     this.flushDelayMs = options.flushDelayMs ?? DEFAULT_FLUSH_DELAY_MS;
     this.now = options.now ?? (() => performance.now());
-    this.send = options.send ?? sendCameraDiagnosticBatch;
+    this.send = options.send;
     this.startedAt = this.now();
   }
 
@@ -105,9 +90,15 @@ export class CameraDiagnosticSession {
       sessionId: this.id,
       events,
     } satisfies CameraDiagnosticBatch;
+    storeCameraDiagnosticBatch(batch);
+    const send = this.send;
+    if (!send) {
+      return this.sendChain;
+    }
+
     this.sendChain = this.sendChain
-      .then(() => this.send(batch))
-      // Diagnostic delivery is best effort and must never affect scanning.
+      .then(() => send(batch))
+      // Optional observers are best effort and must never affect scanning.
       .catch(() => undefined);
 
     return this.sendChain;
