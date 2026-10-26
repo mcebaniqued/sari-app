@@ -1,4 +1,8 @@
 import {
+  type CameraDiagnosticBatch,
+  cameraDiagnosticBatchSchema,
+} from "@sari/contracts";
+import {
   act,
   fireEvent,
   render,
@@ -8,10 +12,6 @@ import {
 } from "@testing-library/react";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  cameraDiagnosticSnapshot,
-  clearCameraDiagnostics,
-} from "./cameraDiagnosticExport";
 import CameraScanner from "./CameraScanner";
 
 const { decode, stop, reader } = vi.hoisted(() => ({
@@ -54,19 +54,24 @@ function miss() {
   });
 }
 
-function rejectRemoteDiagnostics() {
-  const fetch = vi.fn();
+function captureDiagnosticBatches() {
+  const batches: CameraDiagnosticBatch[] = [];
+  const fetch = vi.fn((_input: string, init?: RequestInit) => {
+    if (typeof init?.body !== "string") {
+      throw new TypeError("Expected a serialized diagnostic batch.");
+    }
+
+    const body: unknown = JSON.parse(init.body);
+    batches.push(cameraDiagnosticBatchSchema.parse(body));
+
+    return Promise.resolve(new Response(null, { status: 204 }));
+  });
   vi.stubGlobal("fetch", fetch);
 
-  return fetch;
-}
-
-function diagnosticEvents() {
-  return cameraDiagnosticSnapshot().flatMap((session) => session.events);
+  return { batches, fetch };
 }
 
 afterEach(() => {
-  clearCameraDiagnostics();
   window.history.replaceState({}, "", "/");
   vi.unstubAllGlobals();
   vi.useRealTimers();
@@ -552,7 +557,7 @@ describe("camera scanning lifecycle", () => {
 
   it("keeps diagnostic baseline distinct until the user selects the resolution experiment", async () => {
     window.history.replaceState({}, "", "/?cameraDiagnostics=1");
-    const fetch = rejectRemoteDiagnostics();
+    const { batches, fetch } = captureDiagnosticBatches();
     const { getUserMedia, trackStop } = camera();
     render(<CameraScanner onDetected={vi.fn()} onType={vi.fn()} />);
     await waitFor(() => {
@@ -581,14 +586,14 @@ describe("camera scanning lifecycle", () => {
       },
     });
     await waitFor(() => {
-      expect(diagnosticEvents()).toContainEqual(
-        expect.objectContaining({
-          type: "session-cancelled",
-          reason: "strategy-change",
-        }),
-      );
+      expect(fetch).toHaveBeenCalled();
     });
-    expect(fetch).not.toHaveBeenCalled();
+    expect(batches.flatMap((batch) => batch.events)).toContainEqual(
+      expect.objectContaining({
+        type: "session-cancelled",
+        reason: "strategy-change",
+      }),
+    );
   });
 
   it("lists permission-exposed cameras and changes only the selected source", async () => {
@@ -680,7 +685,7 @@ describe("camera scanning lifecycle", () => {
 
   it("reports acquisition errors without hiding the manual-entry fallback", async () => {
     window.history.replaceState({}, "", "/?cameraDiagnostics=1");
-    const fetch = rejectRemoteDiagnostics();
+    const { batches, fetch } = captureDiagnosticBatches();
     const { getUserMedia } = camera();
     getUserMedia.mockRejectedValue(
       new DOMException("Denied", "NotAllowedError"),
@@ -689,40 +694,18 @@ describe("camera scanning lifecycle", () => {
 
     expect(await screen.findByText(/Allow camera access/)).toBeInTheDocument();
     await waitFor(() => {
-      expect(diagnosticEvents()).toContainEqual(
-        expect.objectContaining({
-          type: "session-error",
-          stage: "acquisition",
-          errorName: "NotAllowedError",
-        }),
-      );
+      expect(fetch).toHaveBeenCalled();
     });
-    expect(fetch).not.toHaveBeenCalled();
+    expect(batches.flatMap((batch) => batch.events)).toContainEqual(
+      expect.objectContaining({
+        type: "session-error",
+        stage: "acquisition",
+        errorName: "NotAllowedError",
+      }),
+    );
     expect(
       screen.getByRole("button", { name: "Enter barcode manually" }),
     ).toBeEnabled();
-  });
-
-  it("keeps an interrupted diagnostic session after the scanner unmounts", async () => {
-    window.history.replaceState({}, "", "/?cameraDiagnostics=1");
-    const fetch = rejectRemoteDiagnostics();
-    camera();
-    const { unmount } = render(
-      <CameraScanner onDetected={vi.fn()} onType={vi.fn()} />,
-    );
-    await waitFor(() => {
-      expect(decode).toHaveBeenCalledOnce();
-    });
-
-    unmount();
-
-    expect(diagnosticEvents()).toContainEqual(
-      expect.objectContaining({
-        type: "session-cancelled",
-        reason: "component-closed",
-      }),
-    );
-    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("stops a stale permission result after the diagnostic strategy changes", async () => {
@@ -783,10 +766,10 @@ describe("camera scanning lifecycle", () => {
     expect(decode).toHaveBeenCalledOnce();
   });
 
-  it("stores an ordered timeline for settings changes and decoder outcomes without barcode values", async () => {
+  it("sends an ordered timeline for settings changes and decoder outcomes without barcode values", async () => {
     vi.useFakeTimers();
     window.history.replaceState({}, "", "/?cameraDiagnostics=1");
-    const fetch = rejectRemoteDiagnostics();
+    const { batches, fetch } = captureDiagnosticBatches();
     const { track } = camera();
     let settings = {
       width: 640,
@@ -841,11 +824,8 @@ describe("camera scanning lifecycle", () => {
     });
 
     expect(onDetected).toHaveBeenCalledExactlyOnceWith("853807005033");
-    expect(fetch).not.toHaveBeenCalled();
-    const completedSession = cameraDiagnosticSnapshot().find((session) =>
-      session.events.some((event) => event.type === "session-completed"),
-    );
-    const events = completedSession?.events ?? [];
+    expect(fetch).toHaveBeenCalled();
+    const events = batches.flatMap((batch) => batch.events);
     expect(events.map((event) => event.type)).toEqual(
       expect.arrayContaining([
         "session-started",
@@ -882,7 +862,7 @@ describe("camera scanning lifecycle", () => {
       invalid: 1,
       valid: 4,
     });
-    expect(JSON.stringify(completedSession)).not.toContain("853807005033");
-    expect(JSON.stringify(completedSession)).not.toContain("raw-camera");
+    expect(JSON.stringify(batches)).not.toContain("853807005033");
+    expect(JSON.stringify(batches)).not.toContain("raw-camera");
   });
 });

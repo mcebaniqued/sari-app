@@ -8,10 +8,6 @@ import {
 } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  clearCameraDiagnostics,
-  storeCameraDiagnosticBatch,
-} from "../BarcodeEntry/cameraDiagnosticExport";
 import FoodItemForm from "./FoodItemForm";
 
 const product: FoodProduct = {
@@ -30,11 +26,7 @@ const product: FoodProduct = {
   sourcePublishedAt: "2026-01-01",
   checkedAt: "2026-10-20T00:00:00Z",
 };
-afterEach(() => {
-  clearCameraDiagnostics();
-  window.history.replaceState({}, "", "/");
-  vi.unstubAllGlobals();
-});
+afterEach(() => vi.unstubAllGlobals());
 
 function setup() {
   const onSave = vi.fn().mockResolvedValue(undefined);
@@ -116,34 +108,6 @@ describe("barcode-assisted pantry form", () => {
       screen.queryByRole("button", { name: "Add item" }),
     ).not.toBeInTheDocument();
     expect(fetcher).not.toHaveBeenCalled();
-  });
-
-  it("keeps opt-in camera diagnostics export available across form modes", () => {
-    window.history.replaceState({}, "", "/?cameraDiagnostics=1");
-    storeCameraDiagnosticBatch({
-      sessionId: "4f6e81ef-6c60-4704-b686-3dd389120246",
-      events: [
-        {
-          type: "session-cancelled",
-          sequence: 1,
-          elapsedMs: 0,
-          reason: "component-closed",
-        },
-      ],
-    });
-    setup();
-
-    expect(
-      screen.getByRole("button", { name: "Export diagnostic JSON" }),
-    ).toBeEnabled();
-    barcode();
-    expect(
-      screen.getByRole("button", { name: "Export diagnostic JSON" }),
-    ).toBeEnabled();
-    manual();
-    expect(
-      screen.getByRole("button", { name: "Export diagnostic JSON" }),
-    ).toBeEnabled();
   });
 
   it("preserves the entire manual draft and barcode when switching views", () => {

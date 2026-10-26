@@ -5,8 +5,6 @@ import { useBarcodeProduct } from "../../hooks/useBarcodeProduct";
 import { useFoodItemDraft } from "../../hooks/useFoodItemDraft";
 import { useFoodItemForm } from "../../hooks/useFoodItemForm";
 import BarcodeEntry from "../BarcodeEntry/BarcodeEntry";
-import CameraDiagnosticExportControl from "../BarcodeEntry/CameraDiagnosticExportControl";
-import { cameraDiagnosticsEnabled } from "../BarcodeEntry/cameraExperiment";
 import ProductReview from "../BarcodeEntry/ProductReview";
 import FoodItemFields from "./FoodItemFields";
 
@@ -25,9 +23,6 @@ export default function FoodItemForm({
 }: FoodItemFormProps) {
   const [mode, setMode] = useState<"manual" | "barcode">("manual");
   const [barcodeValue, setBarcodeValue] = useState("");
-  const diagnosticsEnabled = cameraDiagnosticsEnabled(
-    globalThis.location.search,
-  );
 
   const entryRef = useRef<HTMLDivElement>(null);
   const draft = useFoodItemDraft(item);
@@ -162,7 +157,6 @@ export default function FoodItemForm({
           </div>
         </form>
       )}
-      {diagnosticsEnabled && <CameraDiagnosticExportControl />}
     </div>
   );
 }
