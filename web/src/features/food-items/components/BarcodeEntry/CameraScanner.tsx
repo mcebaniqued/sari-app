@@ -83,7 +83,11 @@ export default function CameraScanner({ onDetected, onType }: Props) {
         controller.signal.throwIfAborted();
         stream = await media.getUserMedia({
           audio: false,
-          video: { facingMode: { ideal: "environment" } },
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
         });
         controller.signal.throwIfAborted();
         timers.push(
