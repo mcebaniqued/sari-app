@@ -562,7 +562,9 @@ test("failed mobile Edit remains in the dialog and can be retried", async ({
   const dialog = page.getByRole("dialog", { name: "Edit item" });
   await dialog.getByLabel(/^Food name/).fill("Oat milk");
   await dialog.getByRole("button", { name: "Save changes" }).click();
-  await expect(dialog.getByRole("alert")).toContainText("Try again");
+  await expect(dialog.getByRole("alert")).toContainText(
+    "The save outcome could not be confirmed",
+  );
   await expect(dialog).toBeVisible();
   expect(
     await dialog.evaluate((element) =>

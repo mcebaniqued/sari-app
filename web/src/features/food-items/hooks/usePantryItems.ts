@@ -50,7 +50,10 @@ export function usePantryItems(onChanged?: () => void) {
 
     try {
       const saved = original
-        ? await updateFoodItem(original.id, values)
+        ? await updateFoodItem(original.id, {
+            expectedRevision: original.revision,
+            changes: values,
+          })
         : await createFoodItem(values, creationKeyFor(values));
 
       setRevision((value) => value + 1);
@@ -76,21 +79,55 @@ export function usePantryItems(onChanged?: () => void) {
     setDeleteError("");
 
     try {
-      const { deletedIds, failedIds, accessDenied } = await deleteFoodItems(
-        deleteTargets.map((item) => item.id),
-      );
-      if (deletedIds.length) {
+      const {
+        deletedIds,
+        unavailableIds,
+        conflictedIds,
+        uncertainIds,
+        failedIds,
+        accessDenied,
+      } = await deleteFoodItems(deleteTargets);
+      if (
+        deletedIds.length ||
+        unavailableIds.length ||
+        conflictedIds.length ||
+        uncertainIds.length
+      ) {
         setRevision((value) => value + 1);
         onChanged?.();
+      }
+      if (deletedIds.length) {
         notify(
           "success",
           deleteTargets.length === 1
             ? `${deleteTargets[0]?.name ?? "Item"} deleted from your pantry.`
-            : `${deletedIds.length} items deleted from your pantry.`,
+            : `${deletedIds.length} ${deletedIds.length === 1 ? "item" : "items"} deleted from your pantry.`,
         );
       }
       if (handleAccessDenied(accessDenied)) {
         return;
+      }
+
+      if (conflictedIds.length) {
+        notify(
+          "error",
+          `${conflictedIds.length === 1 ? "An item has" : "Some items have"} changed since this pantry view loaded. The delete was not applied; review the refreshed pantry before trying again.`,
+          "pantry-delete-conflict",
+        );
+      }
+      if (uncertainIds.length) {
+        notify(
+          "error",
+          `The outcome for ${uncertainIds.length === 1 ? "an item" : `${uncertainIds.length} items`} could not be confirmed. Sari did not repeat the delete; review the refreshed pantry before trying again.`,
+          "pantry-delete-uncertain",
+        );
+      }
+      if (unavailableIds.length) {
+        notify(
+          "error",
+          `${unavailableIds.length === 1 ? "An item is" : "Some items are"} no longer available in your pantry.`,
+          "pantry-delete-unavailable",
+        );
       }
 
       if (failedIds.length) {

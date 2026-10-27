@@ -1,6 +1,8 @@
 import { type CreateFoodItem, createFoodItemSchema } from "@sari/contracts";
 import { type SubmitEvent, useRef, useState } from "react";
+import { ApiError } from "@/api/apiFetch";
 import { useAccessDenied } from "@/hooks/useAccessDenied";
+import { FoodItemMutationOutcomeError } from "../api/foodItemsApi";
 import type { FoodItemDraft } from "./useFoodItemDraft";
 
 const validationMessages = new Map([
@@ -66,9 +68,14 @@ export function useFoodItemForm({
       }
 
       const message =
-        error instanceof TypeError
-          ? "Could not reach your pantry. Check your connection and try again."
-          : "Could not save this item. Try again.";
+        error instanceof ApiError &&
+        error.code === "FOOD_ITEM_REVISION_CONFLICT"
+          ? "This item changed since you opened it. Your edits are still here; refresh the pantry before trying again."
+          : error instanceof FoodItemMutationOutcomeError
+            ? error.message
+            : error instanceof TypeError
+              ? "Could not reach your pantry. Check your connection and try again."
+              : "Could not save this item. Try again.";
       setError(message);
     } finally {
       savingRef.current = false;

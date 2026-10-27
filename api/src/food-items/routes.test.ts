@@ -87,16 +87,20 @@ describe("food item validation", () => {
   );
 
   it.each([
-    {},
-    { name: " " },
-    { quantity: 0 },
-    { quantity: "1" },
-    { unit: "bucket" },
-    { expiresOn: "2026-02-30" },
-    { id: validId },
-    { createdAt: "2026-10-19T00:00:00Z" },
-    { updatedAt: "2026-10-19T00:00:00Z" },
-    { $set: { name: "Rice" } },
+    { expectedRevision: 0, changes: {} },
+    { expectedRevision: -1, changes: { name: "Rice" } },
+    { expectedRevision: "0", changes: { name: "Rice" } },
+    { expectedRevision: 0, changes: { name: " " } },
+    { expectedRevision: 0, changes: { quantity: 0 } },
+    { expectedRevision: 0, changes: { quantity: "1" } },
+    { expectedRevision: 0, changes: { unit: "bucket" } },
+    { expectedRevision: 0, changes: { expiresOn: "2026-02-30" } },
+    { expectedRevision: 0, changes: { id: validId } },
+    {
+      expectedRevision: 0,
+      changes: { createdAt: "2026-10-19T00:00:00Z" },
+    },
+    { expectedRevision: 0, changes: { $set: { name: "Rice" } } },
   ])("rejects invalid updates: %j", async (body) => {
     vi.stubEnv("MONGODB_URI", "");
     const response = await request(app)
@@ -108,20 +112,52 @@ describe("food item validation", () => {
     );
   });
 
-  it.each(["get", "patch", "delete"] as const)(
-    "returns a safe connection error for item %s",
-    async (method) => {
+  it("rejects the previous unprotected mutation contracts", async () => {
+    vi.stubEnv("MONGODB_URI", "");
+    const update = await request(app)
+      .patch(`/api/v1/food-items/${validId}`)
+      .send({ name: "Rice" });
+    const removal = await request(app).delete(`/api/v1/food-items/${validId}`);
+    expect(update.status).toBe(428);
+    expect(removal.status).toBe(428);
+    expect(apiErrorResponseSchema.parse(update.body).error.code).toBe(
+      "FOOD_ITEM_REVISION_REQUIRED",
+    );
+    expect(apiErrorResponseSchema.parse(removal.body).error.code).toBe(
+      "FOOD_ITEM_REVISION_REQUIRED",
+    );
+  });
+
+  it.each(["-1", "1.5", "not-a-revision", "9007199254740992"])(
+    "rejects malformed delete revision %s before connecting",
+    async (revision) => {
       vi.stubEnv("MONGODB_URI", "");
-      const client = request(app);
-      const response = await client[method](
-        `/api/v1/food-items/${validId}`,
-      ).send({ name: "Rice" });
+      const response = await request(app).delete(
+        `/api/v1/food-items/${validId}/revisions/${revision}`,
+      );
+      expect(response.status).toBe(400);
+      expect(apiErrorResponseSchema.parse(response.body).error.code).toBe(
+        "VALIDATION_ERROR",
+      );
+    },
+  );
+
+  it("returns safe connection errors for revision-aware item operations", async () => {
+    vi.stubEnv("MONGODB_URI", "");
+    const responses = await Promise.all([
+      request(app).get(`/api/v1/food-items/${validId}`),
+      request(app)
+        .patch(`/api/v1/food-items/${validId}`)
+        .send({ expectedRevision: 0, changes: { name: "Rice" } }),
+      request(app).delete(`/api/v1/food-items/${validId}/revisions/0`),
+    ]);
+    for (const response of responses) {
       expect(response.status).toBe(503);
       expect(apiErrorResponseSchema.parse(response.body).error.code).toBe(
         "DATABASE_UNAVAILABLE",
       );
-    },
-  );
+    }
+  });
 
   it.each([
     {},

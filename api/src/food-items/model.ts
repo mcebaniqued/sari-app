@@ -19,6 +19,7 @@ const foodItemSchema = new Schema(
       default: null,
     },
     barcode: { type: String, default: null },
+    revision: { type: Number, default: 0, min: 0 },
     creationKey: { type: String, immutable: true, select: false },
     creationFingerprint: { type: String, immutable: true, select: false },
   },

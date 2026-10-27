@@ -1,3 +1,8 @@
+import {
+  foodItemRevisionContractHeader,
+  foodItemRevisionContractVersion,
+  foodItemSchema,
+} from "@sari/contracts";
 import mongoose from "mongoose";
 import request from "supertest";
 import {
@@ -261,21 +266,22 @@ describe.skipIf(!testUri)("USDA lookup persistence", () => {
     const id = (first.body as { id: string }).id;
     expect(
       (
-        await otherAgent
-          .patch(`/api/v1/food-items/${id}`)
-          .send({ name: "Changed by another user" })
+        await otherAgent.patch(`/api/v1/food-items/${id}`).send({
+          expectedRevision: 0,
+          changes: { name: "Changed by another user" },
+        })
       ).status,
     ).toBe(404);
     expect(
       (
         await agent
           .patch(`/api/v1/food-items/${id}`)
-          .send({ barcode: "96385074" })
+          .send({ expectedRevision: 0, changes: { barcode: "96385074" } })
       ).status,
     ).toBe(400);
     const unlinked = await agent
       .patch(`/api/v1/food-items/${id}`)
-      .send({ productId: null });
+      .send({ expectedRevision: 0, changes: { productId: null } });
     expect(unlinked.body).toMatchObject({
       productId: null,
       name: "My oats",
@@ -297,13 +303,26 @@ describe.skipIf(!testUri)("USDA lookup persistence", () => {
     const input = { name: "Manual oats", barcode };
     const key = "barcode-test-operation-123456";
     const responses = await Promise.all([
-      agent.post("/api/v1/food-items").set("Idempotency-Key", key).send(input),
-      agent.post("/api/v1/food-items").set("Idempotency-Key", key).send(input),
+      agent
+        .post("/api/v1/food-items")
+        .set("Idempotency-Key", key)
+        .set(foodItemRevisionContractHeader, foodItemRevisionContractVersion)
+        .send(input),
+      agent
+        .post("/api/v1/food-items")
+        .set("Idempotency-Key", key)
+        .set(foodItemRevisionContractHeader, foodItemRevisionContractVersion)
+        .send(input),
     ]);
     expect(responses.map((r) => r.status)).toEqual([201, 201]);
     expect(responses[0].body).toEqual(responses[1].body);
     expect(await FoodItemModel.countDocuments()).toBe(1);
     expect(responses[0].body).not.toHaveProperty("creationFingerprint");
+    const keyedItem = foodItemSchema.parse(responses[0].body);
+    expect(keyedItem.revision).toBe(0);
+    expect(await FoodItemModel.findById(keyedItem.id).lean()).toMatchObject({
+      revision: 0,
+    });
     expect(
       (
         await agent

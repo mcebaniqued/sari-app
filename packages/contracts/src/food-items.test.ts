@@ -12,19 +12,24 @@ describe("pantry input contracts", () => {
   });
 
   it("preserves omitted PATCH fields while allowing an explicit clear", () => {
-    expect(updateFoodItemSchema.parse({ name: " Oats " })).toEqual({
-      name: "Oats",
-    });
     expect(
       updateFoodItemSchema.parse({
-        expiresOn: null,
-        productId: null,
-        barcode: null,
+        expectedRevision: 0,
+        changes: { name: " Oats " },
+      }),
+    ).toEqual({ expectedRevision: 0, changes: { name: "Oats" } });
+    expect(
+      updateFoodItemSchema.parse({
+        expectedRevision: 3,
+        changes: {
+          expiresOn: null,
+          productId: null,
+          barcode: null,
+        },
       }),
     ).toEqual({
-      expiresOn: null,
-      productId: null,
-      barcode: null,
+      expectedRevision: 3,
+      changes: { expiresOn: null, productId: null, barcode: null },
     });
     expect(updateFoodItemSchema.safeParse({}).success).toBe(false);
   });
@@ -42,7 +47,12 @@ describe("pantry input contracts", () => {
     expect(
       createFoodItemSchema.safeParse({ name: "Rice", ...invalid }).success,
     ).toBe(false);
-    expect(updateFoodItemSchema.safeParse(invalid).success).toBe(false);
+    expect(
+      updateFoodItemSchema.safeParse({
+        expectedRevision: 0,
+        changes: invalid,
+      }).success,
+    ).toBe(false);
   });
 
   it("keeps leap-day dates and canonical barcode identity without converting quantities", () => {

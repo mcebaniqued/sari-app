@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { apiFetch } from "./apiFetch";
+import { apiFetch, type ApiResponseParseError } from "./apiFetch";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -304,7 +304,10 @@ describe("API transport", () => {
 
     const fetch = vi.fn().mockResolvedValue(new Response("Invalid JSON"));
     vi.stubGlobal("fetch", fetch);
-    await expect(apiFetch("/health")).rejects.toBeInstanceOf(SyntaxError);
+    await expect(apiFetch("/health")).rejects.toMatchObject({
+      name: "ApiResponseParseError",
+      status: 200,
+    } satisfies Partial<ApiResponseParseError>);
     expect(fetch).toHaveBeenCalledOnce();
   });
 

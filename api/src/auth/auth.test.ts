@@ -148,10 +148,15 @@ describe.skipIf(!testUri)("real authentication and pantry isolation", () => {
       total: 0,
     });
 
-    for (const method of ["get", "patch", "delete"] as const) {
-      const response = await bob[method](`/api/v1/food-items/${id}`).send({
-        name: "Stolen rice",
-      });
+    const privateResponses = await Promise.all([
+      bob.get(`/api/v1/food-items/${id}`),
+      bob.patch(`/api/v1/food-items/${id}`).send({
+        expectedRevision: 0,
+        changes: { name: "Stolen rice" },
+      }),
+      bob.delete(`/api/v1/food-items/${id}/revisions/0`),
+    ]);
+    for (const response of privateResponses) {
       expect(response.status).toBe(404);
     }
 
