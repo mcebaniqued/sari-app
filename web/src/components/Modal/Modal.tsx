@@ -227,7 +227,11 @@ export default function Modal({
     >
       <div
         data-modal-header
-        className={`grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 border-b border-border-default bg-surface px-6 py-5 ${scroll === "contained" ? "sticky top-0 z-10 shrink-0" : ""}`}
+        className={`grid items-start gap-4 border-b border-border-default bg-surface px-6 py-5 ${
+          presentation === "responsive"
+            ? "grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto]"
+            : "grid-cols-[minmax(0,1fr)_auto]"
+        } ${scroll === "contained" ? "sticky top-0 z-10 shrink-0" : ""}`}
       >
         <div className="min-w-0">
           <h2
