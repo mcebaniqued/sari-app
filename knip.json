@@ -13,6 +13,7 @@
       "project": ["src/**/*.ts", "test/**/*.ts"]
     },
     "web": {
+      "entry": ["src/test/ModalBrowserFixture.tsx"],
       "project": ["src/**/*.{ts,tsx,css}", "*.config.ts"]
     }
   }

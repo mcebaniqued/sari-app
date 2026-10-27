@@ -479,6 +479,9 @@ test("mobile Edit returns focus to its item after Escape, Cancel, and save", asy
 
   await page.getByRole("button", { name: /^Sort by:/ }).click();
   const sortDialog = page.getByRole("dialog", { name: "Sort items" });
+  await expect(
+    sortDialog.getByRole("heading", { name: "Sort items" }),
+  ).toBeFocused();
   await sortDialog.getByRole("radio", { name: "Name: A to Z" }).check();
   await sortDialog.getByRole("button", { name: "Apply" }).click();
   await actions.click();

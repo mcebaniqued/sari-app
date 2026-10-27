@@ -8,13 +8,77 @@ import {
 import { createPortal } from "react-dom";
 import { LuX } from "react-icons/lu";
 
-interface ModalProps {
+export interface ModalDismissalPolicy {
+  backdrop: boolean;
+  closeButton: boolean;
+  escape: boolean;
+}
+
+interface ModalBaseProps {
   title: string;
   description?: string;
   children: ReactNode;
+  headerActions?: ReactNode;
   onClose: () => void;
   onRestoreFocusFallback?: (() => void) | undefined;
-  dismissible?: boolean;
+  presentation?: "centered" | "responsive";
+  scroll?: "dialog" | "contained";
+}
+
+type ModalProps = ModalBaseProps &
+  (
+    | {
+        dismissal?: ModalDismissalPolicy;
+        dismissible?: never;
+      }
+    | {
+        dismissal?: never;
+        dismissible?: boolean;
+      }
+  );
+
+const fullyDismissible: ModalDismissalPolicy = {
+  backdrop: true,
+  closeButton: true,
+  escape: true,
+};
+
+function focusAutofocusCandidate(dialog: HTMLDialogElement) {
+  const candidates = dialog.querySelectorAll<HTMLElement>("[data-autofocus]");
+
+  for (const candidate of candidates) {
+    if (
+      candidate.matches(":disabled, [aria-disabled='true']") ||
+      candidate.closest("[hidden], [inert], [aria-hidden='true']")
+    ) {
+      continue;
+    }
+
+    let current: HTMLElement | null = candidate;
+    let visuallyHidden = false;
+    while (current && current !== dialog) {
+      const style = window.getComputedStyle(current);
+      if (
+        style.display === "none" ||
+        style.visibility === "hidden" ||
+        style.visibility === "collapse"
+      ) {
+        visuallyHidden = true;
+        break;
+      }
+      current = current.parentElement;
+    }
+    if (visuallyHidden) {
+      continue;
+    }
+
+    candidate.focus({ preventScroll: true });
+    if (document.activeElement === candidate) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /** Native dialog supplies the top layer and background inertness; Tab stays inside. */
@@ -22,13 +86,23 @@ export default function Modal({
   title,
   description,
   children,
+  headerActions,
   onClose,
   onRestoreFocusFallback,
+  presentation = "centered",
+  scroll = "dialog",
+  dismissal,
   dismissible = true,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const titleId = useId();
   const descriptionId = useId();
+  const dismissalPolicy =
+    dismissal ??
+    (dismissible
+      ? fullyDismissible
+      : { backdrop: false, closeButton: false, escape: false });
   const restoreFocusFallback = useEffectEvent(() => {
     onRestoreFocusFallback?.();
   });
@@ -43,10 +117,15 @@ export default function Modal({
     const scrollWasLocked = document.body.classList.contains("overflow-hidden");
     document.body.classList.add("overflow-hidden");
     dialog.showModal();
-    dialog.querySelector<HTMLElement>("[data-autofocus]")?.focus();
+
+    if (!focusAutofocusCandidate(dialog)) {
+      titleRef.current?.focus({ preventScroll: true });
+    }
 
     return () => {
-      dialog.close();
+      if (dialog.open) {
+        dialog.close();
+      }
       if (!scrollWasLocked) {
         document.body.classList.remove("overflow-hidden");
       }
@@ -58,6 +137,31 @@ export default function Modal({
     };
   }, []);
 
+  const dialogClassName = [
+    "fixed inset-0 m-auto w-[min(480px,calc(100vw-2rem))] overflow-x-hidden rounded-modal border border-border-default bg-surface p-0 text-content shadow-modal backdrop:bg-overlay",
+    scroll === "contained"
+      ? "modal-contained max-h-[calc(100dvh-3rem)] overflow-hidden"
+      : "max-h-[calc(100dvh-3rem)] overflow-y-auto",
+    presentation === "responsive" ? "modal-responsive" : "",
+    dismissalPolicy.backdrop
+      ? "backdrop:cursor-pointer"
+      : "backdrop:cursor-not-allowed",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const content =
+    scroll === "contained" ? (
+      <div
+        data-modal-scroll-region
+        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
+      >
+        {children}
+      </div>
+    ) : (
+      children
+    );
+
   return createPortal(
     <dialog
       ref={dialogRef}
@@ -65,7 +169,9 @@ export default function Modal({
       aria-describedby={description ? descriptionId : undefined}
       aria-modal="true"
       tabIndex={-1}
-      className={`fixed inset-0 m-auto max-h-[calc(100dvh-3rem)] w-[min(480px,calc(100vw-2rem))] overflow-y-auto rounded-modal border border-border-default bg-surface p-0 text-content shadow-modal backdrop:bg-overlay ${dismissible ? "backdrop:cursor-pointer" : "backdrop:cursor-not-allowed"}`}
+      data-presentation={presentation}
+      data-scroll={scroll}
+      className={dialogClassName}
       onKeyDown={(event) => {
         if (event.key !== "Tab") {
           return;
@@ -99,12 +205,12 @@ export default function Modal({
       }}
       onCancel={(event) => {
         event.preventDefault();
-        if (dismissible) {
+        if (dismissalPolicy.escape) {
           onClose();
         }
       }}
       onClick={(event) => {
-        if (event.target !== event.currentTarget || !dismissible) {
+        if (event.target !== event.currentTarget || !dismissalPolicy.backdrop) {
           return;
         }
 
@@ -119,9 +225,17 @@ export default function Modal({
         }
       }}
     >
-      <div className="flex items-start justify-between gap-4 border-b border-border-default px-6 py-5">
-        <div>
-          <h2 id={titleId} className="text-xl font-semibold tracking-tight">
+      <div
+        data-modal-header
+        className={`grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 border-b border-border-default bg-surface px-6 py-5 ${scroll === "contained" ? "sticky top-0 z-10 shrink-0" : ""}`}
+      >
+        <div className="min-w-0">
+          <h2
+            ref={titleRef}
+            id={titleId}
+            tabIndex={-1}
+            className="wrap-anywhere rounded-control text-xl font-semibold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          >
             {title}
           </h2>
           {description && (
@@ -133,17 +247,20 @@ export default function Modal({
             </p>
           )}
         </div>
-        <button
-          type="button"
-          disabled={!dismissible}
-          onClick={onClose}
-          aria-label="Close modal"
-          className="inline-flex size-8 shrink-0 items-center justify-center rounded-control text-content-muted hover:bg-surface-hover hover:text-content disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand -mr-1"
-        >
-          <LuX aria-hidden="true" className="size-5" />
-        </button>
+        <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
+          {headerActions}
+          <button
+            type="button"
+            disabled={!dismissalPolicy.closeButton}
+            onClick={onClose}
+            aria-label="Close modal"
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-control text-content-muted hover:bg-surface-hover hover:text-content disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          >
+            <LuX aria-hidden="true" className="size-5" />
+          </button>
+        </div>
       </div>
-      {children}
+      {content}
     </dialog>,
     document.body,
   );
