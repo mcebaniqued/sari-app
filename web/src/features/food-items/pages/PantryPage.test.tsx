@@ -1,5 +1,6 @@
-import type { FoodItem } from "@sari/contracts";
+import type { FoodItem, FoodProduct } from "@sari/contracts";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -29,9 +30,34 @@ const other: FoodItem = {
   id: "112345678901234567890123",
   name: "Eggs",
 };
+const localProduct: FoodProduct = {
+  id: "212345678901234567890123",
+  barcode: "00012345678905",
+  name: "Local oats",
+  brand: "Local brand",
+  packageDescription: "500 g",
+  packageQuantity: 500,
+  packageUnit: "g",
+  provider: "usda",
+  externalId: "12345",
+  marketCountry: "United States",
+  sourceUrl: "https://fdc.nal.usda.gov/food-details/12345/nutrients",
+  sourceModifiedAt: null,
+  sourcePublishedAt: "2026-01-01",
+  checkedAt: "2026-10-20T00:00:00Z",
+};
+const serverProduct: FoodProduct = {
+  ...localProduct,
+  id: "312345678901234567890123",
+  barcode: "00000096385074",
+  name: "Server oats",
+  externalId: "67890",
+  sourceUrl: "https://fdc.nal.usda.gov/food-details/67890/nutrients",
+};
 
 function stubFoodFetch(
   mutation: (url: string, init?: RequestInit) => Promise<Response>,
+  initialItems: FoodItem[] = [item, other],
 ) {
   let loads = 0;
   vi.stubGlobal(
@@ -45,12 +71,15 @@ function stubFoodFetch(
   vi.stubGlobal(
     "fetch",
     vi.fn((url: string, init?: RequestInit) => {
-      if (!init?.method || init.method === "GET") {
+      if (
+        (!init?.method || init.method === "GET") &&
+        url.startsWith("/api/v1/food-items?")
+      ) {
         loads++;
         return Promise.resolve(
           Response.json({
-            items: [item, other],
-            total: 2,
+            items: initialItems,
+            total: initialItems.length,
             start: 0,
             limit: 20,
           }),
@@ -168,10 +197,10 @@ describe("pantry modals and persistence", () => {
     });
     fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
     expect(await dialog.findByRole("alert")).toHaveTextContent(
-      "The save outcome could not be confirmed. Refresh your pantry before trying again.",
+      "The save outcome is unknown",
     );
     expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
-    expect(fetch).toHaveBeenLastCalledWith(
+    expect(fetch).toHaveBeenCalledWith(
       `/api/v1/food-items/${item.id}`,
       expect.objectContaining({
         method: "PATCH",
@@ -187,21 +216,391 @@ describe("pantry modals and persistence", () => {
       }),
     );
     fireEvent.click(dialog.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit Milk" })).toBeVisible();
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it("keeps a stale edit draft and identifies the revision conflict", async () => {
+    const current = { ...item, name: "Whole milk", revision: 1 };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            error: {
+              code: "FOOD_ITEM_REVISION_CONFLICT",
+              message: "Changed.",
+            },
+          },
+          { status: 409 },
+        ),
+      )
+      .mockResolvedValueOnce(Response.json(current))
+      .mockResolvedValueOnce(
+        Response.json({ ...current, name: "Oat milk", revision: 2 }),
+      );
+    stubFoodFetch(fetch);
+    render(
+      <MemoryRouter>
+        <PantryPage />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    fireEvent.change(dialog.getByLabelText(/^Food name/), {
+      target: { value: "Oat milk" },
+    });
+    fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
+
+    expect(await dialog.findByRole("alert")).toHaveTextContent(
+      "A newer version was saved",
+    );
+    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(dialog.getByRole("button", { name: "Review newer data" }));
+    expect(await dialog.findByText("Whole milk")).toBeVisible();
+    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(
+      fetch.mock.calls.filter(
+        ([, init]) => (init as RequestInit | undefined)?.method === "PATCH",
+      ),
+    ).toHaveLength(1);
+
+    fireEvent.click(
+      dialog.getByRole("button", {
+        name: "Overwrite saved version with my draft",
+      }),
+    );
+    expect(dialog.getByRole("button", { name: "Save changes" })).toHaveFocus();
+    fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledTimes(3);
+    });
+    expect(fetch).toHaveBeenLastCalledWith(
+      `/api/v1/food-items/${item.id}`,
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({
+          expectedRevision: current.revision,
+          changes: {
+            name: "Oat milk",
+            quantity: 0.5,
+            unit: "l",
+            expiresOn: "2026-11-01",
+          },
+        }),
+      }),
+    );
+  });
+
+  it("ignores a conflict review that resolves after recovery is dismissed", async () => {
+    let completeReview: ((response: Response) => void) | undefined;
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            error: {
+              code: "FOOD_ITEM_REVISION_CONFLICT",
+              message: "Changed.",
+            },
+          },
+          { status: 409 },
+        ),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            completeReview = resolve;
+          }),
+      );
+    stubFoodFetch(fetch);
+    render(
+      <MemoryRouter>
+        <PantryPage />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    fireEvent.change(dialog.getByLabelText(/^Food name/), {
+      target: { value: "Oat milk" },
+    });
+    fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
+    await dialog.findByText("A newer version was saved");
+
+    fireEvent.click(dialog.getByRole("button", { name: "Review newer data" }));
+    expect(
+      dialog.getByRole("button", { name: "Loading newer data…" }),
+    ).toBeDisabled();
+    fireEvent.click(dialog.getByRole("button", { name: "Continue editing" }));
+    expect(dialog.queryByRole("alert")).not.toBeInTheDocument();
+    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
+    expect(dialog.getByLabelText(/^Food name/)).toHaveFocus();
+
+    await act(async () => {
+      completeReview?.(
+        Response.json({ ...item, name: "Whole milk", revision: 1 }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(dialog.queryByRole("alert")).not.toBeInTheDocument();
+    expect(dialog.queryByText("Whole milk")).not.toBeInTheDocument();
+    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
+  });
+
+  it("discloses product identity and requires an explicit full-draft overwrite", async () => {
+    const localItem = {
+      ...item,
+      productId: localProduct.id,
+      barcode: localProduct.barcode,
+    };
+    const current = {
+      ...localItem,
+      name: "Server milk",
+      quantity: 3,
+      expiresOn: "2026-12-01",
+      productId: serverProduct.id,
+      barcode: serverProduct.barcode,
+      revision: 1,
+    };
+    const patchBodies: unknown[] = [];
+    const fetch = vi.fn((url: string, init?: RequestInit) => {
+      if (url.includes("/food-products/")) {
+        return Promise.resolve(
+          Response.json(
+            url.endsWith(serverProduct.id) ? serverProduct : localProduct,
+          ),
+        );
+      }
+      if (init?.method === "PATCH") {
+        if (typeof init.body !== "string") {
+          throw new Error("Expected a JSON PATCH body.");
+        }
+        const body = JSON.parse(init.body) as {
+          expectedRevision: number;
+          changes: Partial<FoodItem>;
+        };
+        patchBodies.push(body);
+        if (patchBodies.length === 1) {
+          return Promise.resolve(
+            Response.json(
+              {
+                error: {
+                  code: "FOOD_ITEM_REVISION_CONFLICT",
+                  message: "Changed.",
+                },
+              },
+              { status: 409 },
+            ),
+          );
+        }
+
+        return Promise.resolve(
+          Response.json({
+            ...current,
+            ...body.changes,
+            revision: current.revision + 1,
+          }),
+        );
+      }
+
+      return Promise.resolve(Response.json(current));
+    });
+    stubFoodFetch(fetch, [localItem]);
+    render(
+      <MemoryRouter>
+        <PantryPage />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    fireEvent.change(dialog.getByLabelText(/^Food name/), {
+      target: { value: "My oat milk" },
+    });
+    fireEvent.change(dialog.getByLabelText(/^Quantity/), {
+      target: { value: "4" },
+    });
+    fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
+    await dialog.findByText("A newer version was saved");
+    fireEvent.click(dialog.getByRole("button", { name: "Review newer data" }));
+
+    const recovery = within(await dialog.findByRole("alert"));
+    expect(
+      await recovery.findByRole("heading", { name: "Your draft" }),
+    ).toBeVisible();
+    expect(
+      recovery.getByText(`Barcode ${localProduct.barcode}`, { exact: false }),
+    ).toBeVisible();
+    expect(
+      recovery.getByText(`Product ID ${localProduct.id}`, { exact: false }),
+    ).toBeVisible();
+    expect(
+      recovery.getByText(`Barcode ${serverProduct.barcode}`, { exact: false }),
+    ).toBeVisible();
+    expect(
+      recovery.getByText(`Product ID ${serverProduct.id}`, { exact: false }),
+    ).toBeVisible();
+    expect(
+      recovery.getByText(
+        /next Save changes will replace every newer saved value/,
+      ),
+    ).toBeVisible();
+    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("My oat milk");
+    expect(dialog.getByLabelText(/^Quantity/)).toHaveValue(4);
+
+    fireEvent.click(
+      dialog.getByRole("button", {
+        name: "Overwrite saved version with my draft",
+      }),
+    );
+    expect(dialog.getByRole("button", { name: "Save changes" })).toHaveFocus();
+    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("My oat milk");
+    fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => {
+      expect(patchBodies).toHaveLength(2);
+    });
+    expect(patchBodies[1]).toEqual({
+      expectedRevision: current.revision,
+      changes: {
+        name: "My oat milk",
+        quantity: 4,
+        unit: localItem.unit,
+        expiresOn: localItem.expiresOn,
+        productId: localProduct.id,
+        barcode: localProduct.barcode,
+      },
+    });
+  });
+
+  it("loads the reviewed server version and restores focus without another PATCH", async () => {
+    const localItem = {
+      ...item,
+      productId: localProduct.id,
+      barcode: localProduct.barcode,
+    };
+    const current = {
+      ...localItem,
+      name: "Server milk",
+      quantity: 3,
+      productId: serverProduct.id,
+      barcode: serverProduct.barcode,
+      revision: 1,
+    };
+    let patchCount = 0;
+    const fetch = vi.fn((url: string, init?: RequestInit) => {
+      if (url.includes("/food-products/")) {
+        return Promise.resolve(
+          Response.json(
+            url.endsWith(serverProduct.id) ? serverProduct : localProduct,
+          ),
+        );
+      }
+      if (init?.method === "PATCH") {
+        patchCount++;
+
+        return Promise.resolve(
+          Response.json(
+            {
+              error: {
+                code: "FOOD_ITEM_REVISION_CONFLICT",
+                message: "Changed.",
+              },
+            },
+            { status: 409 },
+          ),
+        );
+      }
+
+      return Promise.resolve(Response.json(current));
+    });
+    stubFoodFetch(fetch, [localItem]);
+    render(
+      <MemoryRouter>
+        <PantryPage />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    fireEvent.change(dialog.getByLabelText(/^Food name/), {
+      target: { value: "My oat milk" },
+    });
+    fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
+    await dialog.findByText("A newer version was saved");
+    fireEvent.click(dialog.getByRole("button", { name: "Review newer data" }));
+    fireEvent.click(
+      await dialog.findByRole("button", { name: "Use newer saved version" }),
+    );
+
+    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Server milk");
+    expect(dialog.getByLabelText(/^Food name/)).toHaveFocus();
+    expect(dialog.getByLabelText(/^Quantity/)).toHaveValue(3);
+    expect(patchCount).toBe(1);
+    fireEvent.click(dialog.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("keeps an edit draft after an unreadable successful response", async () => {
+    const current = { ...item, name: "Whole milk", revision: 1 };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response("{", {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(Response.json(current));
+    stubFoodFetch(fetch);
+    render(
+      <MemoryRouter>
+        <PantryPage />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    fireEvent.change(dialog.getByLabelText(/^Food name/), {
+      target: { value: "Oat milk" },
+    });
+    fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
+
+    expect(await dialog.findByRole("alert")).toHaveTextContent(
+      "The save outcome is unknown",
+    );
+    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
+    expect(dialog.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    expect(
+      dialog.getByRole("button", {
+        name: "Overwrite saved version with my draft",
+      }),
+    ).toBeVisible();
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(
+      fetch.mock.calls.filter(
+        ([, init]) => (init as RequestInit | undefined)?.method === "PATCH",
+      ),
+    ).toHaveLength(1);
+    expect(notify).not.toHaveBeenCalledWith(
+      "success",
+      expect.stringContaining("updated"),
+    );
+  });
+
+  it("keeps the draft but prevents another save when the item is unavailable", async () => {
     const fetch = vi.fn().mockResolvedValueOnce(
       Response.json(
         {
           error: {
-            code: "FOOD_ITEM_REVISION_CONFLICT",
-            message: "Changed.",
+            code: "FOOD_ITEM_NOT_FOUND",
+            message: "Food item not found.",
           },
         },
-        { status: 409 },
+        { status: 404 },
       ),
     );
     stubFoodFetch(fetch);
@@ -218,40 +617,11 @@ describe("pantry modals and persistence", () => {
     fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
 
     expect(await dialog.findByRole("alert")).toHaveTextContent(
-      "This item changed since you opened it. Your edits are still here",
+      "This item is no longer available",
     );
     expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
-    expect(fetch).toHaveBeenCalledTimes(1);
-  });
-
-  it("keeps an edit draft after an unreadable successful response", async () => {
-    const fetch = vi.fn().mockResolvedValueOnce(
-      new Response("{", {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    );
-    stubFoodFetch(fetch);
-    render(
-      <MemoryRouter>
-        <PantryPage />
-      </MemoryRouter>,
-    );
-    fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
-    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
-    fireEvent.change(dialog.getByLabelText(/^Food name/), {
-      target: { value: "Oat milk" },
-    });
-    fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
-
-    expect(await dialog.findByRole("alert")).toHaveTextContent(
-      "The save outcome could not be confirmed",
-    );
-    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
-    expect(notify).not.toHaveBeenCalledWith(
-      "success",
-      expect.stringContaining("updated"),
-    );
+    expect(dialog.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    expect(fetch).toHaveBeenCalledOnce();
   });
 
   it("rejects whitespace names before making a save request", async () => {

@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getSession } from "@/features/auth/api/authApi";
 import App from "./App";
@@ -21,13 +21,17 @@ beforeEach(() => {
   });
 });
 
+function renderApp(path: string) {
+  const router = createMemoryRouter([{ path: "*", element: <App /> }], {
+    initialEntries: [path],
+  });
+
+  return render(<RouterProvider router={router} />);
+}
+
 describe("application routing", () => {
   it("renders a recovery link for an unknown route", async () => {
-    render(
-      <MemoryRouter initialEntries={["/missing"]}>
-        <App />
-      </MemoryRouter>,
-    );
+    renderApp("/missing");
     expect(
       await screen.findByRole("heading", { name: "Page not found" }),
     ).toBeVisible();
@@ -42,11 +46,7 @@ describe("application routing", () => {
     ).toHaveAttribute("href", "/pantry");
   });
   it("renders an access denied page", async () => {
-    render(
-      <MemoryRouter initialEntries={["/access-denied"]}>
-        <App />
-      </MemoryRouter>,
-    );
+    renderApp("/access-denied");
     expect(
       await screen.findByRole("heading", { name: "Access denied" }),
     ).toBeVisible();
@@ -65,11 +65,7 @@ describe("application routing", () => {
     "redirects signed-out visitors from %s to login",
     async (path) => {
       vi.mocked(getSession).mockResolvedValue(null);
-      render(
-        <MemoryRouter initialEntries={[path]}>
-          <App />
-        </MemoryRouter>,
-      );
+      renderApp(path);
       expect(
         await screen.findByRole("heading", { name: "Log in" }),
       ).toBeVisible();
@@ -81,11 +77,7 @@ describe("application routing", () => {
 
   it("keeps registration public with exactly the requested fields", async () => {
     vi.mocked(getSession).mockResolvedValue(null);
-    render(
-      <MemoryRouter initialEntries={["/register"]}>
-        <App />
-      </MemoryRouter>,
-    );
+    renderApp("/register");
     expect(
       await screen.findByRole("heading", { name: "Create an account" }),
     ).toBeVisible();
@@ -97,11 +89,7 @@ describe("application routing", () => {
 
   it("does not show protected content while the session is loading", () => {
     vi.mocked(getSession).mockReturnValue(new Promise(() => undefined));
-    render(
-      <MemoryRouter initialEntries={["/pantry"]}>
-        <App />
-      </MemoryRouter>,
-    );
+    renderApp("/pantry");
     expect(screen.getByRole("status")).toHaveTextContent(
       "Checking your session",
     );

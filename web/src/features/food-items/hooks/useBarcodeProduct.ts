@@ -127,6 +127,15 @@ export function useBarcodeProduct(
     );
   }
 
+  function replaceWithItem(nextItem: FoodItem) {
+    cancelLookup();
+    setProduct(null);
+    setProductId(nextItem.productId ?? null);
+    setBarcode(nextItem.barcode ?? null);
+    setReplacement(null);
+    setMessage("");
+  }
+
   function keepValues() {
     setReplacement(null);
   }
@@ -150,5 +159,6 @@ export function useBarcodeProduct(
     unlink,
     keepValues,
     replaceValues,
+    replaceWithItem,
   };
 }

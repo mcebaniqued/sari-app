@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import AppHeader from "@/components/AppHeader/AppHeader";
 import ToastViewport from "@/components/Toast/ToastViewport";
+import UnsavedChangesProvider from "@/contexts/UnsavedChangesContext";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useMobileHeader } from "@/hooks/useMobileHeader";
 
@@ -26,20 +27,22 @@ export default function AppLayout() {
       >
         Skip to content
       </a>
-      <AppHeader
-        firstName={
-          location.pathname === "/pantry" ? user?.firstName : undefined
-        }
-        onLogout={logout}
-        hiddenOnMobile={pantry && !headerVisible}
-      />
-      <main
-        id="main-content"
-        tabIndex={-1}
-        className={`mx-auto max-w-360 px-4 py-8 sm:px-8 lg:px-12 md:h-[calc(100dvh-4.5rem)] md:min-h-0 ${pantry ? "" : "md:overflow-y-auto"}`}
-      >
-        <Outlet />
-      </main>
+      <UnsavedChangesProvider>
+        <AppHeader
+          firstName={
+            location.pathname === "/pantry" ? user?.firstName : undefined
+          }
+          onLogout={logout}
+          hiddenOnMobile={pantry && !headerVisible}
+        />
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className={`mx-auto max-w-360 px-4 py-8 sm:px-8 lg:px-12 md:h-[calc(100dvh-4.5rem)] md:min-h-0 ${pantry ? "" : "md:overflow-y-auto"}`}
+        >
+          <Outlet />
+        </main>
+      </UnsavedChangesProvider>
       <ToastViewport />
     </div>
   );

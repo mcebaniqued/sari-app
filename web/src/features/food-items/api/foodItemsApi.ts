@@ -64,7 +64,7 @@ export async function listFoodItems(
   return foodItemListSchema.parse(response);
 }
 
-async function getFoodItem(id: string) {
+export async function getFoodItem(id: string) {
   const response = await apiFetch<unknown>(`/food-items/${id}`, {
     headers: revisionHeaders,
   });
@@ -76,8 +76,8 @@ async function verifyAmbiguousMutation(id: string): Promise<never> {
   try {
     const currentItem = await getFoodItem(id);
 
-    // Matching values cannot prove whether the attempted request succeeded,
-    // so report uncertainty even when the current record looks familiar.
+    // Neither matching values nor an unchanged revision prove that an earlier
+    // request has finished, so retain an uncertain outcome for every record.
     throw new FoodItemMutationOutcomeError("uncertain", currentItem);
   } catch (error) {
     if (error instanceof FoodItemMutationOutcomeError) {
