@@ -36,6 +36,14 @@ const foodItemFields = {
   barcode: barcodeSchema.nullable().optional(),
 };
 
+export const foodItemRevisionContractHeader = "Sari-Revision-Contract";
+export const foodItemRevisionContractVersion = "1";
+export const foodItemRevisionSchema = z
+  .number()
+  .int()
+  .nonnegative()
+  .max(Number.MAX_SAFE_INTEGER);
+
 export const createFoodItemSchema = z.strictObject({
   ...foodItemFields,
   quantity: foodItemFields.quantity.default(1),
@@ -44,7 +52,7 @@ export const createFoodItemSchema = z.strictObject({
 });
 
 // PATCH has no creation defaults: omitted fields retain their stored values.
-export const updateFoodItemSchema = z
+const foodItemChangesSchema = z
   .strictObject(foodItemFields)
   .partial()
   .refine(
@@ -52,11 +60,20 @@ export const updateFoodItemSchema = z
     "Provide at least one field to update.",
   );
 
+export const updateFoodItemSchema = z.strictObject({
+  expectedRevision: foodItemRevisionSchema,
+  changes: foodItemChangesSchema,
+});
+
 export const foodItemIdSchema = z.string().regex(/^[a-f0-9]{24}$/);
 
 export const foodItemSchema = z.strictObject({
   ...foodItemFields,
   id: foodItemIdSchema,
+  // Missing revisions are accepted only for compatibility with the previous
+  // API during the staged rollout. Revision-qualified mutations remain
+  // mandatory, so this fallback cannot enable an unprotected write.
+  revision: foodItemRevisionSchema.default(0),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });

@@ -13,6 +13,7 @@ const item: FoodItem = {
   quantity: 1,
   unit: "l",
   expiresOn: null,
+  revision: 0,
   createdAt: "2026-10-19T00:00:00Z",
   updatedAt: "2026-10-19T00:00:00Z",
 };

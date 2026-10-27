@@ -1,4 +1,9 @@
-import { foodItemListSchema, foodItemSchema } from "@sari/contracts";
+import {
+  foodItemListSchema,
+  foodItemRevisionContractHeader,
+  foodItemRevisionContractVersion,
+  foodItemSchema,
+} from "@sari/contracts";
 import mongoose from "mongoose";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -59,6 +64,8 @@ describe.skipIf(!testUri)("MongoDB food persistence", () => {
     });
     createdIds.push(foodItemSchema.parse(response.body).id);
     expect(response.status).toBe(201);
+    expect(response.body).not.toHaveProperty("revision");
+    expect(response.headers.vary).toContain(foodItemRevisionContractHeader);
     const item = foodItemSchema.parse(response.body);
     expect(item).toMatchObject({
       name: "Integration test rice",
@@ -74,6 +81,9 @@ describe.skipIf(!testUri)("MongoDB food persistence", () => {
     });
     const listed = await agent.get("/api/v1/food-items");
     expect(listed.status).toBe(200);
+    expect((listed.body as { items: unknown[] }).items[0]).not.toHaveProperty(
+      "revision",
+    );
     expect(foodItemListSchema.parse(listed.body).items).toContainEqual(item);
     expect(item).not.toHaveProperty("_id");
     expect(item).not.toHaveProperty("__v");
@@ -106,7 +116,11 @@ describe.skipIf(!testUri)("MongoDB food persistence", () => {
     });
     const updated = await agent
       .patch(`/api/v1/food-items/${original.id}`)
-      .send({ unit: "fl oz" });
+      .set(foodItemRevisionContractHeader, foodItemRevisionContractVersion)
+      .send({
+        expectedRevision: original.revision,
+        changes: { unit: "fl oz" },
+      });
     expect(updated.status).toBe(200);
     expect(foodItemSchema.parse(updated.body)).toMatchObject({
       quantity: 1.5,
@@ -152,13 +166,18 @@ describe.skipIf(!testUri)("MongoDB food persistence", () => {
 
     const updated = await agent
       .patch(`/api/v1/food-items/${original.id}`)
-      .send({ name: "  Rolled oats  ", expiresOn: null });
+      .set(foodItemRevisionContractHeader, foodItemRevisionContractVersion)
+      .send({
+        expectedRevision: original.revision,
+        changes: { name: "  Rolled oats  ", expiresOn: null },
+      });
     expect(updated.status).toBe(200);
     const item = foodItemSchema.parse(updated.body);
     expect(item).toEqual({
       ...original,
       name: "Rolled oats",
       expiresOn: null,
+      revision: 1,
       updatedAt: item.updatedAt,
     });
     expect(new Date(item.updatedAt).getTime()).toBeGreaterThanOrEqual(
@@ -172,17 +191,181 @@ describe.skipIf(!testUri)("MongoDB food persistence", () => {
       expiresOn: null,
     });
 
-    const fetched = await agent.get(`/api/v1/food-items/${item.id}`);
+    const fetched = await agent
+      .get(`/api/v1/food-items/${item.id}`)
+      .set(foodItemRevisionContractHeader, foodItemRevisionContractVersion);
     expect(fetched.status).toBe(200);
     expect(foodItemSchema.parse(fetched.body)).toEqual(item);
-    const listed = await agent.get("/api/v1/food-items");
+    const listed = await agent
+      .get("/api/v1/food-items")
+      .set(foodItemRevisionContractHeader, foodItemRevisionContractVersion);
     expect(foodItemListSchema.parse(listed.body).items).toContainEqual(item);
 
     const invalid = await agent
       .patch(`/api/v1/food-items/${item.id}`)
-      .send({ quantity: -3 });
+      .send({ expectedRevision: item.revision, changes: { quantity: -3 } });
     expect(invalid.status).toBe(400);
     expect((await FoodItemModel.findById(item.id))?.quantity).toBe(2);
+  });
+
+  it("initializes revisions and rejects stale and concurrent mutations atomically", async () => {
+    const created = await agent
+      .post("/api/v1/food-items")
+      .set(foodItemRevisionContractHeader, foodItemRevisionContractVersion)
+      .send({ name: "Revision test item" });
+    expect(created.status).toBe(201);
+    const original = foodItemSchema.parse(created.body);
+    createdIds.push(original.id);
+    expect(original.revision).toBe(0);
+    expect(created.body).toHaveProperty("revision", 0);
+    expect((await FoodItemModel.findById(original.id).lean())?.revision).toBe(
+      0,
+    );
+
+    const concurrent = await Promise.all([
+      agent
+        .patch(`/api/v1/food-items/${original.id}`)
+        .set(foodItemRevisionContractHeader, foodItemRevisionContractVersion)
+        .send({
+          expectedRevision: 0,
+          changes: { name: "First concurrent name" },
+        }),
+      agent
+        .patch(`/api/v1/food-items/${original.id}`)
+        .set(foodItemRevisionContractHeader, foodItemRevisionContractVersion)
+        .send({
+          expectedRevision: 0,
+          changes: { name: "Second concurrent name" },
+        }),
+    ]);
+    expect(concurrent.map(({ status }) => status).sort()).toEqual([200, 409]);
+    const winner = concurrent.find(({ status }) => status === 200);
+    const conflict = concurrent.find(({ status }) => status === 409);
+    expect(foodItemSchema.parse(winner?.body).revision).toBe(1);
+    expect(conflict?.body).toEqual({
+      error: {
+        code: "FOOD_ITEM_REVISION_CONFLICT",
+        message:
+          "This pantry item changed since it was loaded. Refresh it before trying again.",
+      },
+    });
+
+    const staleDelete = await agent.delete(
+      `/api/v1/food-items/${original.id}/revisions/0`,
+    );
+    expect(staleDelete.status).toBe(409);
+    expect(await FoodItemModel.findById(original.id)).not.toBeNull();
+
+    const removed = await agent.delete(
+      `/api/v1/food-items/${original.id}/revisions/1`,
+    );
+    expect(removed.status).toBe(204);
+  });
+
+  it("treats legacy records as revision zero without a migration", async () => {
+    const inserted = await FoodItemModel.collection.insertOne({
+      userId,
+      name: "Legacy revision item",
+      quantity: 1,
+      unit: "item",
+      expiresOn: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    const id = inserted.insertedId.toHexString();
+    createdIds.push(id);
+
+    const read = await agent
+      .get(`/api/v1/food-items/${id}`)
+      .set(foodItemRevisionContractHeader, foodItemRevisionContractVersion);
+    expect(foodItemSchema.parse(read.body).revision).toBe(0);
+
+    const updated = await agent
+      .patch(`/api/v1/food-items/${id}`)
+      .set(foodItemRevisionContractHeader, foodItemRevisionContractVersion)
+      .send({ expectedRevision: 0, changes: { quantity: 2 } });
+    expect(updated.status).toBe(200);
+    expect(foodItemSchema.parse(updated.body)).toMatchObject({
+      quantity: 2,
+      revision: 1,
+    });
+    expect(await FoodItemModel.findById(id).lean()).toMatchObject({
+      quantity: 2,
+      revision: 1,
+    });
+  });
+
+  it("advances revisions sequentially and rejects reuse of an earlier revision", async () => {
+    const created = await agent
+      .post("/api/v1/food-items")
+      .set(foodItemRevisionContractHeader, foodItemRevisionContractVersion)
+      .send({ name: "Sequential revision item" });
+    const original = foodItemSchema.parse(created.body);
+    createdIds.push(original.id);
+
+    const first = await agent
+      .patch(`/api/v1/food-items/${original.id}`)
+      .set(foodItemRevisionContractHeader, foodItemRevisionContractVersion)
+      .send({ expectedRevision: 0, changes: { quantity: 2 } });
+    const revisionOne = foodItemSchema.parse(first.body);
+    expect(first.status).toBe(200);
+    expect(revisionOne).toMatchObject({ quantity: 2, revision: 1 });
+
+    const second = await agent
+      .patch(`/api/v1/food-items/${original.id}`)
+      .set(foodItemRevisionContractHeader, foodItemRevisionContractVersion)
+      .send({ expectedRevision: 1, changes: { quantity: 3 } });
+    const revisionTwo = foodItemSchema.parse(second.body);
+    expect(second.status).toBe(200);
+    expect(revisionTwo).toMatchObject({ quantity: 3, revision: 2 });
+
+    const reused = await agent
+      .patch(`/api/v1/food-items/${original.id}`)
+      .send({ expectedRevision: 1, changes: { quantity: 4 } });
+    expect(reused.status).toBe(409);
+    expect(await FoodItemModel.findById(original.id).lean()).toMatchObject({
+      quantity: 3,
+      revision: 2,
+    });
+  });
+
+  it("allows only one winner when an update and delete use the same revision", async () => {
+    const created = await agent
+      .post("/api/v1/food-items")
+      .set(foodItemRevisionContractHeader, foodItemRevisionContractVersion)
+      .send({ name: "Update delete race item" });
+    const original = foodItemSchema.parse(created.body);
+    createdIds.push(original.id);
+
+    const [updated, deleted] = await Promise.all([
+      agent
+        .patch(`/api/v1/food-items/${original.id}`)
+        .set(foodItemRevisionContractHeader, foodItemRevisionContractVersion)
+        .send({
+          expectedRevision: original.revision,
+          changes: { name: "Update won" },
+        }),
+      agent.delete(
+        `/api/v1/food-items/${original.id}/revisions/${original.revision}`,
+      ),
+    ]);
+    expect(
+      [updated, deleted].filter(({ status }) => status >= 200 && status < 300),
+    ).toHaveLength(1);
+
+    const stored = await FoodItemModel.findById(original.id).lean();
+    if (updated.status === 200) {
+      expect(deleted.status).toBe(409);
+      expect(foodItemSchema.parse(updated.body)).toMatchObject({
+        name: "Update won",
+        revision: 1,
+      });
+      expect(stored).toMatchObject({ name: "Update won", revision: 1 });
+    } else {
+      expect(updated.status).toBe(404);
+      expect(deleted.status).toBe(204);
+      expect(stored).toBeNull();
+    }
   });
 
   it("deletes only the selected item and reports missing records consistently", async () => {
@@ -196,7 +379,9 @@ describe.skipIf(!testUri)("MongoDB food persistence", () => {
     const beforeIds = foodItemListSchema
       .parse(before.body)
       .items.map((entry) => entry.id);
-    const removed = await agent.delete(`/api/v1/food-items/${item.id}`);
+    const removed = await agent.delete(
+      `/api/v1/food-items/${item.id}/revisions/${item.revision}`,
+    );
     expect(removed.status).toBe(204);
     expect(removed.text).toBe("");
     expect(await FoodItemModel.findById(item.id)).toBeNull();
@@ -205,11 +390,15 @@ describe.skipIf(!testUri)("MongoDB food persistence", () => {
       foodItemListSchema.parse(listed.body).items.map((entry) => entry.id),
     ).toEqual(beforeIds.filter((id) => id !== item.id));
 
-    for (const method of ["get", "patch", "delete"] as const) {
-      const client = agent;
-      const response = await client[method](
-        `/api/v1/food-items/${item.id}`,
-      ).send({ quantity: 3 });
+    const missingResponses = await Promise.all([
+      agent.get(`/api/v1/food-items/${item.id}`),
+      agent.patch(`/api/v1/food-items/${item.id}`).send({
+        expectedRevision: item.revision,
+        changes: { quantity: 3 },
+      }),
+      agent.delete(`/api/v1/food-items/${item.id}/revisions/${item.revision}`),
+    ]);
+    for (const response of missingResponses) {
       expect(response.status).toBe(404);
       expect(response.body).toEqual({
         error: { code: "FOOD_ITEM_NOT_FOUND", message: "Food item not found." },

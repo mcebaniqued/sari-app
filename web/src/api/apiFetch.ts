@@ -11,6 +11,14 @@ export class ApiError extends Error {
   }
 }
 
+/** A successful response was received, but its JSON representation was unreadable. */
+export class ApiResponseParseError extends Error {
+  constructor(public readonly status: number) {
+    super(`Could not read the successful response (${status}).`);
+    this.name = "ApiResponseParseError";
+  }
+}
+
 interface RetryOptions {
   /** Additional attempts after the initial request; defaults to 2, maximum 5. */
   maxRetries?: number;
@@ -186,7 +194,17 @@ export async function apiFetch<T>(
       return undefined;
     }
 
-    const body: unknown = await response.json();
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch (error) {
+      init.signal?.throwIfAborted();
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw error;
+      }
+
+      throw new ApiResponseParseError(response.status);
+    }
     init.signal?.throwIfAborted();
 
     return body as T;

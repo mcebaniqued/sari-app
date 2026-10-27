@@ -23,6 +23,7 @@ export const milk: FoodItem = {
   quantity: 2,
   unit: "l",
   expiresOn: "2028-02-29",
+  revision: 0,
   createdAt: "2026-10-19T00:00:00Z",
   updatedAt: "2026-10-19T00:00:00Z",
 };
@@ -129,11 +130,15 @@ export async function foodApi(
   const queries: URLSearchParams[] = [];
   await page.route("**/api/v1/food-items**", async (route) => {
     const request = route.request();
-    const id = new URL(request.url()).pathname.split("/").pop();
+    const url = new URL(request.url());
+    const segments = url.pathname.split("/").filter(Boolean);
+    const id =
+      request.method() === "DELETE" ? segments.at(-3) : segments.at(-1);
     if (request.method() === "POST") {
       const item: FoodItem = {
         ...createFoodItemSchema.parse(request.postDataJSON()),
         id: "312345678901234567890123",
+        revision: 0,
         createdAt: milk.createdAt,
         updatedAt: milk.updatedAt,
       };
@@ -145,7 +150,25 @@ export async function foodApi(
         throw new Error("Fixture item missing.");
       }
 
-      Object.assign(item, request.postDataJSON(), {
+      const body = request.postDataJSON() as {
+        expectedRevision: number;
+        changes: Partial<FoodItem>;
+      };
+      if (body.expectedRevision !== item.revision) {
+        await route.fulfill({
+          status: 409,
+          json: {
+            error: {
+              code: "FOOD_ITEM_REVISION_CONFLICT",
+              message: "This pantry item changed since it was loaded.",
+            },
+          },
+        });
+
+        return;
+      }
+      Object.assign(item, body.changes, {
+        revision: item.revision + 1,
         updatedAt: "2026-10-19T00:01:00Z",
       });
       await route.fulfill({ json: item });
@@ -158,7 +181,7 @@ export async function foodApi(
       if (failurePending && id === failOnceId) {
         failurePending = false;
         await route.fulfill({
-          status: 503,
+          status: 422,
           json: {
             error: {
               code: "DATABASE_UNAVAILABLE",
@@ -170,8 +193,23 @@ export async function foodApi(
         items = items.filter((item) => item.id !== id);
         await route.fulfill({ status: 204, body: "" });
       }
+    } else if (id && id !== "food-items") {
+      const item = items.find((entry) => entry.id === id);
+      await route.fulfill(
+        item
+          ? { json: item }
+          : {
+              status: 404,
+              json: {
+                error: {
+                  code: "FOOD_ITEM_NOT_FOUND",
+                  message: "Food item not found.",
+                },
+              },
+            },
+      );
     } else {
-      const parameters = new URL(request.url()).searchParams;
+      const parameters = url.searchParams;
       queries.push(parameters);
       const query = foodItemQuerySchema.parse(Object.fromEntries(parameters));
       let matching = items.filter((item) =>

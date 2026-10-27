@@ -3,13 +3,21 @@ import {
   createFoodItemSchema,
   foodItemIdSchema,
   foodItemQuerySchema,
+  foodItemRevisionContractHeader,
+  foodItemRevisionContractVersion,
+  foodItemRevisionSchema,
   updateFoodItemSchema,
 } from "@sari/contracts";
-import { type Response, Router } from "express";
+import { type Request, type Response, Router } from "express";
 import { connectDatabase } from "../db.js";
 import { FoodItemModel } from "./model.js";
 import { foodMongoQuery } from "./query.js";
-import { createFoodItem, foodItemDto, resolveProductLink } from "./service.js";
+import {
+  createFoodItem,
+  foodItemDto,
+  foodItemRevision,
+  resolveProductLink,
+} from "./service.js";
 
 export const foodItemsRouter = Router();
 
@@ -25,10 +33,70 @@ foodItemsRouter.param("id", (_req, res, next, id: string) => {
   next();
 });
 
+foodItemsRouter.param("revision", (_req, res, next, revision: string) => {
+  if (!/^\d+$/.test(revision)) {
+    res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Invalid food item revision.",
+      },
+    } satisfies ApiErrorResponse);
+
+    return;
+  }
+
+  next();
+});
+
 function itemNotFound(res: Response) {
   res.status(404).json({
     error: { code: "FOOD_ITEM_NOT_FOUND", message: "Food item not found." },
   } satisfies ApiErrorResponse);
+}
+
+function revisionConflict(res: Response) {
+  res.status(409).json({
+    error: {
+      code: "FOOD_ITEM_REVISION_CONFLICT",
+      message:
+        "This pantry item changed since it was loaded. Refresh it before trying again.",
+    },
+  } satisfies ApiErrorResponse);
+}
+
+function revisionRequired(res: Response) {
+  res.status(428).json({
+    error: {
+      code: "FOOD_ITEM_REVISION_REQUIRED",
+      message: "A food item revision is required for this change.",
+    },
+  } satisfies ApiErrorResponse);
+}
+
+function revisionFilter(expectedRevision: number) {
+  return expectedRevision === 0
+    ? { $or: [{ revision: 0 }, { revision: { $exists: false } }] }
+    : { revision: expectedRevision };
+}
+
+function revisionResponseRequested(req: Request) {
+  return (
+    req.get(foodItemRevisionContractHeader) === foodItemRevisionContractVersion
+  );
+}
+
+function responseItem(
+  req: Request,
+  document: InstanceType<typeof FoodItemModel>,
+) {
+  const item = foodItemDto(document);
+  if (revisionResponseRequested(req)) {
+    return item;
+  }
+
+  const { revision: _revision, ...legacyItem } = item;
+
+  return legacyItem;
 }
 
 async function databaseAvailable(res: Response): Promise<boolean> {
@@ -113,7 +181,8 @@ foodItemsRouter.post("/", async (req, res) => {
     return;
   }
 
-  res.status(201).json(foodItemDto(document));
+  res.vary(foodItemRevisionContractHeader);
+  res.status(201).json(responseItem(req, document));
 });
 
 foodItemsRouter.get("/", async (req, res) => {
@@ -177,7 +246,13 @@ foodItemsRouter.get("/", async (req, res) => {
       FoodItemModel.countDocuments(filter).maxTimeMS(5000),
     ]);
   }
-  res.json({ items: documents.map(foodItemDto), total, start, limit });
+  res.vary(foodItemRevisionContractHeader);
+  res.json({
+    items: documents.map((document) => responseItem(req, document)),
+    total,
+    start,
+    limit,
+  });
 });
 
 foodItemsRouter.get("/:id", async (req, res) => {
@@ -195,10 +270,21 @@ foodItemsRouter.get("/:id", async (req, res) => {
     return;
   }
 
-  res.json(foodItemDto(document));
+  res.vary(foodItemRevisionContractHeader);
+  res.json(responseItem(req, document));
 });
 
 foodItemsRouter.patch("/:id", async (req, res) => {
+  if (
+    !req.body ||
+    typeof req.body !== "object" ||
+    !("expectedRevision" in req.body)
+  ) {
+    revisionRequired(res);
+
+    return;
+  }
+
   const result = updateFoodItemSchema.safeParse(req.body);
   if (!result.success) {
     res.status(400).json({
@@ -225,7 +311,14 @@ foodItemsRouter.patch("/:id", async (req, res) => {
     return;
   }
 
-  const link = await resolveProductLink(result.data, existing);
+  const currentRevision = foodItemRevision(existing);
+  if (currentRevision !== result.data.expectedRevision) {
+    revisionConflict(res);
+
+    return;
+  }
+
+  const link = await resolveProductLink(result.data.changes, existing);
   if (!link) {
     invalidLink(res);
 
@@ -233,20 +326,47 @@ foodItemsRouter.patch("/:id", async (req, res) => {
   }
 
   const document = await FoodItemModel.findOneAndUpdate(
-    { _id: req.params.id, userId: res.locals.userId },
-    { $set: { ...result.data, ...link } },
+    {
+      _id: req.params.id,
+      userId: res.locals.userId,
+      ...revisionFilter(result.data.expectedRevision),
+    },
+    { $set: { ...result.data.changes, ...link }, $inc: { revision: 1 } },
     { returnDocument: "after", runValidators: true },
   );
   if (!document) {
-    itemNotFound(res);
+    const stillExists = await FoodItemModel.exists({
+      _id: req.params.id,
+      userId: res.locals.userId,
+    });
+    if (stillExists) {
+      revisionConflict(res);
+    } else {
+      itemNotFound(res);
+    }
 
     return;
   }
 
-  res.json(foodItemDto(document));
+  res.vary(foodItemRevisionContractHeader);
+  res.json(responseItem(req, document));
 });
 
-foodItemsRouter.delete("/:id", async (req, res) => {
+foodItemsRouter.delete("/:id/revisions/:revision", async (req, res) => {
+  const revision = foodItemRevisionSchema.safeParse(
+    Number(req.params.revision),
+  );
+  if (!revision.success) {
+    res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Invalid food item revision.",
+      },
+    } satisfies ApiErrorResponse);
+
+    return;
+  }
+
   if (!(await databaseAvailable(res))) {
     return;
   }
@@ -254,12 +374,27 @@ foodItemsRouter.delete("/:id", async (req, res) => {
   const document = await FoodItemModel.findOneAndDelete({
     _id: req.params.id,
     userId: res.locals.userId,
+    ...revisionFilter(revision.data),
   });
   if (!document) {
-    itemNotFound(res);
+    const stillExists = await FoodItemModel.exists({
+      _id: req.params.id,
+      userId: res.locals.userId,
+    });
+    if (stillExists) {
+      revisionConflict(res);
+    } else {
+      itemNotFound(res);
+    }
 
     return;
   }
 
   res.status(204).end();
+});
+
+// Keep old clients from silently issuing unprotected deletes during an
+// API-first rollout. The revision-qualified route above is the only write path.
+foodItemsRouter.delete("/:id", (_req, res) => {
+  revisionRequired(res);
 });

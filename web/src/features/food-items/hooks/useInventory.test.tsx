@@ -14,6 +14,7 @@ const items: FoodItem[] = Array.from({ length: 25 }, (_, index) => ({
   quantity: 1,
   unit: "item",
   expiresOn: null,
+  revision: 0,
   createdAt: "2026-10-19T00:00:00Z",
   updatedAt: "2026-10-19T00:00:00Z",
 }));

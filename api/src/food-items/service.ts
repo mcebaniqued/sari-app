@@ -8,6 +8,12 @@ import { FoodProductModel } from "../food-products/model.js";
 import { isDuplicateKeyError } from "../utils/mongoError.js";
 import { FoodItemModel } from "./model.js";
 
+export function foodItemRevision(document: InstanceType<typeof FoodItemModel>) {
+  const revision = document.get("revision") as unknown;
+
+  return typeof revision === "number" ? revision : 0;
+}
+
 export function foodItemDto(document: InstanceType<typeof FoodItemModel>) {
   return foodItemSchema.parse({
     id: document._id.toHexString(),
@@ -17,6 +23,9 @@ export function foodItemDto(document: InstanceType<typeof FoodItemModel>) {
     expiresOn: document.expiresOn ?? null,
     productId: document.productId?.toHexString() ?? null,
     barcode: document.barcode,
+    // Documents created before revision enforcement are revision zero. Their
+    // first guarded update atomically materializes revision one.
+    revision: foodItemRevision(document),
     createdAt: document.createdAt.toISOString(),
     updatedAt: document.updatedAt.toISOString(),
   });
@@ -24,7 +33,7 @@ export function foodItemDto(document: InstanceType<typeof FoodItemModel>) {
 
 /** Omitted link fields preserve existing values; null explicitly removes a link. */
 export async function resolveProductLink(
-  values: CreateFoodItem | UpdateFoodItem,
+  values: CreateFoodItem | UpdateFoodItem["changes"],
   existing?: InstanceType<typeof FoodItemModel>,
 ) {
   if (values.productId === undefined && values.barcode === undefined) {

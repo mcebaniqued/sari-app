@@ -20,6 +20,7 @@ const item: FoodItem = {
   quantity: 0.5,
   unit: "l",
   expiresOn: "2026-11-01",
+  revision: 0,
   createdAt: "2026-10-19T00:00:00Z",
   updatedAt: "2026-10-19T00:00:00Z",
 };
@@ -167,7 +168,7 @@ describe("pantry modals and persistence", () => {
     });
     fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
     expect(await dialog.findByRole("alert")).toHaveTextContent(
-      "Could not save this item. Try again.",
+      "The save outcome could not be confirmed. Refresh your pantry before trying again.",
     );
     expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
     expect(fetch).toHaveBeenLastCalledWith(
@@ -175,10 +176,13 @@ describe("pantry modals and persistence", () => {
       expect.objectContaining({
         method: "PATCH",
         body: JSON.stringify({
-          name: "Oat milk",
-          quantity: 0.5,
-          unit: "l",
-          expiresOn: null,
+          expectedRevision: item.revision,
+          changes: {
+            name: "Oat milk",
+            quantity: 0.5,
+            unit: "l",
+            expiresOn: null,
+          },
         }),
       }),
     );
@@ -186,6 +190,68 @@ describe("pantry modals and persistence", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit Milk" })).toBeVisible();
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a stale edit draft and identifies the revision conflict", async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(
+      Response.json(
+        {
+          error: {
+            code: "FOOD_ITEM_REVISION_CONFLICT",
+            message: "Changed.",
+          },
+        },
+        { status: 409 },
+      ),
+    );
+    stubFoodFetch(fetch);
+    render(
+      <MemoryRouter>
+        <PantryPage />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    fireEvent.change(dialog.getByLabelText(/^Food name/), {
+      target: { value: "Oat milk" },
+    });
+    fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
+
+    expect(await dialog.findByRole("alert")).toHaveTextContent(
+      "This item changed since you opened it. Your edits are still here",
+    );
+    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps an edit draft after an unreadable successful response", async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(
+      new Response("{", {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    stubFoodFetch(fetch);
+    render(
+      <MemoryRouter>
+        <PantryPage />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    fireEvent.change(dialog.getByLabelText(/^Food name/), {
+      target: { value: "Oat milk" },
+    });
+    fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
+
+    expect(await dialog.findByRole("alert")).toHaveTextContent(
+      "The save outcome could not be confirmed",
+    );
+    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
+    expect(notify).not.toHaveBeenCalledWith(
+      "success",
+      expect.stringContaining("updated"),
+    );
   });
 
   it("rejects whitespace names before making a save request", async () => {
@@ -207,14 +273,19 @@ describe("pantry modals and persistence", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("requires confirmation and retries only failed rows after a partial bulk deletion", async () => {
+  it("defensively retries only unresolved rows after an unexpected non-ambiguous delete failure", async () => {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(
         Response.json(
-          { error: { code: "DATABASE_UNAVAILABLE", message: "Unavailable" } },
-          { status: 503 },
+          {
+            error: {
+              code: "UNEXPECTED_DELETE_FAILURE",
+              message: "Unexpected delete failure.",
+            },
+          },
+          { status: 422 },
         ),
       )
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
@@ -248,6 +319,10 @@ describe("pantry modals and persistence", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "1 item could not be deleted",
     );
+    expect(notify).toHaveBeenCalledWith(
+      "success",
+      "1 item deleted from your pantry.",
+    );
     await waitFor(() => {
       expect(api.loads).toBe(2);
     });
@@ -260,12 +335,14 @@ describe("pantry modals and persistence", () => {
     );
     expect(
       fetch.mock.calls.filter(
-        ([url]) => url === `/api/v1/food-items/${item.id}`,
+        ([url]) =>
+          url === `/api/v1/food-items/${item.id}/revisions/${item.revision}`,
       ),
     ).toHaveLength(1);
     expect(
       fetch.mock.calls.filter(
-        ([url]) => url === `/api/v1/food-items/${other.id}`,
+        ([url]) =>
+          url === `/api/v1/food-items/${other.id}/revisions/${other.revision}`,
       ),
     ).toHaveLength(2);
   });
