@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { createPreview } from "./create-pr-preview.mjs";
 
@@ -77,6 +78,8 @@ function mockServices({
   domainExists = false,
   domainBranch = branch,
   domainProject = webProject,
+  domainVerified = true,
+  verificationStates = [],
   origins = [wildcardOrigin],
   envCount = 1,
   envType = "plain",
@@ -99,6 +102,9 @@ function mockServices({
     domainExists,
     domainBranch,
     domainProject,
+    domainVerified,
+    verificationReads: 0,
+    verificationStarted: false,
     origins: [...origins],
     deployments: [],
     prReads: 0,
@@ -129,6 +135,25 @@ function mockServices({
 
     let status = 200;
     let body = {};
+
+    function readVerificationState() {
+      if (state.verificationReads < verificationStates.length) {
+        state.domainVerified = verificationStates[state.verificationReads];
+      }
+      state.verificationReads += 1;
+
+      return state.domainVerified;
+    }
+
+    function domainResponse(name = domain) {
+      return {
+        name,
+        projectId: state.domainProject,
+        gitBranch: state.domainBranch,
+        verified: state.domainVerified,
+      };
+    }
+
     if (request.pathname === `/repos/${repository}/actions/workflows/ci.yml`) {
       body = workflow;
     } else if (request.pathname === `/repos/${repository}/actions/runs/12345`) {
@@ -146,11 +171,10 @@ function mockServices({
       options.method === "GET"
     ) {
       if (state.domainExists) {
-        body = {
-          name: domain,
-          projectId: state.domainProject,
-          gitBranch: state.domainBranch,
-        };
+        if (state.verificationStarted) {
+          readVerificationState();
+        }
+        body = domainResponse();
       } else {
         status = 404;
       }
@@ -161,11 +185,15 @@ function mockServices({
       state.domainExists = true;
       state.domainProject = webProject;
       state.domainBranch = entry.body.gitBranch;
-      body = {
-        name: entry.body.name,
-        projectId: state.domainProject,
-        gitBranch: state.domainBranch,
-      };
+      body = domainResponse(entry.body.name);
+    } else if (
+      request.pathname ===
+        `/v9/projects/${webProject}/domains/${domain}/verify` &&
+      options.method === "POST"
+    ) {
+      state.verificationStarted = true;
+      readVerificationState();
+      body = domainResponse();
     } else if (
       request.pathname === `/v9/projects/${apiProject}/env` &&
       options.method === "GET"
@@ -251,6 +279,23 @@ function assertTokenIsolation(calls) {
   }
 }
 
+test("workflow skips unassociated and non-staging pull-request CI runs", async () => {
+  const workflow = await readFile(
+    new URL("../.github/workflows/create-pr-preview.yml", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workflow, /github\.event\.workflow_run\.pull_requests != null/);
+  assert.match(
+    workflow,
+    /github\.event\.workflow_run\.pull_requests\[0\] != null/,
+  );
+  assert.match(
+    workflow,
+    /github\.event\.workflow_run\.pull_requests\[0\]\.base\.ref == 'staging'/,
+  );
+});
+
 test("provisions the PR-number domain, exact branch, trusted origin, and current staging API", async () => {
   const mock = mockServices();
   const result = await run(mock);
@@ -313,6 +358,88 @@ test("an existing correct domain only adds the missing origin", async () => {
   assert.equal(
     mock.calls.some(
       (call) => call.url.pathname === `/v10/projects/${webProject}/domains`,
+    ),
+    false,
+  );
+});
+
+test("a newly created domain is verified with bounded polling before provisioning continues", async () => {
+  const mock = mockServices({
+    domainVerified: false,
+    verificationStates: [false, false, true],
+  });
+  const result = await run(mock);
+
+  assert.equal(result.domainCreated, true);
+  assert.equal(mock.state.domainVerified, true);
+  assert.deepEqual(
+    mock.calls
+      .filter((call) => call.url.pathname.includes(`/domains/${domain}`))
+      .map((call) => `${call.method} ${call.url.pathname}`),
+    [
+      `GET /v9/projects/${webProject}/domains/${domain}`,
+      `POST /v9/projects/${webProject}/domains/${domain}/verify`,
+      `GET /v9/projects/${webProject}/domains/${domain}`,
+      `GET /v9/projects/${webProject}/domains/${domain}`,
+    ],
+  );
+});
+
+test("an existing unverified domain resumes verification without recreating it", async () => {
+  const mock = mockServices({
+    domainExists: true,
+    domainVerified: false,
+    verificationStates: [false, true],
+  });
+  const result = await run(mock);
+
+  assert.equal(result.domainCreated, false);
+  assert.equal(mock.state.domainVerified, true);
+  assert.equal(
+    mock.calls.some(
+      (call) => call.url.pathname === `/v10/projects/${webProject}/domains`,
+    ),
+    false,
+  );
+  assert.equal(
+    mock.calls.filter(
+      (call) =>
+        call.method === "POST" &&
+        call.url.pathname.endsWith(`/domains/${domain}/verify`),
+    ).length,
+    1,
+  );
+});
+
+test("an unverified domain fails before trusted-origin or deployment changes", async () => {
+  const mock = mockServices({
+    domainExists: true,
+    domainVerified: false,
+    verificationStates: Array.from({ length: 12 }, () => false),
+  });
+  await assert.rejects(run(mock), /could not be verified/);
+
+  assert.equal(mock.state.verificationReads, 12);
+  assert.equal(
+    mock.calls.some(
+      (call) =>
+        call.method === "PATCH" || call.url.pathname === "/v13/deployments",
+    ),
+    false,
+  );
+});
+
+test("an invalid domain verification response fails clearly", async () => {
+  const mock = mockServices({
+    domainExists: true,
+    domainVerified: false,
+    verificationStates: ["invalid"],
+  });
+  await assert.rejects(run(mock), /invalid verification status/);
+  assert.equal(
+    mock.calls.some(
+      (call) =>
+        call.method === "PATCH" || call.url.pathname === "/v13/deployments",
     ),
     false,
   );

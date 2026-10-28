@@ -10,6 +10,8 @@ const BASE_BRANCH = "staging";
 const CI_NAME = "CI";
 const CI_PATH = ".github/workflows/ci.yml";
 const SHA_PATTERN = /^[a-f0-9]{40}$/;
+const DOMAIN_VERIFICATION_ATTEMPTS = 12;
+const DOMAIN_VERIFICATION_INTERVAL_MS = 2_500;
 
 function validateTrigger(event) {
   const run = event?.workflow_run;
@@ -60,9 +62,20 @@ function createClient(fetchImpl, { webToken, apiToken, githubToken }) {
     if (service === "web") {
       const domainBase = `/v9/projects/${WEB_PROJECT_ID}/domains/`;
       const addDomainPath = `/v10/projects/${WEB_PROJECT_ID}/domains`;
+      const verifyDomain = url.pathname.slice(
+        domainBase.length,
+        -"/verify".length,
+      );
+      const verifyDomainRoute =
+        method === "POST" &&
+        url.pathname.startsWith(domainBase) &&
+        url.pathname.endsWith("/verify") &&
+        verifyDomain.length > 0 &&
+        !verifyDomain.includes("/");
       if (!(
         (method === "GET" && url.pathname.startsWith(domainBase)) ||
-        (method === "POST" && url.pathname === addDomainPath)
+        (method === "POST" && url.pathname === addDomainPath) ||
+        verifyDomainRoute
       )) {
         throw new Error(
           "Web token may only access staging web project domains.",
@@ -230,6 +243,49 @@ function validateDomain(domainRecord, { domain, branch }) {
   }
 }
 
+function validateDomainVerification(domainRecord, domain) {
+  if (typeof domainRecord?.verified !== "boolean") {
+    throw new Error(
+      `Vercel returned an invalid verification status for ${domain}.`,
+    );
+  }
+
+  return domainRecord.verified;
+}
+
+async function ensureDomainVerified({
+  web,
+  domainPath,
+  domainRecord,
+  domain,
+  branch,
+  sleep,
+}) {
+  validateDomain(domainRecord, { domain, branch });
+  if (validateDomainVerification(domainRecord, domain)) {
+    return;
+  }
+
+  for (let attempt = 0; attempt < DOMAIN_VERIFICATION_ATTEMPTS; attempt++) {
+    const current =
+      attempt === 0
+        ? await web(`${domainPath}/verify`, { method: "POST" })
+        : await web(domainPath);
+    validateDomain(current, { domain, branch });
+    if (validateDomainVerification(current, domain)) {
+      console.info(`Verified PR domain ${domain}.`);
+      return;
+    }
+    if (attempt < DOMAIN_VERIFICATION_ATTEMPTS - 1) {
+      await sleep(DOMAIN_VERIFICATION_INTERVAL_MS);
+    }
+  }
+
+  throw new Error(
+    `PR domain ${domain} could not be verified after ${DOMAIN_VERIFICATION_ATTEMPTS} attempts.`,
+  );
+}
+
 export async function createPreview({
   event,
   webToken,
@@ -296,18 +352,31 @@ export async function createPreview({
   }
 
   let domainCreated = false;
+  let domainRecord = existingDomain;
   if (!existingDomain) {
     await recheckPullRequest();
-    const createdDomain = await web(`/v10/projects/${WEB_PROJECT_ID}/domains`, {
+    domainRecord = await web(`/v10/projects/${WEB_PROJECT_ID}/domains`, {
       method: "POST",
       body: { name: domain, gitBranch: branch },
     });
-    validateDomain(createdDomain, { domain, branch });
+    validateDomain(domainRecord, { domain, branch });
     domainCreated = true;
     console.info(`Created PR #${number} short domain ${domain}.`);
   } else {
     console.info(`PR #${number} short domain already exists.`);
   }
+
+  if (domainRecord.verified !== true) {
+    await recheckPullRequest();
+  }
+  await ensureDomainVerified({
+    web,
+    domainPath,
+    domainRecord,
+    domain,
+    branch,
+    sleep,
+  });
 
   let originAdded = false;
   if (!originPresent) {
