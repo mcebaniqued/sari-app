@@ -145,7 +145,9 @@ describe("barcode-assisted pantry form", () => {
     search();
     await found();
     expect(screen.queryByLabelText("Barcode number")).not.toBeInTheDocument();
-    expect(screen.getByLabelText(/^Food name/)).toHaveFocus();
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^Food name/)).toHaveFocus();
+    });
     expect(screen.getByLabelText(/^Food name/)).toHaveValue("USDA oats");
     expect(screen.getByLabelText(/^Quantity/)).toHaveValue(500);
     expect(onSave).not.toHaveBeenCalled();

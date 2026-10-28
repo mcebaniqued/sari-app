@@ -200,7 +200,7 @@ describe("revision-aware food item mutations", () => {
     ).toHaveLength(1);
   });
 
-  it("verifies a PATCH after a schema-invalid successful response", async () => {
+  it("keeps a PATCH uncertain when verification still shows the original revision", async () => {
     const original = item(1);
     const fetch = vi
       .fn()
@@ -219,6 +219,49 @@ describe("revision-aware food item mutations", () => {
       currentItem: original,
     } satisfies Partial<FoodItemMutationOutcomeError>);
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry when an ambiguous PATCH completes after verification", async () => {
+    const original = item(1);
+    const updated = { ...original, name: "Updated", revision: 2 };
+    let stored = original;
+    let completeWrite: (() => void) | undefined;
+    const writeFinished = new Promise<void>((resolve) => {
+      completeWrite = () => {
+        stored = updated;
+        resolve();
+      };
+    });
+    const fetch = vi.fn((url: string, init?: RequestInit) => {
+      if (init?.method === "PATCH") {
+        void writeFinished;
+
+        return Promise.reject(new TypeError("connection lost"));
+      }
+
+      expect(url).toBe(`/api/v1/food-items/${original.id}`);
+
+      return Promise.resolve(Response.json(stored));
+    });
+    vi.stubGlobal("fetch", fetch);
+
+    await expect(
+      updateFoodItem(original.id, {
+        expectedRevision: original.revision,
+        changes: { name: "Updated" },
+      }),
+    ).rejects.toMatchObject({
+      name: "FoodItemMutationOutcomeError",
+      outcome: "uncertain",
+      currentItem: original,
+    } satisfies Partial<FoodItemMutationOutcomeError>);
+    completeWrite?.();
+    await writeFinished;
+
+    expect(stored).toEqual(updated);
+    expect(
+      fetch.mock.calls.filter((call) => call[1]?.method === "PATCH"),
+    ).toHaveLength(1);
   });
 
   it("verifies a DELETE after an unreadable successful response", async () => {

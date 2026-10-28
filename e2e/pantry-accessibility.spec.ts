@@ -5,6 +5,7 @@ import {
   foodApi,
   milk,
   nameCells,
+  requireGeometry,
   rice,
   test,
 } from "./fixtures/pantry";
@@ -500,6 +501,43 @@ test("mobile Edit returns focus to its item after Escape, Cancel, and save", asy
   ).toBeFocused();
 });
 
+test("changed Edit keeps its draft and focus through discard confirmation", async ({
+  page,
+}) => {
+  await foodApi(page, [milk]);
+  await page.goto("/pantry");
+  await page.getByRole("button", { name: "Edit Milk" }).click();
+  const edit = page.getByRole("dialog", { name: "Edit item" });
+  const name = edit.getByLabel(/^Food name/);
+  const quantity = edit.getByLabel(/^Quantity/);
+  await name.fill("Oat milk");
+  await quantity.focus();
+
+  await page.keyboard.press("Escape");
+  const confirmation = page.getByRole("dialog", { name: "Discard changes?" });
+  await expect(confirmation).toBeVisible();
+  await expect(
+    confirmation.getByRole("button", { name: "Continue editing" }),
+  ).toBeFocused();
+  await expectAccessible(page);
+
+  await confirmation.getByRole("button", { name: "Continue editing" }).click();
+  await expect(edit).toBeVisible();
+  await expect(name).toHaveValue("Oat milk");
+  await expect(quantity).toBeFocused();
+
+  const bounds = requireGeometry(await edit.boundingBox());
+  await page.mouse.click(bounds.x - 4, bounds.y);
+  await expect(confirmation).toBeVisible();
+  await confirmation.getByRole("button", { name: "Continue editing" }).click();
+  await expect(name).toHaveValue("Oat milk");
+  await expect(quantity).toBeFocused();
+
+  await edit.getByRole("button", { name: "Cancel" }).click();
+  await confirmation.getByRole("button", { name: "Discard changes" }).click();
+  await expect(edit).toHaveCount(0);
+});
+
 test("mobile Delete cancellation restores focus and keeps dialog focus contained", async ({
   page,
 }) => {
@@ -566,7 +604,7 @@ test("failed mobile Edit remains in the dialog and can be retried", async ({
   await dialog.getByLabel(/^Food name/).fill("Oat milk");
   await dialog.getByRole("button", { name: "Save changes" }).click();
   await expect(dialog.getByRole("alert")).toContainText(
-    "The save outcome could not be confirmed",
+    "The save outcome is unknown",
   );
   await expect(dialog).toBeVisible();
   expect(
@@ -574,6 +612,14 @@ test("failed mobile Edit remains in the dialog and can be retried", async ({
       element.contains(document.activeElement),
     ),
   ).toBe(true);
+  await dialog
+    .getByRole("button", {
+      name: "Overwrite saved version with my draft",
+    })
+    .click();
+  await expect(
+    dialog.getByRole("button", { name: "Save changes" }),
+  ).toBeFocused();
   await dialog.getByRole("button", { name: "Save changes" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(

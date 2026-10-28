@@ -161,6 +161,25 @@ export function usePantryItems(onChanged?: () => void) {
     setEditor(null);
   }, []);
 
+  const acceptCurrentItem = useCallback(
+    (item: FoodItem, useServerValues: boolean) => {
+      setEditor((current) => {
+        if (useServerValues || !current?.item) {
+          return { item };
+        }
+
+        return {
+          item: {
+            ...current.item,
+            revision: item.revision,
+            updatedAt: item.updatedAt,
+          },
+        };
+      });
+    },
+    [],
+  );
+
   const closeDelete = useCallback(() => {
     setDeleteTargets(null);
   }, []);
@@ -175,6 +194,7 @@ export function usePantryItems(onChanged?: () => void) {
     startEdit,
     startDelete,
     closeEditor,
+    acceptCurrentItem,
     closeDelete,
     saveItem: handleSave,
     deleteItems: handleDelete,

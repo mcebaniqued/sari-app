@@ -551,6 +551,7 @@ export default function PantryPage() {
           item={pantry.editor.item}
           busy={pantry.busy}
           onSave={pantry.saveItem}
+          onAcceptCurrentItem={pantry.acceptCurrentItem}
           onClose={() => {
             pendingMobileActionFocus.current = null;
             pantry.closeEditor();

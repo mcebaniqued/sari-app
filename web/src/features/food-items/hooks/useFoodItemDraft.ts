@@ -8,14 +8,42 @@ export interface FoodItemDraft {
   expiresOn: string;
 }
 
-/** Draft values outlive individual entry views; provider suggestions never overwrite edits. */
-export function useFoodItemDraft(item: FoodItem | null) {
-  const [values, setValues] = useState<FoodItemDraft>(() => ({
+export interface FoodItemLinkage {
+  productId: string | null;
+  barcode: string | null;
+}
+
+function foodItemDraftFromItem(item: FoodItem | null): FoodItemDraft {
+  return {
     name: item?.name ?? "",
     quantity: String(item?.quantity ?? 1),
     unit: item?.unit ?? "item",
     expiresOn: item?.expiresOn ?? "",
-  }));
+  };
+}
+
+/** Compare the values the API would persist, not keystrokes or provider metadata. */
+export function normalizedFoodItemEdit(
+  values: FoodItemDraft,
+  linkage: FoodItemLinkage,
+) {
+  const quantity = Number(values.quantity);
+
+  return {
+    name: values.name.trim(),
+    quantity: Number.isFinite(quantity) ? quantity : values.quantity.trim(),
+    unit: values.unit,
+    expiresOn: values.expiresOn || null,
+    productId: linkage.productId,
+    barcode: linkage.barcode,
+  };
+}
+
+/** Draft values outlive individual entry views; provider suggestions never overwrite edits. */
+export function useFoodItemDraft(item: FoodItem | null) {
+  const [values, setValues] = useState<FoodItemDraft>(() =>
+    foodItemDraftFromItem(item),
+  );
 
   // Refs keep asynchronous suggestions aligned with edits made before React rerenders.
   const currentValues = useRef(values);
@@ -31,6 +59,14 @@ export function useFoodItemDraft(item: FoodItem | null) {
   function edit(field: keyof FoodItemDraft, value: string) {
     editedFields.current.add(field);
     update({ ...currentValues.current, [field]: value });
+  }
+
+  function replaceWithItem(nextItem: FoodItem) {
+    const next = foodItemDraftFromItem(nextItem);
+    initialValues.current = next;
+    editedFields.current.clear();
+    suggestedValues.current.clear();
+    update(next);
   }
 
   /** Editing either half protects the entire amount from partial provider replacement. */
@@ -93,5 +129,5 @@ export function useFoodItemDraft(item: FoodItem | null) {
     update(next);
   }
 
-  return { values, edit, applyProduct, resetSuggestions };
+  return { values, edit, applyProduct, resetSuggestions, replaceWithItem };
 }
