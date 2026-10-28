@@ -93,7 +93,13 @@ export default function FoodItemEditorDialog({
             ? "Update the details of your pantry item."
             : "Add something you have on hand."
       }
-      onClose={confirmation ? continueEditing : requestDiscard}
+      onClose={
+        confirmation
+          ? continueEditing
+          : () => {
+              requestDiscard();
+            }
+      }
       onRestoreFocusFallback={onRestoreFocusFallback}
       dismissible={!busy}
     >
