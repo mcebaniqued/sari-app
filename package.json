@@ -31,7 +31,7 @@
     "pretest:e2e": "npm run contracts:build",
     "test:e2e": "playwright test",
     "test:integration": "node scripts/test-integration.mjs",
-    "test:deployment": "node --test scripts/vercel-config.test.mjs scripts/cleanup-pr-preview.test.mjs",
+    "test:deployment": "node --test scripts/vercel-config.test.mjs scripts/cleanup-pr-preview.test.mjs scripts/create-pr-preview.test.mjs",
     "knip": "knip",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run knip && npm run test:deployment && npm run test && npm run build",
     "prepare": "husky"

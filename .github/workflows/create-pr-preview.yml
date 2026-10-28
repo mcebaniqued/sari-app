@@ -1,0 +1,48 @@
+name: Provision PR previews
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+# Serialize trusted-origin changes with closed-PR cleanup.
+concurrency:
+  group: sari-pr-preview-lifecycle
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  provision:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # workflow_run is privileged. Only execute code from the protected default
+      # branch, never from the pull request that caused the CI run.
+      - name: Checkout trusted main branch
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Provision short domain and trusted origin
+        run: node scripts/create-pr-preview.mjs
+        env:
+          VERCEL_WEB_TOKEN: ${{ secrets.VERCEL_PREVIEW_WEB_TOKEN }}
+          VERCEL_API_TOKEN: ${{ secrets.VERCEL_PREVIEW_API_TOKEN }}
+          GITHUB_READ_TOKEN: ${{ github.token }}
+
+# workflow_run workflows activate only after this file reaches the default
+# branch. Release this through the normal staging -> main promotion process.
