@@ -1,5 +1,6 @@
 import type { FoodItem, FoodProduct } from "@sari/contracts";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { LuCheck, LuCopy } from "react-icons/lu";
 import {
   type FoodItemDraft,
   normalizedFoodItemEdit,
@@ -215,18 +216,55 @@ export function FoodItemUnavailableView({
   product,
   onDiscard,
 }: UnavailableViewProps) {
-  const [copyStatus, setCopyStatus] = useState("");
+  const [copyState, setCopyState] = useState<"idle" | "copying" | "copied">(
+    "idle",
+  );
+  const [copyError, setCopyError] = useState("");
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mounted = useRef(true);
   const details = persistedValues(draft, product);
   const copyText = details
     .map(({ label, value }) => `${label}: ${value}`)
     .join("\n");
 
+  useEffect(() => {
+    mounted.current = true;
+
+    return () => {
+      mounted.current = false;
+      if (resetTimer.current !== null) {
+        clearTimeout(resetTimer.current);
+        resetTimer.current = null;
+      }
+    };
+  }, []);
+
   async function copyDetails() {
+    if (copyState !== "idle") {
+      return;
+    }
+
+    setCopyState("copying");
+    setCopyError("");
+
     try {
       await navigator.clipboard.writeText(copyText);
-      setCopyStatus("Details copied");
+      if (!mounted.current) {
+        return;
+      }
+
+      setCopyState("copied");
+      resetTimer.current = setTimeout(() => {
+        setCopyState("idle");
+        resetTimer.current = null;
+      }, 2_000);
     } catch {
-      setCopyStatus(
+      if (!mounted.current) {
+        return;
+      }
+
+      setCopyState("idle");
+      setCopyError(
         "Copy failed. Select the text in the manual-copy field and copy it manually.",
       );
     }
@@ -246,7 +284,7 @@ export function FoodItemUnavailableView({
           </div>
         ))}
       </dl>
-      {copyStatus.startsWith("Copy failed") && (
+      {copyError && (
         <textarea
           readOnly
           aria-label="Draft details for manual copying"
@@ -257,20 +295,24 @@ export function FoodItemUnavailableView({
           }}
         />
       )}
-      <p
-        role="status"
-        aria-live="polite"
-        className="text-sm text-content-muted"
-      >
-        {copyStatus}
-      </p>
+      {copyError && (
+        <p role="status" className="text-sm text-content-muted">
+          {copyError}
+        </p>
+      )}
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
         <button
           type="button"
+          aria-disabled={copyState !== "idle"}
           onClick={() => void copyDetails()}
-          className={secondaryButton}
+          className={`${secondaryButton} gap-2`}
         >
-          Copy details
+          {copyState === "copied" ? (
+            <LuCheck aria-hidden="true" className="size-4" />
+          ) : (
+            <LuCopy aria-hidden="true" className="size-4" />
+          )}
+          {copyState === "copied" ? "Copied" : "Copy details"}
         </button>
         <button type="button" onClick={onDiscard} className={primaryButton}>
           Discard and close

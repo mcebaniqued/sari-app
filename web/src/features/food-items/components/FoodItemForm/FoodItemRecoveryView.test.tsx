@@ -1,12 +1,15 @@
 import type { FoodItem } from "@sari/contracts";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import {
   FoodItemRecoveryView,
   FoodItemUnavailableView,
 } from "./FoodItemRecoveryView";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 const saved: FoodItem = {
   id: "012345678901234567890123",
@@ -180,6 +183,79 @@ it("keeps meaningful normalized field differences visible", () => {
   expect(within(table).getByText("Expiration date")).toBeVisible();
 });
 
+it("confirms a successful copy inside the button and restores it after two seconds", async () => {
+  vi.useFakeTimers();
+  let resolveCopy: (() => void) | undefined;
+  const writeText = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        resolveCopy = resolve;
+      }),
+  );
+  vi.stubGlobal("navigator", { clipboard: { writeText } });
+  render(
+    <FoodItemUnavailableView
+      draft={draft}
+      product={null}
+      onDiscard={vi.fn()}
+    />,
+  );
+
+  const copyButton = screen.getByRole("button", { name: "Copy details" });
+  fireEvent.click(copyButton);
+  fireEvent.click(copyButton);
+
+  expect(writeText).toHaveBeenCalledOnce();
+  expect(copyButton).toHaveAttribute("aria-disabled", "true");
+  expect(copyButton).toHaveTextContent("Copy details");
+
+  await act(async () => {
+    resolveCopy?.();
+    await Promise.resolve();
+  });
+
+  expect(screen.getByRole("button", { name: "Copied" })).toHaveAttribute(
+    "aria-disabled",
+    "true",
+  );
+  expect(screen.queryByText("Details copied")).not.toBeInTheDocument();
+
+  await act(async () => vi.advanceTimersByTimeAsync(1_999));
+  expect(screen.getByRole("button", { name: "Copied" })).toBeVisible();
+
+  await act(async () => vi.advanceTimersByTimeAsync(1));
+  expect(screen.getByRole("button", { name: "Copy details" })).toHaveAttribute(
+    "aria-disabled",
+    "false",
+  );
+  expect(writeText).toHaveBeenCalledWith(
+    expect.stringContaining("Name: Draft milk"),
+  );
+});
+
+it("cleans up the copy confirmation timer when unmounted", async () => {
+  vi.useFakeTimers();
+  const clearTimeout = vi.spyOn(globalThis, "clearTimeout");
+  vi.stubGlobal("navigator", {
+    clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
+  });
+  const { unmount } = render(
+    <FoodItemUnavailableView
+      draft={draft}
+      product={null}
+      onDiscard={vi.fn()}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "Copy details" }));
+  await act(async () => Promise.resolve());
+  expect(screen.getByRole("button", { name: "Copied" })).toBeVisible();
+
+  unmount();
+
+  expect(clearTimeout).toHaveBeenCalledOnce();
+});
+
 it("keeps labeled draft text selectable when clipboard access fails", async () => {
   vi.stubGlobal("navigator", {
     clipboard: { writeText: vi.fn().mockRejectedValue(new Error("blocked")) },
@@ -202,4 +278,8 @@ it("keeps labeled draft text selectable when clipboard access fails", async () =
       name: "Draft details for manual copying",
     }).value,
   ).toContain("Name: Draft milk");
+  expect(screen.getByRole("button", { name: "Copy details" })).toHaveAttribute(
+    "aria-disabled",
+    "false",
+  );
 });

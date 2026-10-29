@@ -848,9 +848,10 @@ describe("pantry modals and persistence", () => {
       screen.getByRole("dialog", { name: "Item unavailable" }),
     ).toBeVisible();
     fireEvent.click(unavailable.getByRole("button", { name: "Copy details" }));
-    expect(await unavailable.findByRole("status")).toHaveTextContent(
-      "Details copied",
-    );
+    expect(
+      await unavailable.findByRole("button", { name: "Copied" }),
+    ).toHaveAttribute("aria-disabled", "true");
+    expect(unavailable.queryByText("Details copied")).not.toBeInTheDocument();
     expect(writeText).toHaveBeenCalledWith(
       expect.stringContaining("Name: Oat milk"),
     );
