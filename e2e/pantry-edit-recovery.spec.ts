@@ -38,9 +38,10 @@ async function productApi(page: Page) {
   });
 }
 
-async function conflictingEditApi(page: Page) {
+async function conflictingEditApi(page: Page, conflictAfterReview = false) {
   await foodApi(page, [linkedMilk]);
   await productApi(page);
+  let current = newerMilk;
   const patches: Array<{
     expectedRevision: number;
     changes: Partial<FoodItem>;
@@ -50,7 +51,7 @@ async function conflictingEditApi(page: Page) {
     if (request.method() === "PATCH") {
       const body = request.postDataJSON() as (typeof patches)[number];
       patches.push(body);
-      if (patches.length === 1) {
+      if (patches.length === 1 || conflictAfterReview) {
         await route.fulfill({
           status: 409,
           json: {
@@ -66,19 +67,27 @@ async function conflictingEditApi(page: Page) {
 
       await route.fulfill({
         json: {
-          ...newerMilk,
+          ...current,
           ...body.changes,
-          revision: newerMilk.revision + 1,
+          revision: current.revision + 1,
         },
       });
 
       return;
     }
 
-    await route.fulfill({ json: newerMilk });
+    await route.fulfill({ json: current });
   });
 
-  return patches;
+  return {
+    patches,
+    get current() {
+      return current;
+    },
+    updateCurrent(next: FoodItem) {
+      current = next;
+    },
+  };
 }
 
 test("dirty Edit blocks in-app navigation", async ({ page }) => {
@@ -157,36 +166,40 @@ test("dirty Edit blocks browser Forward navigation", async ({ page }) => {
 test("conflict review identifies both products and explicitly overwrites with the draft", async ({
   page,
 }) => {
-  const patches = await conflictingEditApi(page);
+  const { patches } = await conflictingEditApi(page);
   await page.goto("/pantry");
   await page.getByRole("button", { name: "Edit Milk" }).click();
   const edit = page.getByRole("dialog", { name: "Edit item" });
   await edit.getByLabel(/^Food name/).fill("My oat milk");
   await edit.getByLabel(/^Quantity/).fill("4");
   await edit.getByRole("button", { name: "Save changes" }).click();
-  await edit.getByRole("button", { name: "Review newer data" }).click();
+  await edit.getByRole("button", { name: "Review changes" }).click();
 
-  const recovery = edit.getByRole("alert");
+  const recovery = page.getByRole("dialog", { name: "Review changes" });
+  await expect(recovery).toBeVisible();
   await expect(
-    recovery.getByRole("heading", { name: "Your draft" }),
-  ).toBeVisible();
+    recovery.getByRole("heading", { name: "Review changes" }),
+  ).toBeFocused();
+  await page.mouse.click(5, 5);
+  await expect(recovery).toBeVisible();
   await expect(recovery).toContainText(`Barcode ${usdaOats.barcode}`);
   await expect(recovery).toContainText(`Product ID ${usdaOats.id}`);
   await expect(recovery).toContainText(`Barcode ${newerProduct.barcode}`);
   await expect(recovery).toContainText(`Product ID ${newerProduct.id}`);
   await expect(recovery).toContainText(
-    "the next Save changes will replace every newer saved value",
+    "complete submitted values to replace the saved version",
   );
 
-  await recovery
-    .getByRole("button", { name: "Overwrite saved version with my draft" })
-    .click();
-  const save = edit.getByRole("button", { name: "Save changes" });
+  await recovery.getByRole("button", { name: "Keep my draft" }).click();
+  const authorizedEdit = page.getByRole("dialog", { name: "Edit item" });
+  const save = authorizedEdit.getByRole("button", { name: "Save and replace" });
   await expect(save).toBeFocused();
-  await expect(edit.getByLabel(/^Food name/)).toHaveValue("My oat milk");
-  await expect(edit.getByLabel(/^Quantity/)).toHaveValue("4");
+  await expect(authorizedEdit.getByLabel(/^Food name/)).toHaveValue(
+    "My oat milk",
+  );
+  await expect(authorizedEdit.getByLabel(/^Quantity/)).toHaveValue("4");
   await save.click();
-  await expect(edit).toHaveCount(0);
+  await expect(authorizedEdit).toHaveCount(0);
 
   expect(patches).toHaveLength(2);
   expect(patches[1]).toEqual({
@@ -205,14 +218,17 @@ test("conflict review identifies both products and explicitly overwrites with th
 test("Use newer version replaces the draft and restores field focus", async ({
   page,
 }) => {
-  const patches = await conflictingEditApi(page);
+  const { patches } = await conflictingEditApi(page);
   await page.goto("/pantry");
   await page.getByRole("button", { name: "Edit Milk" }).click();
   const edit = page.getByRole("dialog", { name: "Edit item" });
   await edit.getByLabel(/^Food name/).fill("My oat milk");
   await edit.getByRole("button", { name: "Save changes" }).click();
-  await edit.getByRole("button", { name: "Review newer data" }).click();
-  await edit.getByRole("button", { name: "Use newer saved version" }).click();
+  await edit.getByRole("button", { name: "Review changes" }).click();
+  await page
+    .getByRole("dialog", { name: "Review changes" })
+    .getByRole("button", { name: "Use saved version" })
+    .click();
 
   await expect(edit.getByLabel(/^Food name/)).toHaveValue("Server milk");
   await expect(edit.getByLabel(/^Food name/)).toBeFocused();
@@ -221,6 +237,70 @@ test("Use newer version replaces the draft and restores field focus", async ({
   await edit.getByRole("button", { name: "Cancel" }).click();
   await expect(edit).toHaveCount(0);
   expect(patches).toHaveLength(1);
+});
+
+test("conflict review uses the stacked full-page layout on a narrow viewport", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await conflictingEditApi(page);
+  await page.goto("/pantry");
+  await page.getByRole("button", { name: "Actions for Milk" }).click();
+  await page.getByRole("button", { name: "Edit Milk" }).click();
+  const edit = page.getByRole("dialog", { name: "Edit item" });
+  await edit.getByLabel(/^Food name/).fill("My oat milk");
+  await edit.getByRole("button", { name: "Save changes" }).click();
+  await edit.getByRole("button", { name: "Review changes" }).click();
+
+  const review = page.getByRole("dialog", { name: "Review changes" });
+  const bounds = await review.boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(bounds?.x).toBe(0);
+  expect(bounds?.y).toBe(0);
+  expect(bounds?.width).toBe(390);
+  expect(bounds?.height).toBe(844);
+  await expect(review.getByRole("table")).toBeHidden();
+  await expect(
+    review.getByRole("button", { name: "Keep my draft" }),
+  ).toBeVisible();
+  expect(
+    await review.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+});
+
+test("a change after review conflicts instead of overwriting the newer item", async ({
+  page,
+}) => {
+  const conflict = await conflictingEditApi(page, true);
+  await page.goto("/pantry");
+  await page.getByRole("button", { name: "Edit Milk" }).click();
+  const edit = page.getByRole("dialog", { name: "Edit item" });
+  await edit.getByLabel(/^Food name/).fill("My oat milk");
+  await edit.getByRole("button", { name: "Save changes" }).click();
+  await edit.getByRole("button", { name: "Review changes" }).click();
+  await page
+    .getByRole("dialog", { name: "Review changes" })
+    .getByRole("button", { name: "Keep my draft" })
+    .click();
+  conflict.updateCurrent({
+    ...newerMilk,
+    name: "Second server update",
+    revision: 2,
+  });
+  await edit.getByRole("button", { name: "Save and replace" }).click();
+
+  await expect(
+    edit.getByRole("heading", { name: "A newer version is available" }),
+  ).toBeFocused();
+  await expect(edit.getByLabel(/^Food name/)).toHaveValue("My oat milk");
+  expect(conflict.patches).toHaveLength(2);
+  expect(conflict.patches[1]?.expectedRevision).toBe(newerMilk.revision);
+  expect(conflict.current).toMatchObject({
+    name: "Second server update",
+    revision: 2,
+  });
 });
 
 test("an uncertain save is not repeated until an explicit guarded retry", async ({
@@ -258,14 +338,17 @@ test("an uncertain save is not repeated until an explicit guarded retry", async 
   await edit.getByLabel(/^Food name/).fill("Oat milk");
   await edit.getByRole("button", { name: "Save changes" }).click();
 
-  await expect(edit.getByRole("alert")).toContainText(
-    "The save outcome is unknown",
-  );
+  await expect(
+    edit.getByRole("heading", { name: "We couldn't confirm your save" }),
+  ).toBeFocused();
   expect(patchCount).toBe(1);
-  await edit
-    .getByRole("button", { name: "Overwrite saved version with my draft" })
-    .click();
-  const save = edit.getByRole("button", { name: "Save changes" });
+  await edit.getByRole("button", { name: "Check saved version" }).click();
+  const review = page.getByRole("dialog", { name: "Review saved version" });
+  await expect(
+    review.getByRole("heading", { name: "Review saved version" }),
+  ).toBeFocused();
+  await review.getByRole("button", { name: "Keep my draft" }).click();
+  const save = edit.getByRole("button", { name: "Save and replace" });
   await expect(save).toBeFocused();
   expect(patchCount).toBe(1);
   await save.click();

@@ -603,24 +603,25 @@ test("failed mobile Edit remains in the dialog and can be retried", async ({
   const dialog = page.getByRole("dialog", { name: "Edit item" });
   await dialog.getByLabel(/^Food name/).fill("Oat milk");
   await dialog.getByRole("button", { name: "Save changes" }).click();
-  await expect(dialog.getByRole("alert")).toContainText(
-    "The save outcome is unknown",
-  );
+  await expect(
+    dialog.getByRole("heading", { name: "We couldn't confirm your save" }),
+  ).toBeFocused();
   await expect(dialog).toBeVisible();
   expect(
     await dialog.evaluate((element) =>
       element.contains(document.activeElement),
     ),
   ).toBe(true);
-  await dialog
-    .getByRole("button", {
-      name: "Overwrite saved version with my draft",
-    })
-    .click();
+  await dialog.getByRole("button", { name: "Check saved version" }).click();
+  const review = page.getByRole("dialog", { name: "Review saved version" });
   await expect(
-    dialog.getByRole("button", { name: "Save changes" }),
+    review.getByRole("heading", { name: "Review saved version" }),
   ).toBeFocused();
-  await dialog.getByRole("button", { name: "Save changes" }).click();
+  await review.getByRole("button", { name: "Keep my draft" }).click();
+  await expect(
+    dialog.getByRole("button", { name: "Save and replace" }),
+  ).toBeFocused();
+  await dialog.getByRole("button", { name: "Save and replace" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Actions for Oat milk" }),

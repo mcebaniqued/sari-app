@@ -2,7 +2,9 @@ import type { CreateFoodItem, FoodItem } from "@sari/contracts";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import Modal from "@/components/Modal/Modal";
 import { useUnsavedChangesGuard } from "@/contexts/UnsavedChangesGuard";
-import FoodItemForm from "../FoodItemForm/FoodItemForm";
+import FoodItemForm, {
+  type FoodItemRecoveryState,
+} from "../FoodItemForm/FoodItemForm";
 
 interface FoodItemEditorDialogProps {
   item: FoodItem | null;
@@ -27,6 +29,8 @@ export default function FoodItemEditorDialog({
   onRestoreFocusFallback,
 }: FoodItemEditorDialogProps) {
   const [dirty, setDirty] = useState(false);
+  const [recoveryState, setRecoveryState] =
+    useState<FoodItemRecoveryState>("editing");
   const [confirmation, setConfirmation] = useState<DiscardConfirmation | null>(
     null,
   );
@@ -46,7 +50,7 @@ export default function FoodItemEditorDialog({
         return;
       }
 
-      if (!item || !dirty) {
+      if (!item || (!dirty && recoveryState === "editing")) {
         onDiscard();
 
         return;
@@ -62,10 +66,13 @@ export default function FoodItemEditorDialog({
           : lastEditFocus.current;
       setConfirmation({ onDiscard, onContinue });
     },
-    [busy, dirty, item, onClose],
+    [busy, dirty, item, onClose, recoveryState],
   );
 
-  useUnsavedChangesGuard(Boolean(item && dirty), requestDiscard);
+  useUnsavedChangesGuard(
+    Boolean(item && (dirty || recoveryState !== "editing")),
+    requestDiscard,
+  );
 
   useLayoutEffect(() => {
     if (confirmation) {
@@ -81,17 +88,50 @@ export default function FoodItemEditorDialog({
     setConfirmation(null);
   }
 
+  const dedicatedRecovery =
+    recoveryState === "review-conflict" ||
+    recoveryState === "review-uncertain" ||
+    recoveryState === "unavailable";
+
+  useLayoutEffect(() => {
+    if (
+      recoveryState === "review-conflict" ||
+      recoveryState === "review-uncertain" ||
+      recoveryState === "unavailable"
+    ) {
+      editContent.current
+        ?.closest("dialog")
+        ?.querySelector<HTMLElement>("[data-modal-header] h2")
+        ?.focus();
+    }
+  }, [recoveryState]);
+
+  const title = confirmation
+    ? "Discard changes?"
+    : recoveryState === "review-conflict"
+      ? "Review changes"
+      : recoveryState === "review-uncertain"
+        ? "Review saved version"
+        : recoveryState === "unavailable"
+          ? "Item unavailable"
+          : item
+            ? "Edit item"
+            : "Add item";
+
   return (
     <Modal
-      title={
-        confirmation ? "Discard changes?" : item ? "Edit item" : "Add item"
-      }
+      title={title}
       description={
         confirmation
           ? "Your unsaved changes will be lost."
-          : item
-            ? "Update the details of your pantry item."
-            : "Add something you have on hand."
+          : recoveryState === "review-conflict" ||
+              recoveryState === "review-uncertain"
+            ? "Choose which version to continue with."
+            : recoveryState === "unavailable"
+              ? "Review or copy your unsaved draft before closing."
+              : item
+                ? "Update the details of your pantry item."
+                : "Add something you have on hand."
       }
       onClose={
         confirmation
@@ -101,7 +141,13 @@ export default function FoodItemEditorDialog({
             }
       }
       onRestoreFocusFallback={onRestoreFocusFallback}
-      dismissible={!busy}
+      presentation={dedicatedRecovery ? "responsive" : "centered"}
+      scroll="contained"
+      dismissal={
+        dedicatedRecovery
+          ? { backdrop: false, closeButton: !busy, escape: !busy }
+          : { backdrop: !busy, closeButton: !busy, escape: !busy }
+      }
     >
       <div
         ref={editContent}
@@ -118,7 +164,9 @@ export default function FoodItemEditorDialog({
           onCancel={() => {
             requestDiscard();
           }}
+          onDiscardAndClose={onClose}
           onDirtyChange={setDirty}
+          onRecoveryStateChange={setRecoveryState}
           onAcceptCurrentItem={onAcceptCurrentItem}
         />
       </div>
