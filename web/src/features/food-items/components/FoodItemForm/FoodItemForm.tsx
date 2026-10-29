@@ -1,6 +1,6 @@
 import type { CreateFoodItem, FoodItem } from "@sari/contracts";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { LuCheck, LuPlus } from "react-icons/lu";
+import { LuCheck, LuInfo, LuPlus } from "react-icons/lu";
 import { useBarcodeProduct } from "../../hooks/useBarcodeProduct";
 import {
   normalizedFoodItemEdit,
@@ -316,14 +316,15 @@ export default function FoodItemForm({
             {notice && (
               <section
                 aria-labelledby="food-save-issue-title"
-                className="space-y-2 rounded-lg border border-border-default bg-surface-subtle p-4 text-sm text-content"
+                className="space-y-2 rounded-lg border border-info-border border-l-4 bg-info-subtle p-4 text-sm text-content"
               >
                 <h3
                   ref={noticeHeadingRef}
                   id="food-save-issue-title"
                   tabIndex={-1}
-                  className="rounded-control font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                  className="flex items-center gap-2 rounded-control font-semibold text-info focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                 >
+                  <LuInfo aria-hidden="true" className="size-5 shrink-0" />
                   {notice.kind === "conflict"
                     ? "A newer version is available"
                     : "We couldn't confirm your save"}

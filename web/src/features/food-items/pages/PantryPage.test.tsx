@@ -265,11 +265,17 @@ describe("pantry modals and persistence", () => {
     });
     fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
 
-    expect(
-      await dialog.findByRole("heading", {
-        name: "A newer version is available",
-      }),
-    ).toHaveFocus();
+    const recoveryHeading = await dialog.findByRole("heading", {
+      name: "A newer version is available",
+    });
+    expect(recoveryHeading).toHaveFocus();
+    const recoveryNotice = recoveryHeading.closest("section");
+    expect(recoveryNotice).toHaveClass(
+      "border-info-border",
+      "border-l-4",
+      "bg-info-subtle",
+    );
+    expect(recoveryNotice?.querySelector("svg")).not.toBeNull();
     expect(
       dialog.getByText(
         "This item changed elsewhere. Your edits are still here but haven't been saved.",

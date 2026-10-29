@@ -55,7 +55,7 @@ it("compares only differing persisted values in a semantic table", () => {
   ).toBeVisible();
   expect(
     within(table).getByRole("columnheader", {
-      name: "Your edits (unsaved)",
+      name: "Your edits",
     }),
   ).toBeVisible();
   expect(
@@ -63,7 +63,7 @@ it("compares only differing persisted values in a semantic table", () => {
   ).toBeVisible();
   expect(
     within(table).getByRole("columnheader", {
-      name: "Your edits (unsaved)",
+      name: "Your edits",
     }),
   ).toHaveClass("bg-brand-subtle");
   expect(

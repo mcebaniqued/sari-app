@@ -138,7 +138,7 @@ export function FoodItemRecoveryView({
                   Field
                 </th>
                 <th className="w-3/8 border-b border-border-default bg-brand-subtle p-3 font-semibold">
-                  Your edits (unsaved)
+                  Your edits
                 </th>
                 <th className="w-3/8 border-b border-border-default bg-surface-subtle p-3 font-semibold">
                   Latest saved
@@ -171,7 +171,7 @@ export function FoodItemRecoveryView({
                 <dd className="mt-3 grid gap-3 text-sm">
                   <div className="rounded-control bg-brand-subtle p-3">
                     <span className="block font-medium text-content">
-                      Your edits (unsaved)
+                      Your edits
                     </span>
                     <span className="wrap-anywhere">{row.draft}</span>
                   </div>
