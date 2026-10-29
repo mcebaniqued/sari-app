@@ -258,7 +258,7 @@ export default function Modal({
             disabled={!dismissalPolicy.closeButton}
             onClick={onClose}
             aria-label="Close modal"
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-control text-content-muted hover:bg-surface-hover hover:text-content disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-control text-content-muted hover:bg-surface-hover hover:text-content disabled:opacity-40 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand"
           >
             <LuX aria-hidden="true" className="size-5" />
           </button>

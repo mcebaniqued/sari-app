@@ -187,13 +187,26 @@ test("conflict review identifies both products and explicitly overwrites with th
   await expect(recovery).toContainText(`Barcode ${newerProduct.barcode}`);
   await expect(recovery).toContainText(`Product ID ${newerProduct.id}`);
   await expect(recovery).toContainText(
-    "complete submitted values to replace the saved version",
+    "Save and replace will overwrite the saved item with your full draft",
   );
 
-  await recovery.getByRole("button", { name: "Keep my draft" }).click();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  await expect(
+    recovery.getByRole("button", { name: "Keep my draft" }),
+  ).toBeFocused();
+  await page.keyboard.press("Enter");
   const authorizedEdit = page.getByRole("dialog", { name: "Edit item" });
   const save = authorizedEdit.getByRole("button", { name: "Save and replace" });
   await expect(save).toBeFocused();
+  expect(
+    await save.evaluate((element) => element.matches(":focus-visible")),
+  ).toBe(true);
+  await expect(save).toHaveCSS("outline-style", "solid");
+  await expect(save).toHaveCSS("outline-width", "3px");
+  await expect(save).toHaveCSS("outline-offset", "2px");
   await expect(authorizedEdit.getByLabel(/^Food name/)).toHaveValue(
     "My oat milk",
   );
