@@ -39,7 +39,10 @@ export function usePantryItems(onChanged?: () => void) {
     return createOperation.current.key;
   }
 
-  async function handleSave(values: CreateFoodItem) {
+  async function handleSave(
+    values: CreateFoodItem,
+    expectedRevision: number | null,
+  ) {
     if (mutationRef.current) {
       throw new Error("Another change is in progress.");
     }
@@ -49,12 +52,18 @@ export function usePantryItems(onChanged?: () => void) {
     const original = editor?.item;
 
     try {
-      const saved = original
-        ? await updateFoodItem(original.id, {
-            expectedRevision: original.revision,
-            changes: values,
-          })
-        : await createFoodItem(values, creationKeyFor(values));
+      let saved: FoodItem;
+      if (original) {
+        if (expectedRevision === null) {
+          throw new Error("An edited item requires an expected revision.");
+        }
+        saved = await updateFoodItem(original.id, {
+          expectedRevision,
+          changes: values,
+        });
+      } else {
+        saved = await createFoodItem(values, creationKeyFor(values));
+      }
 
       setRevision((value) => value + 1);
       onChanged?.();
@@ -161,23 +170,13 @@ export function usePantryItems(onChanged?: () => void) {
     setEditor(null);
   }, []);
 
-  const acceptCurrentItem = useCallback(
-    (item: FoodItem, useServerValues: boolean) => {
-      setEditor((current) => {
-        if (useServerValues || !current?.item) {
-          return { item };
-        }
-
-        return {
-          item: {
-            ...current.item,
-            revision: item.revision,
-            updatedAt: item.updatedAt,
-          },
-        };
-      });
+  const keepSavedAndClose = useCallback(
+    (item: FoodItem) => {
+      setRevision((value) => value + 1);
+      onChanged?.();
+      setEditor((current) => (current?.item?.id === item.id ? null : current));
     },
-    [],
+    [onChanged],
   );
 
   const closeDelete = useCallback(() => {
@@ -194,7 +193,7 @@ export function usePantryItems(onChanged?: () => void) {
     startEdit,
     startDelete,
     closeEditor,
-    acceptCurrentItem,
+    keepSavedAndClose,
     closeDelete,
     saveItem: handleSave,
     deleteItems: handleDelete,

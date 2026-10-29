@@ -35,8 +35,8 @@ const draft = {
 
 it("compares only differing persisted values in a semantic table", () => {
   const onBack = vi.fn();
-  const onUseSaved = vi.fn();
-  const onKeepDraft = vi.fn();
+  const onKeepSaved = vi.fn();
+  const onOverwrite = vi.fn();
   render(
     <FoodItemRecoveryView
       kind="conflict"
@@ -44,8 +44,9 @@ it("compares only differing persisted values in a semantic table", () => {
       saved={saved}
       product={null}
       onBack={onBack}
-      onUseSaved={onUseSaved}
-      onKeepDraft={onKeepDraft}
+      pending={false}
+      onKeepSaved={onKeepSaved}
+      onOverwrite={onOverwrite}
     />,
   );
 
@@ -78,7 +79,7 @@ it("compares only differing persisted values in a semantic table", () => {
   expect(table).toHaveTextContent(`Product ID ${saved.productId ?? ""}`);
   expect(
     screen.getByText(
-      "Keeping your draft won't save it yet. Save and replace will overwrite the saved item with your full draft.",
+      "Overwriting replaces all saved item values with your draft, not just the fields you changed.",
     ),
   ).toBeVisible();
   expect(
@@ -87,20 +88,22 @@ it("compares only differing persisted values in a semantic table", () => {
     ),
   ).not.toBeInTheDocument();
 
-  const back = screen.getByRole("button", { name: "Back to editing" });
-  const useSaved = screen.getByRole("button", { name: "Use saved version" });
-  const keepDraft = screen.getByRole("button", { name: "Keep my draft" });
-  expect(back).toHaveClass("border", "bg-surface");
-  expect(useSaved).toHaveClass("border", "bg-surface");
-  expect(keepDraft).toHaveClass("bg-brand");
-  expect(useSaved).not.toHaveClass("bg-brand");
+  const back = screen.getByRole("button", { name: "Back" });
+  const keepSaved = screen.getByRole("button", {
+    name: "Keep saved & close",
+  });
+  const overwrite = screen.getByRole("button", { name: "Overwrite saved" });
+  expect(back).not.toHaveClass("bg-brand");
+  expect(keepSaved).toHaveClass("border", "bg-surface");
+  expect(overwrite).toHaveClass("bg-brand");
+  expect(keepSaved).not.toHaveClass("bg-brand");
 
   fireEvent.click(back);
-  fireEvent.click(useSaved);
-  fireEvent.click(keepDraft);
+  fireEvent.click(keepSaved);
+  fireEvent.click(overwrite);
   expect(onBack).toHaveBeenCalledOnce();
-  expect(onUseSaved).toHaveBeenCalledOnce();
-  expect(onKeepDraft).toHaveBeenCalledOnce();
+  expect(onKeepSaved).toHaveBeenCalledOnce();
+  expect(onOverwrite).toHaveBeenCalledOnce();
 });
 
 it("keeps uncertain-save meaning concise without claiming the save failed", () => {
@@ -110,15 +113,16 @@ it("keeps uncertain-save meaning concise without claiming the save failed", () =
       draft={draft}
       saved={saved}
       product={null}
+      pending={false}
       onBack={vi.fn()}
-      onUseSaved={vi.fn()}
-      onKeepDraft={vi.fn()}
+      onKeepSaved={vi.fn()}
+      onOverwrite={vi.fn()}
     />,
   );
 
   expect(
     screen.getByText(
-      "Matching values do not confirm whether the earlier save finished. Keeping your draft won't save it yet. Save and replace may overwrite the saved item with your full draft.",
+      "Matching values do not confirm whether the earlier save finished. Overwriting replaces all saved item values with your draft, not just the fields you changed.",
     ),
   ).toBeVisible();
   expect(
@@ -142,9 +146,10 @@ it("normalizes equivalent persisted values before comparing versions", () => {
       }}
       saved={equivalentSaved}
       product={null}
+      pending={false}
       onBack={vi.fn()}
-      onUseSaved={vi.fn()}
-      onKeepDraft={vi.fn()}
+      onKeepSaved={vi.fn()}
+      onOverwrite={vi.fn()}
     />,
   );
 
@@ -154,7 +159,9 @@ it("normalizes equivalent persisted values before comparing versions", () => {
     ),
   ).toBeVisible();
   expect(screen.queryByRole("table")).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Keep my draft" })).toBeVisible();
+  expect(
+    screen.getByRole("button", { name: "Keep saved & close" }),
+  ).toBeVisible();
 });
 
 it("keeps meaningful normalized field differences visible", () => {
@@ -171,9 +178,10 @@ it("keeps meaningful normalized field differences visible", () => {
       }}
       saved={saved}
       product={null}
+      pending={false}
       onBack={vi.fn()}
-      onUseSaved={vi.fn()}
-      onKeepDraft={vi.fn()}
+      onKeepSaved={vi.fn()}
+      onOverwrite={vi.fn()}
     />,
   );
 
@@ -181,6 +189,37 @@ it("keeps meaningful normalized field differences visible", () => {
   expect(within(table).getByText("Quantity")).toBeVisible();
   expect(within(table).getByText("Unit")).toBeVisible();
   expect(within(table).getByText("Expiration date")).toBeVisible();
+});
+
+it("keeps recovery actions focused and prevents activation while overwrite is pending", () => {
+  const onBack = vi.fn();
+  const onKeepSaved = vi.fn();
+  const onOverwrite = vi.fn();
+  render(
+    <FoodItemRecoveryView
+      kind="conflict"
+      draft={draft}
+      saved={saved}
+      product={null}
+      pending
+      onBack={onBack}
+      onKeepSaved={onKeepSaved}
+      onOverwrite={onOverwrite}
+    />,
+  );
+
+  const overwrite = screen.getByRole("button", { name: "Overwrite saved" });
+  overwrite.focus();
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+  fireEvent.click(screen.getByRole("button", { name: "Keep saved & close" }));
+  fireEvent.click(overwrite);
+
+  expect(overwrite).toHaveFocus();
+  expect(overwrite).toHaveAttribute("aria-busy", "true");
+  expect(screen.getByRole("status")).toHaveTextContent("Saving your draft…");
+  expect(onBack).not.toHaveBeenCalled();
+  expect(onKeepSaved).not.toHaveBeenCalled();
+  expect(onOverwrite).not.toHaveBeenCalled();
 });
 
 it("confirms a successful copy inside the button and restores it after two seconds", async () => {

@@ -187,32 +187,23 @@ test("conflict review identifies both products and explicitly overwrites with th
   await expect(recovery).toContainText(`Barcode ${newerProduct.barcode}`);
   await expect(recovery).toContainText(`Product ID ${newerProduct.id}`);
   await expect(recovery).toContainText(
-    "Save and replace will overwrite the saved item with your full draft",
+    "Overwriting replaces all saved item values with your draft, not just the fields you changed",
   );
 
   await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
-  await expect(
-    recovery.getByRole("button", { name: "Keep my draft" }),
-  ).toBeFocused();
-  await page.keyboard.press("Enter");
-  const authorizedEdit = page.getByRole("dialog", { name: "Edit item" });
-  const save = authorizedEdit.getByRole("button", { name: "Save and replace" });
-  await expect(save).toBeFocused();
+  const overwrite = recovery.getByRole("button", { name: "Overwrite saved" });
+  await expect(overwrite).toBeFocused();
   expect(
-    await save.evaluate((element) => element.matches(":focus-visible")),
+    await overwrite.evaluate((element) => element.matches(":focus-visible")),
   ).toBe(true);
-  await expect(save).toHaveCSS("outline-style", "solid");
-  await expect(save).toHaveCSS("outline-width", "3px");
-  await expect(save).toHaveCSS("outline-offset", "2px");
-  await expect(authorizedEdit.getByLabel(/^Food name/)).toHaveValue(
-    "My oat milk",
-  );
-  await expect(authorizedEdit.getByLabel(/^Quantity/)).toHaveValue("4");
-  await save.click();
-  await expect(authorizedEdit).toHaveCount(0);
+  await expect(overwrite).toHaveCSS("outline-style", "solid");
+  await expect(overwrite).toHaveCSS("outline-width", "3px");
+  await expect(overwrite).toHaveCSS("outline-offset", "2px");
+  await page.keyboard.press("Enter");
+  await expect(edit).toHaveCount(0);
 
   expect(patches).toHaveLength(2);
   expect(patches[1]).toEqual({
@@ -228,7 +219,7 @@ test("conflict review identifies both products and explicitly overwrites with th
   });
 });
 
-test("Use newer version replaces the draft and restores field focus", async ({
+test("Keep saved and close accepts the reviewed version without another PATCH", async ({
   page,
 }) => {
   const { patches } = await conflictingEditApi(page);
@@ -240,15 +231,13 @@ test("Use newer version replaces the draft and restores field focus", async ({
   await edit.getByRole("button", { name: "Review changes" }).click();
   await page
     .getByRole("dialog", { name: "Review changes" })
-    .getByRole("button", { name: "Use saved version" })
+    .getByRole("button", { name: "Keep saved & close" })
     .click();
 
-  await expect(edit.getByLabel(/^Food name/)).toHaveValue("Server milk");
-  await expect(edit.getByLabel(/^Food name/)).toBeFocused();
-  await expect(edit.getByLabel(/^Quantity/)).toHaveValue("3");
-  await expect(edit).toContainText(`Barcode: ${newerProduct.barcode}`);
-  await edit.getByRole("button", { name: "Cancel" }).click();
   await expect(edit).toHaveCount(0);
+  await expect(
+    page.getByRole("dialog", { name: "Discard changes?" }),
+  ).toHaveCount(0);
   expect(patches).toHaveLength(1);
 });
 
@@ -274,7 +263,7 @@ test("conflict review uses the stacked full-page layout on a narrow viewport", a
   expect(bounds?.height).toBe(844);
   await expect(review.getByRole("table")).toBeHidden();
   await expect(
-    review.getByRole("button", { name: "Keep my draft" }),
+    review.getByRole("button", { name: "Overwrite saved" }),
   ).toBeVisible();
   expect(
     await review.evaluate(
@@ -293,16 +282,15 @@ test("a change after review conflicts instead of overwriting the newer item", as
   await edit.getByLabel(/^Food name/).fill("My oat milk");
   await edit.getByRole("button", { name: "Save changes" }).click();
   await edit.getByRole("button", { name: "Review changes" }).click();
-  await page
-    .getByRole("dialog", { name: "Review changes" })
-    .getByRole("button", { name: "Keep my draft" })
-    .click();
   conflict.updateCurrent({
     ...newerMilk,
     name: "Second server update",
     revision: 2,
   });
-  await edit.getByRole("button", { name: "Save and replace" }).click();
+  await page
+    .getByRole("dialog", { name: "Review changes" })
+    .getByRole("button", { name: "Overwrite saved" })
+    .click();
 
   await expect(
     edit.getByRole("heading", { name: "A newer version is available" }),
@@ -360,11 +348,7 @@ test("an uncertain save is not repeated until an explicit guarded retry", async 
   await expect(
     review.getByRole("heading", { name: "Review saved version" }),
   ).toBeFocused();
-  await review.getByRole("button", { name: "Keep my draft" }).click();
-  const save = edit.getByRole("button", { name: "Save and replace" });
-  await expect(save).toBeFocused();
-  expect(patchCount).toBe(1);
-  await save.click();
+  await review.getByRole("button", { name: "Overwrite saved" }).click();
   await expect(edit).toHaveCount(0);
   expect(patchCount).toBe(2);
 });

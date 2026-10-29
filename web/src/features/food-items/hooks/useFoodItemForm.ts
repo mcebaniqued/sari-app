@@ -22,7 +22,10 @@ const validationMessages = new Map([
 interface FoodItemFormOptions {
   disabled: boolean;
   item: FoodItem | null;
-  onSave: (values: CreateFoodItem) => Promise<void>;
+  onSave: (
+    values: CreateFoodItem,
+    expectedRevision: number | null,
+  ) => Promise<void>;
   values: FoodItemDraft;
   linkage?: { productId: string | null; barcode: string | null };
 }
@@ -57,9 +60,8 @@ export function useFoodItemForm({
     [],
   );
 
-  async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (savingRef.current || disabled || saveIssue) {
+  async function submit(expectedRevision: number | null, keepReview = false) {
+    if (savingRef.current || disabled) {
       return;
     }
 
@@ -72,8 +74,8 @@ export function useFoodItemForm({
       ...(linkage ?? {}),
     });
     setError("");
-    setSaveIssue(null);
     if (!result.success) {
+      setSaveIssue(null);
       const field = result.error.issues[0]?.path[0];
       const message =
         typeof field === "string" ? validationMessages.get(field) : undefined;
@@ -82,11 +84,15 @@ export function useFoodItemForm({
       return;
     }
 
+    if (!keepReview) {
+      setSaveIssue(null);
+    }
+
     savingRef.current = true;
     setSaving(true);
 
     try {
-      await onSave(result.data);
+      await onSave(result.data, expectedRevision);
     } catch (error) {
       if (handleAccessDenied(error)) {
         return;
@@ -106,6 +112,7 @@ export function useFoodItemForm({
           ...(error.currentItem ? { currentItem: error.currentItem } : {}),
         });
       } else {
+        setSaveIssue(null);
         setError(
           error instanceof TypeError
             ? "Could not reach your pantry. Check your connection and try again."
@@ -116,6 +123,27 @@ export function useFoodItemForm({
       savingRef.current = false;
       setSaving(false);
     }
+  }
+
+  async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saveIssue) {
+      return;
+    }
+
+    await submit(item?.revision ?? null);
+  }
+
+  async function overwriteReviewed() {
+    if (
+      saveIssue?.phase !== "review" ||
+      !saveIssue.currentItem ||
+      saveIssue.kind === "unavailable"
+    ) {
+      return;
+    }
+
+    await submit(saveIssue.currentItem.revision, true);
   }
 
   async function reviewLatest() {
@@ -166,6 +194,7 @@ export function useFoodItemForm({
     error,
     saveIssue,
     handleSubmit,
+    overwriteReviewed,
     reviewLatest,
     backToNotice: () => {
       ++reviewGeneration.current;

@@ -635,11 +635,14 @@ test("failed mobile Edit remains in the dialog and can be retried", async ({
   await expect(
     review.getByRole("heading", { name: "Review saved version" }),
   ).toBeFocused();
-  await review.getByRole("button", { name: "Keep my draft" }).click();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
   await expect(
-    dialog.getByRole("button", { name: "Save and replace" }),
+    review.getByRole("button", { name: "Overwrite saved" }),
   ).toBeFocused();
-  await dialog.getByRole("button", { name: "Save and replace" }).click();
+  await page.keyboard.press("Enter");
   await expect(dialog).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Actions for Oat milk" }),

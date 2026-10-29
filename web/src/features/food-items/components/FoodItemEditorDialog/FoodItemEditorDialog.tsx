@@ -10,8 +10,11 @@ interface FoodItemEditorDialogProps {
   item: FoodItem | null;
   busy: boolean;
   onClose: () => void;
-  onSave: (values: CreateFoodItem) => Promise<void>;
-  onAcceptCurrentItem: (item: FoodItem, useServerValues: boolean) => void;
+  onSave: (
+    values: CreateFoodItem,
+    expectedRevision: number | null,
+  ) => Promise<void>;
+  onKeepSavedAndClose: (item: FoodItem) => void;
   onRestoreFocusFallback?: () => void;
 }
 
@@ -25,7 +28,7 @@ export default function FoodItemEditorDialog({
   busy,
   onClose,
   onSave,
-  onAcceptCurrentItem,
+  onKeepSavedAndClose,
   onRestoreFocusFallback,
 }: FoodItemEditorDialogProps) {
   const [dirty, setDirty] = useState(false);
@@ -168,7 +171,7 @@ export default function FoodItemEditorDialog({
           onDiscardAndClose={onClose}
           onDirtyChange={setDirty}
           onRecoveryStateChange={setRecoveryState}
-          onAcceptCurrentItem={onAcceptCurrentItem}
+          onKeepSavedAndClose={onKeepSavedAndClose}
         />
       </div>
       {confirmation && (

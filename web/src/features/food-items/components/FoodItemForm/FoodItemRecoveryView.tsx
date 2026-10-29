@@ -1,5 +1,5 @@
 import type { FoodItem, FoodProduct } from "@sari/contracts";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LuCheck, LuCopy } from "react-icons/lu";
 import {
   type FoodItemDraft,
@@ -16,9 +16,10 @@ interface RecoveryViewProps {
   draft: DraftVersion;
   saved: FoodItem;
   product: FoodProduct | null;
+  pending: boolean;
   onBack: () => void;
-  onUseSaved: () => void;
-  onKeepDraft: () => void;
+  onKeepSaved: () => void;
+  onOverwrite: () => void;
 }
 
 interface UnavailableViewProps {
@@ -112,20 +113,35 @@ function comparisonRows(
 }
 
 const secondaryButton =
-  "inline-flex min-h-11 w-full items-center justify-center rounded-control border border-border-default bg-surface px-4 py-2.5 text-sm font-semibold text-content hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:w-auto sm:flex-1";
+  "inline-flex min-h-11 w-full items-center justify-center rounded-control border border-border-default bg-surface px-4 py-2.5 text-sm font-semibold text-content hover:bg-surface-hover aria-disabled:cursor-not-allowed aria-disabled:opacity-50 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand sm:w-auto sm:flex-1";
 const primaryButton =
-  "inline-flex min-h-11 w-full items-center justify-center rounded-control bg-brand px-4 py-2.5 text-sm font-semibold text-content-inverse hover:bg-brand-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:w-auto sm:flex-1";
+  "inline-flex min-h-11 w-full items-center justify-center rounded-control bg-brand px-4 py-2.5 text-sm font-semibold text-content-inverse hover:bg-brand-hover aria-disabled:cursor-not-allowed aria-disabled:opacity-50 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand";
+const tertiaryButton =
+  "min-h-11 rounded-control px-2 py-2 text-sm font-semibold text-brand underline-offset-4 hover:underline aria-disabled:cursor-not-allowed aria-disabled:opacity-50 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand";
 
 export function FoodItemRecoveryView({
   kind,
   draft,
   saved,
   product,
+  pending,
   onBack,
-  onUseSaved,
-  onKeepDraft,
+  onKeepSaved,
+  onOverwrite,
 }: RecoveryViewProps) {
   const rows = comparisonRows(draft, saved, product);
+  const overwriteButton = useRef<HTMLButtonElement>(null);
+  const runUnlessPending = (action: () => void) => {
+    if (!pending) {
+      action();
+    }
+  };
+
+  useLayoutEffect(() => {
+    if (pending) {
+      overwriteButton.current?.focus();
+    }
+  }, [pending]);
 
   return (
     <div className="space-y-6 px-6 py-6">
@@ -193,19 +209,49 @@ export function FoodItemRecoveryView({
       )}
       <p className="text-sm leading-relaxed text-content-muted">
         {kind === "conflict"
-          ? "Keeping your draft won't save it yet. Save and replace will overwrite the saved item with your full draft."
-          : "Matching values do not confirm whether the earlier save finished. Keeping your draft won't save it yet. Save and replace may overwrite the saved item with your full draft."}
+          ? "Overwriting replaces all saved item values with your draft, not just the fields you changed."
+          : "Matching values do not confirm whether the earlier save finished. Overwriting replaces all saved item values with your draft, not just the fields you changed."}
       </p>
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <button type="button" onClick={onBack} className={secondaryButton}>
-          Back to editing
+      <div className="space-y-3">
+        {pending && (
+          <p role="status" className="text-sm font-medium text-content-muted">
+            Saving your draft…
+          </p>
+        )}
+        <button
+          type="button"
+          aria-disabled={pending}
+          onClick={() => {
+            runUnlessPending(onBack);
+          }}
+          className={tertiaryButton}
+        >
+          Back
         </button>
-        <button type="button" onClick={onUseSaved} className={secondaryButton}>
-          Use saved version
-        </button>
-        <button type="button" onClick={onKeepDraft} className={primaryButton}>
-          Keep my draft
-        </button>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            aria-disabled={pending}
+            onClick={() => {
+              runUnlessPending(onKeepSaved);
+            }}
+            className={secondaryButton}
+          >
+            Keep saved &amp; close
+          </button>
+          <button
+            ref={overwriteButton}
+            type="button"
+            aria-busy={pending}
+            aria-disabled={pending}
+            onClick={() => {
+              runUnlessPending(onOverwrite);
+            }}
+            className={primaryButton}
+          >
+            Overwrite saved
+          </button>
+        </div>
       </div>
     </div>
   );

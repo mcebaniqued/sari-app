@@ -21,18 +21,20 @@ export type FoodItemRecoveryState =
   | "uncertain-notice"
   | "review-conflict"
   | "review-uncertain"
-  | "unavailable"
-  | "authorized";
+  | "unavailable";
 
 interface FoodItemFormProps {
   item: FoodItem | null;
   disabled: boolean;
-  onSave: (values: CreateFoodItem) => Promise<void>;
+  onSave: (
+    values: CreateFoodItem,
+    expectedRevision: number | null,
+  ) => Promise<void>;
   onCancel: () => void;
   onDiscardAndClose?: () => void;
   onDirtyChange?: (dirty: boolean) => void;
   onRecoveryStateChange?: (state: FoodItemRecoveryState) => void;
-  onAcceptCurrentItem?: (item: FoodItem, useServerValues: boolean) => void;
+  onKeepSavedAndClose: (item: FoodItem) => void;
 }
 
 const footerButton =
@@ -48,15 +50,14 @@ export default function FoodItemForm({
   onDiscardAndClose,
   onDirtyChange,
   onRecoveryStateChange,
-  onAcceptCurrentItem,
+  onKeepSavedAndClose,
 }: FoodItemFormProps) {
   const [mode, setMode] = useState<"manual" | "barcode">("manual");
   const [barcodeValue, setBarcodeValue] = useState("");
-  const [overwriteAuthorized, setOverwriteAuthorized] = useState(false);
   const entryRef = useRef<HTMLDivElement>(null);
   const noticeHeadingRef = useRef<HTMLHeadingElement>(null);
   const readErrorRef = useRef<HTMLParagraphElement>(null);
-  const recoveryFocus = useRef<"name" | "save" | "review" | null>(null);
+  const recoveryFocus = useRef<"save" | "review" | null>(null);
   const draft = useFoodItemDraft(item);
   const barcode = useBarcodeProduct(item, draft);
   const linked =
@@ -92,9 +93,9 @@ export default function FoodItemForm({
     error,
     saveIssue,
     handleSubmit,
+    overwriteReviewed,
     reviewLatest,
     backToNotice,
-    clearSaveIssue,
   } = useFoodItemForm({
     disabled,
     item,
@@ -113,9 +114,7 @@ export default function FoodItemForm({
         : saveIssue.kind === "conflict"
           ? "conflict-notice"
           : "uncertain-notice"
-    : overwriteAuthorized
-      ? "authorized"
-      : "editing";
+    : "editing";
 
   useEffect(() => {
     onRecoveryStateChange?.(recoveryState);
@@ -157,6 +156,7 @@ export default function FoodItemForm({
       } else {
         noticeHeadingRef.current?.focus();
       }
+      recoveryFocus.current = null;
     }
   }, [saveIssue]);
 
@@ -166,11 +166,9 @@ export default function FoodItemForm({
     }
 
     const frame = requestAnimationFrame(() => {
-      const selector =
-        recoveryFocus.current === "name"
-          ? "[data-autofocus]"
-          : 'button[type="submit"]';
-      entryRef.current?.querySelector<HTMLElement>(selector)?.focus();
+      entryRef.current
+        ?.querySelector<HTMLElement>('button[type="submit"]')
+        ?.focus();
       recoveryFocus.current = null;
     });
 
@@ -182,34 +180,6 @@ export default function FoodItemForm({
   function switchMode(next: "manual" | "barcode") {
     barcode.cancelLookup();
     setMode(next);
-  }
-
-  function adoptSavedVersion(currentItem: FoodItem) {
-    recoveryFocus.current = "name";
-    setOverwriteAuthorized(false);
-    onAcceptCurrentItem?.(currentItem, true);
-    draft.replaceWithItem(currentItem);
-    barcode.replaceWithItem(currentItem);
-    initialEdit.current = normalizedFoodItemEdit(
-      {
-        name: currentItem.name,
-        quantity: String(currentItem.quantity),
-        unit: currentItem.unit,
-        expiresOn: currentItem.expiresOn ?? "",
-      },
-      {
-        productId: currentItem.productId ?? null,
-        barcode: currentItem.barcode ?? null,
-      },
-    );
-    clearSaveIssue();
-  }
-
-  function keepDraft(currentItem: FoodItem) {
-    recoveryFocus.current = "save";
-    onAcceptCurrentItem?.(currentItem, false);
-    setOverwriteAuthorized(true);
-    clearSaveIssue();
   }
 
   function returnToNotice() {
@@ -239,12 +209,14 @@ export default function FoodItemForm({
           draft={draftVersion}
           saved={reviewedItem}
           product={barcode.product}
+          pending={saving || disabled}
           onBack={returnToNotice}
-          onUseSaved={() => {
-            adoptSavedVersion(reviewedItem);
+          onKeepSaved={() => {
+            onKeepSavedAndClose(reviewedItem);
           }}
-          onKeepDraft={() => {
-            keepDraft(reviewedItem);
+          onOverwrite={() => {
+            recoveryFocus.current = "save";
+            void overwriteReviewed();
           }}
         />
       </div>
@@ -347,15 +319,6 @@ export default function FoodItemForm({
                 )}
               </section>
             )}
-            {overwriteAuthorized && (
-              <section
-                role="status"
-                className="rounded-lg border border-border-default bg-surface-subtle p-4 text-sm leading-relaxed text-content"
-              >
-                Your draft is ready to replace the saved version you reviewed.
-                Choose Save and replace to submit it with revision protection.
-              </section>
-            )}
           </fieldset>
           {!item && (
             <div className="flex justify-end px-6 pb-3">
@@ -401,13 +364,7 @@ export default function FoodItemForm({
                 ) : (
                   <LuPlus aria-hidden="true" />
                 )}
-                {saving
-                  ? "Saving…"
-                  : overwriteAuthorized
-                    ? "Save and replace"
-                    : item
-                      ? "Save changes"
-                      : "Add item"}
+                {saving ? "Saving…" : item ? "Save changes" : "Add item"}
               </button>
             )}
           </div>

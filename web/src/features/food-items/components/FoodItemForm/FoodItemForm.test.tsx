@@ -37,6 +37,7 @@ function setup() {
         disabled={false}
         onSave={onSave}
         onCancel={vi.fn()}
+        onKeepSavedAndClose={vi.fn()}
       />
     </MemoryRouter>,
   );
@@ -161,6 +162,7 @@ describe("barcode-assisted pantry form", () => {
           productId: product.id,
           barcode: product.barcode,
         }),
+        null,
       );
     });
   });
@@ -247,12 +249,15 @@ describe("barcode-assisted pantry form", () => {
     expect(screen.getByLabelText(/^Quantity/)).toHaveValue(500);
     fireEvent.click(screen.getByRole("button", { name: "Add item" }));
     await waitFor(() => {
-      expect(onSave).toHaveBeenCalledWith({
-        name: "USDA oats",
-        quantity: 500,
-        unit: "g",
-        expiresOn: null,
-      });
+      expect(onSave).toHaveBeenCalledWith(
+        {
+          name: "USDA oats",
+          quantity: 500,
+          unit: "g",
+          expiresOn: null,
+        },
+        null,
+      );
     });
   });
 
@@ -285,6 +290,7 @@ describe("barcode-assisted pantry form", () => {
           barcode: product.barcode,
           productId: null,
         }),
+        null,
       );
     });
   });
