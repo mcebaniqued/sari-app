@@ -352,3 +352,65 @@ test("an uncertain save is not repeated until an explicit guarded retry", async 
   await expect(edit).toHaveCount(0);
   expect(patchCount).toBe(2);
 });
+
+test("unavailable actions stay balanced with single-line copy feedback", async ({
+  page,
+}) => {
+  await foodApi(page, [milk]);
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: () => Promise.resolve() },
+    });
+  });
+  await page.route(`**/api/v1/food-items/${milk.id}`, async (route) => {
+    if (route.request().method() === "PATCH") {
+      await route.fulfill({
+        status: 404,
+        json: {
+          error: {
+            code: "FOOD_ITEM_NOT_FOUND",
+            message: "Food item not found.",
+          },
+        },
+      });
+
+      return;
+    }
+
+    await route.fallback();
+  });
+  await page.goto("/pantry");
+  await page.getByRole("button", { name: "Edit Milk" }).click();
+  const edit = page.getByRole("dialog", { name: "Edit item" });
+  await edit.getByLabel(/^Food name/).fill("Oat milk");
+  await edit.getByRole("button", { name: "Save changes" }).click();
+
+  const unavailable = page.getByRole("dialog", { name: "Item unavailable" });
+  const copy = unavailable.getByRole("button", { name: "Copy details" });
+  const discard = unavailable.getByRole("button", {
+    name: "Discard and close",
+  });
+  const copyBox = await copy.boundingBox();
+  const discardBox = await discard.boundingBox();
+  expect(copyBox).not.toBeNull();
+  expect(discardBox).not.toBeNull();
+  expect(
+    Math.abs((copyBox?.width ?? 0) - (discardBox?.width ?? 0)),
+  ).toBeLessThanOrEqual(2);
+  expect(
+    Math.abs((copyBox?.height ?? 0) - (discardBox?.height ?? 0)),
+  ).toBeLessThanOrEqual(1);
+  await expect(copy).toHaveCSS("white-space", "nowrap");
+  await expect(discard).toHaveCSS("white-space", "nowrap");
+
+  await copy.click();
+  const copied = unavailable.getByRole("button", { name: "Copied" });
+  const copiedBox = await copied.boundingBox();
+  expect(copiedBox?.width).toBe(copyBox?.width);
+  expect(copiedBox?.height).toBe(copyBox?.height);
+  await expect(copied).toHaveCSS("white-space", "nowrap");
+
+  await discard.click();
+  await expect(unavailable).toHaveCount(0);
+});
