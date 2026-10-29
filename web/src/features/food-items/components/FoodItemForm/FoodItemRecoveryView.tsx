@@ -128,11 +128,6 @@ export function FoodItemRecoveryView({
 
   return (
     <div className="space-y-6 px-6 py-6">
-      <p className="text-sm leading-relaxed text-content-muted">
-        {kind === "conflict"
-          ? "Compare your unsaved draft with the newer saved version."
-          : "Compare your draft with the version Sari can currently read. Matching values do not confirm whether the earlier save finished."}
-      </p>
       {rows.length ? (
         <>
           <table className="hidden w-full table-fixed border-separate border-spacing-0 text-left text-sm sm:table">
@@ -141,11 +136,11 @@ export function FoodItemRecoveryView({
                 <th className="w-1/4 border-b border-border-default p-3 font-semibold">
                   Field
                 </th>
-                <th className="w-3/8 border-b border-border-default p-3 font-semibold">
-                  Your draft
+                <th className="w-3/8 border-b border-border-default bg-brand-subtle p-3 font-semibold">
+                  Your edits (unsaved)
                 </th>
-                <th className="w-3/8 border-b border-border-default p-3 font-semibold">
-                  Saved version
+                <th className="w-3/8 border-b border-border-default bg-surface-subtle p-3 font-semibold">
+                  Latest saved
                 </th>
               </tr>
             </thead>
@@ -155,10 +150,10 @@ export function FoodItemRecoveryView({
                   <th className="border-b border-border-default p-3 align-top font-medium">
                     {row.label}
                   </th>
-                  <td className="wrap-anywhere border-b border-border-default p-3 align-top">
+                  <td className="wrap-anywhere border-b border-border-default bg-brand-subtle p-3 align-top">
                     {row.draft}
                   </td>
-                  <td className="wrap-anywhere border-b border-border-default p-3 align-top">
+                  <td className="wrap-anywhere border-b border-border-default bg-surface-subtle p-3 align-top">
                     {row.saved}
                   </td>
                 </tr>
@@ -173,15 +168,15 @@ export function FoodItemRecoveryView({
               >
                 <dt className="font-semibold">{row.label}</dt>
                 <dd className="mt-3 grid gap-3 text-sm">
-                  <div>
-                    <span className="block font-medium text-content-muted">
-                      Your draft
+                  <div className="rounded-control bg-brand-subtle p-3">
+                    <span className="block font-medium text-content">
+                      Your edits (unsaved)
                     </span>
                     <span className="wrap-anywhere">{row.draft}</span>
                   </div>
-                  <div>
-                    <span className="block font-medium text-content-muted">
-                      Saved version
+                  <div className="rounded-control bg-surface-subtle p-3">
+                    <span className="block font-medium text-content">
+                      Latest saved
                     </span>
                     <span className="wrap-anywhere">{row.saved}</span>
                   </div>
@@ -196,15 +191,15 @@ export function FoodItemRecoveryView({
         </p>
       )}
       <p className="text-sm leading-relaxed text-content-muted">
-        Keeping your draft authorizes its complete submitted values to replace
-        the saved version when you choose Save and replace. Nothing is saved
-        from this review.
+        {kind === "conflict"
+          ? "Keeping your draft won't save it yet. Save and replace will overwrite the saved item with your full draft."
+          : "Matching values do not confirm whether the earlier save finished. Keeping your draft won't save it yet. Save and replace may overwrite the saved item with your full draft."}
       </p>
       <div className="flex flex-col gap-3 sm:flex-row">
         <button type="button" onClick={onBack} className={secondaryButton}>
           Back to editing
         </button>
-        <button type="button" onClick={onUseSaved} className={primaryButton}>
+        <button type="button" onClick={onUseSaved} className={secondaryButton}>
           Use saved version
         </button>
         <button type="button" onClick={onKeepDraft} className={primaryButton}>

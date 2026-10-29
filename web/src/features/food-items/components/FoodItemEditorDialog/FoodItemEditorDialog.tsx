@@ -124,14 +124,15 @@ export default function FoodItemEditorDialog({
       description={
         confirmation
           ? "Your unsaved changes will be lost."
-          : recoveryState === "review-conflict" ||
-              recoveryState === "review-uncertain"
-            ? "Choose which version to continue with."
-            : recoveryState === "unavailable"
-              ? "Review or copy your unsaved draft before closing."
-              : item
-                ? "Update the details of your pantry item."
-                : "Add something you have on hand."
+          : recoveryState === "review-conflict"
+            ? "Compare your edits with the latest saved version."
+            : recoveryState === "review-uncertain"
+              ? "Compare your edits with the version Sari can currently read."
+              : recoveryState === "unavailable"
+                ? "Review or copy your unsaved draft before closing."
+                : item
+                  ? "Update the details of your pantry item."
+                  : "Add something you have on hand."
       }
       onClose={
         confirmation

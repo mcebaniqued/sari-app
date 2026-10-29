@@ -270,7 +270,11 @@ describe("pantry modals and persistence", () => {
         name: "A newer version is available",
       }),
     ).toHaveFocus();
-    expect(dialog.getByText(/Your changes haven't been saved\./)).toBeVisible();
+    expect(
+      dialog.getByText(
+        "This item changed elsewhere. Your edits are still here but haven't been saved.",
+      ),
+    ).toBeVisible();
     expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
     expect(fetch).toHaveBeenCalledTimes(1);
 
@@ -281,6 +285,9 @@ describe("pantry modals and persistence", () => {
     const review = within(
       await screen.findByRole("dialog", { name: "Review changes" }),
     );
+    expect(
+      review.getByText("Compare your edits with the latest saved version."),
+    ).toBeVisible();
     expect(await review.findAllByText("Whole milk")).not.toHaveLength(0);
     expect(review.getAllByText("Oat milk")).not.toHaveLength(0);
     expect(fetch).toHaveBeenCalledTimes(2);
@@ -478,7 +485,7 @@ describe("pantry modals and persistence", () => {
     ).not.toHaveLength(0);
     expect(
       recovery.getByText(
-        /complete submitted values to replace the saved version/,
+        "Keeping your draft won't save it yet. Save and replace will overwrite the saved item with your full draft.",
       ),
     ).toBeVisible();
     expect(recovery.getAllByText("My oat milk")).not.toHaveLength(0);

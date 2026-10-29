@@ -330,7 +330,7 @@ export default function FoodItemForm({
                 </h3>
                 <p className="leading-relaxed text-content-muted">
                   {notice.kind === "conflict"
-                    ? "This item changed while you were editing. Your changes haven't been saved. Review the differences before saving."
+                    ? "This item changed elsewhere. Your edits are still here but haven't been saved."
                     : "Your changes may have been saved. Check the saved version before trying again."}
                 </p>
                 {notice.readError && (

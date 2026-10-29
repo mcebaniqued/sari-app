@@ -31,6 +31,8 @@ const draft = {
 };
 
 it("compares only differing persisted values in a semantic table", () => {
+  const onBack = vi.fn();
+  const onUseSaved = vi.fn();
   const onKeepDraft = vi.fn();
   render(
     <FoodItemRecoveryView
@@ -38,8 +40,8 @@ it("compares only differing persisted values in a semantic table", () => {
       draft={draft}
       saved={saved}
       product={null}
-      onBack={vi.fn()}
-      onUseSaved={vi.fn()}
+      onBack={onBack}
+      onUseSaved={onUseSaved}
       onKeepDraft={onKeepDraft}
     />,
   );
@@ -49,11 +51,21 @@ it("compares only differing persisted values in a semantic table", () => {
     within(table).getByRole("columnheader", { name: "Field" }),
   ).toBeVisible();
   expect(
-    within(table).getByRole("columnheader", { name: "Your draft" }),
+    within(table).getByRole("columnheader", {
+      name: "Your edits (unsaved)",
+    }),
   ).toBeVisible();
   expect(
-    within(table).getByRole("columnheader", { name: "Saved version" }),
+    within(table).getByRole("columnheader", { name: "Latest saved" }),
   ).toBeVisible();
+  expect(
+    within(table).getByRole("columnheader", {
+      name: "Your edits (unsaved)",
+    }),
+  ).toHaveClass("bg-brand-subtle");
+  expect(
+    within(table).getByRole("columnheader", { name: "Latest saved" }),
+  ).toHaveClass("bg-surface-subtle");
   expect(within(table).getByText("Name")).toBeVisible();
   expect(within(table).getByText("Product link")).toBeVisible();
   expect(within(table).queryByText("Quantity")).not.toBeInTheDocument();
@@ -61,9 +73,54 @@ it("compares only differing persisted values in a semantic table", () => {
   expect(within(table).queryByText("Expiration date")).not.toBeInTheDocument();
   expect(table).toHaveTextContent(`Product ID ${draft.productId}`);
   expect(table).toHaveTextContent(`Product ID ${saved.productId ?? ""}`);
+  expect(
+    screen.getByText(
+      "Keeping your draft won't save it yet. Save and replace will overwrite the saved item with your full draft.",
+    ),
+  ).toBeVisible();
+  expect(
+    screen.queryByText(
+      "Compare your unsaved draft with the newer saved version.",
+    ),
+  ).not.toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole("button", { name: "Keep my draft" }));
+  const back = screen.getByRole("button", { name: "Back to editing" });
+  const useSaved = screen.getByRole("button", { name: "Use saved version" });
+  const keepDraft = screen.getByRole("button", { name: "Keep my draft" });
+  expect(back).toHaveClass("border", "bg-surface");
+  expect(useSaved).toHaveClass("border", "bg-surface");
+  expect(keepDraft).toHaveClass("bg-brand");
+  expect(useSaved).not.toHaveClass("bg-brand");
+
+  fireEvent.click(back);
+  fireEvent.click(useSaved);
+  fireEvent.click(keepDraft);
+  expect(onBack).toHaveBeenCalledOnce();
+  expect(onUseSaved).toHaveBeenCalledOnce();
   expect(onKeepDraft).toHaveBeenCalledOnce();
+});
+
+it("keeps uncertain-save meaning concise without claiming the save failed", () => {
+  render(
+    <FoodItemRecoveryView
+      kind="uncertain"
+      draft={draft}
+      saved={saved}
+      product={null}
+      onBack={vi.fn()}
+      onUseSaved={vi.fn()}
+      onKeepDraft={vi.fn()}
+    />,
+  );
+
+  expect(
+    screen.getByText(
+      "Matching values do not confirm whether the earlier save finished. Keeping your draft won't save it yet. Save and replace may overwrite the saved item with your full draft.",
+    ),
+  ).toBeVisible();
+  expect(
+    screen.queryByText(/earlier save (?:did not|didn't) finish/i),
+  ).not.toBeInTheDocument();
 });
 
 it("normalizes equivalent persisted values before comparing versions", () => {
