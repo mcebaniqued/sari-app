@@ -113,9 +113,9 @@ function comparisonRows(
 }
 
 const secondaryButton =
-  "inline-flex min-h-11 w-full items-center justify-center whitespace-nowrap rounded-control border border-border-default bg-surface px-4 py-2.5 text-sm font-semibold text-content hover:bg-surface-hover aria-disabled:cursor-not-allowed aria-disabled:opacity-50 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand sm:w-auto sm:flex-1";
+  "inline-flex min-h-11 w-full items-center justify-center whitespace-nowrap rounded-control border border-border-default bg-surface px-4 py-2.5 text-sm font-semibold text-content enabled:hover:bg-surface-hover aria-disabled:cursor-not-allowed aria-disabled:opacity-50 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand sm:w-auto sm:flex-1";
 const primaryButton =
-  "inline-flex min-h-11 w-full items-center justify-center whitespace-nowrap rounded-control bg-brand px-4 py-2.5 text-sm font-semibold text-content-inverse hover:bg-brand-hover aria-disabled:cursor-not-allowed aria-disabled:opacity-50 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand sm:w-auto sm:flex-1";
+  "inline-flex min-h-11 w-full items-center justify-center whitespace-nowrap rounded-control bg-brand px-4 py-2.5 text-sm font-semibold text-content-inverse enabled:hover:bg-brand-hover aria-disabled:cursor-not-allowed aria-disabled:opacity-50 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand sm:w-auto sm:flex-1";
 const tertiaryButton =
   "min-h-11 rounded-control px-2 py-2 text-sm font-semibold text-brand underline-offset-4 hover:underline aria-disabled:cursor-not-allowed aria-disabled:opacity-50 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand";
 
