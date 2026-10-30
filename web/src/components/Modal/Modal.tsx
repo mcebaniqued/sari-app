@@ -150,17 +150,18 @@ export default function Modal({
     .filter(Boolean)
     .join(" ");
 
-  const content =
-    scroll === "contained" ? (
-      <div
-        data-modal-scroll-region
-        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
-      >
-        {children}
-      </div>
-    ) : (
-      children
-    );
+  const content = (
+    <div
+      data-modal-scroll-region={scroll === "contained" ? "" : undefined}
+      className={
+        scroll === "contained"
+          ? "min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
+          : undefined
+      }
+    >
+      {children}
+    </div>
+  );
 
   return createPortal(
     <dialog

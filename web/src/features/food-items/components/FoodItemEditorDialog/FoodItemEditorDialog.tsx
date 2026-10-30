@@ -146,7 +146,7 @@ export default function FoodItemEditorDialog({
       }
       onRestoreFocusFallback={onRestoreFocusFallback}
       presentation={dedicatedRecovery ? "responsive" : "centered"}
-      scroll="contained"
+      scroll={dedicatedRecovery ? "contained" : "dialog"}
       dismissal={
         dedicatedRecovery
           ? { backdrop: false, closeButton: !busy, escape: !busy }

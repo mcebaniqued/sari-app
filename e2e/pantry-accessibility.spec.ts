@@ -28,6 +28,142 @@ async function tabPastNativeDateStops(
   }
 }
 
+async function openEditDialog(page: Page) {
+  const actions = page.getByRole("button", { name: "Actions for Milk" });
+  const usesActionMenu = await actions.isVisible();
+  if (usesActionMenu) {
+    await actions.click();
+  }
+
+  const edit = page.getByRole("button", { name: "Edit Milk" });
+  await edit.focus();
+  await page.keyboard.press("Enter");
+
+  return {
+    dialog: page.getByRole("dialog", { name: "Edit item" }),
+    restoreFocus: usesActionMenu ? actions : edit,
+  };
+}
+
+async function expectEditorContentGeometry(
+  dialog: Locator,
+  submitName: "Add item" | "Save changes",
+) {
+  const dialogBox = requireGeometry(await dialog.boundingBox());
+  const controls = [
+    dialog.getByLabel(/^Food name/),
+    dialog.getByLabel(/^Quantity/),
+    dialog.getByLabel("Unit"),
+    dialog.getByLabel(/^Expiration date/),
+    ...(submitName === "Add item"
+      ? [dialog.getByRole("button", { name: "Input barcode instead" })]
+      : []),
+    dialog.getByRole("button", { name: "Cancel" }),
+    dialog.getByRole("button", { name: submitName, exact: true }),
+  ];
+
+  for (const control of controls) {
+    await expect(control).toBeVisible();
+    const box = requireGeometry(await control.boundingBox());
+    expect(box.width).toBeGreaterThan(0);
+    expect(box.height).toBeGreaterThan(0);
+    expect(box.x).toBeGreaterThanOrEqual(dialogBox.x - 1);
+    expect(box.x + box.width).toBeLessThanOrEqual(
+      dialogBox.x + dialogBox.width + 1,
+    );
+  }
+
+  expect(
+    await dialog.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+}
+
+for (const viewport of [
+  { name: "desktop", width: 1280, height: 720 },
+  { name: "mobile", width: 390, height: 844 },
+] as const) {
+  test(`Add and Edit forms render complete content at the ${viewport.name} viewport`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await foodApi(page, [milk]);
+    await page.goto("/pantry");
+
+    const addTrigger = page.getByRole("button", {
+      name: "Add item",
+      exact: true,
+    });
+    await addTrigger.focus();
+    await page.keyboard.press("Enter");
+    const add = page.getByRole("dialog", { name: "Add item" });
+    await expectEditorContentGeometry(add, "Add item");
+    await add.getByRole("button", { name: "Close modal" }).click();
+    await expect(add).toHaveCount(0);
+    await expect(addTrigger).toBeFocused();
+
+    const { dialog: edit, restoreFocus } = await openEditDialog(page);
+    await expectEditorContentGeometry(edit, "Save changes");
+    await expect(edit.getByLabel(/^Food name/)).toHaveValue("Milk");
+    await edit.getByRole("button", { name: "Cancel" }).click();
+    await expect(edit).toHaveCount(0);
+    await expect(restoreFocus).toBeFocused();
+  });
+}
+
+test("short mobile Add and Edit dialogs scroll without collapsing form content", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 500 });
+  await foodApi(page, [milk]);
+  await page.goto("/pantry");
+
+  const addTrigger = page.getByRole("button", {
+    name: "Add item",
+    exact: true,
+  });
+  await addTrigger.focus();
+  await page.keyboard.press("Enter");
+  const add = page.getByRole("dialog", { name: "Add item" });
+  await expectEditorContentGeometry(add, "Add item");
+  const addSubmit = add.getByRole("button", { name: "Add item", exact: true });
+  const addMetrics = await add.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(addMetrics.scrollHeight).toBeGreaterThan(addMetrics.clientHeight);
+  await addSubmit.scrollIntoViewIfNeeded();
+  await expect(addSubmit).toBeInViewport();
+  expect(await add.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await add.getByRole("button", { name: "Cancel" }).click();
+  await expect(add).toHaveCount(0);
+  await expect(addTrigger).toBeFocused();
+
+  const { dialog: edit, restoreFocus } = await openEditDialog(page);
+  await expectEditorContentGeometry(edit, "Save changes");
+  const name = edit.getByLabel(/^Food name/);
+  await name.fill("Oat milk");
+  const cancel = edit.getByRole("button", { name: "Cancel" });
+  await cancel.scrollIntoViewIfNeeded();
+  await expect(cancel).toBeInViewport();
+  expect(await edit.evaluate((element) => element.scrollTop)).toBeGreaterThan(
+    0,
+  );
+  await cancel.focus();
+  await page.keyboard.press("Enter");
+
+  const confirmation = page.getByRole("dialog", { name: "Discard changes?" });
+  await expect(confirmation).toBeVisible();
+  await confirmation.getByRole("button", { name: "Continue editing" }).click();
+  await expect(name).toHaveValue("Oat milk");
+  await expect(cancel).toBeFocused();
+  await page.keyboard.press("Enter");
+  await confirmation.getByRole("button", { name: "Discard changes" }).click();
+  await expect(edit).toHaveCount(0);
+  await expect(restoreFocus).toBeFocused();
+});
+
 test("table, filter dialog, editor, and confirmation are keyboard accessible", async ({
   page,
 }) => {
