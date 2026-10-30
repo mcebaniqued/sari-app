@@ -22,15 +22,20 @@ const validationMessages = new Map([
 interface FoodItemFormOptions {
   disabled: boolean;
   item: FoodItem | null;
-  onSave: (values: CreateFoodItem) => Promise<void>;
+  onSave: (
+    values: CreateFoodItem,
+    expectedRevision: number | null,
+  ) => Promise<void>;
   values: FoodItemDraft;
   linkage?: { productId: string | null; barcode: string | null };
 }
 
 export interface FoodItemSaveIssue {
   kind: "conflict" | "unavailable" | "uncertain";
+  phase: "notice" | "review";
   currentItem?: FoodItem;
   loading?: boolean;
+  readError?: boolean;
 }
 
 export function useFoodItemForm({
@@ -55,8 +60,7 @@ export function useFoodItemForm({
     [],
   );
 
-  async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submit(expectedRevision: number | null, keepReview = false) {
     if (savingRef.current || disabled) {
       return;
     }
@@ -70,8 +74,8 @@ export function useFoodItemForm({
       ...(linkage ?? {}),
     });
     setError("");
-    setSaveIssue(null);
     if (!result.success) {
+      setSaveIssue(null);
       const field = result.error.issues[0]?.path[0];
       const message =
         typeof field === "string" ? validationMessages.get(field) : undefined;
@@ -80,11 +84,15 @@ export function useFoodItemForm({
       return;
     }
 
+    if (!keepReview) {
+      setSaveIssue(null);
+    }
+
     savingRef.current = true;
     setSaving(true);
 
     try {
-      await onSave(result.data);
+      await onSave(result.data, expectedRevision);
     } catch (error) {
       if (handleAccessDenied(error)) {
         return;
@@ -94,15 +102,17 @@ export function useFoodItemForm({
         error instanceof ApiError &&
         error.code === "FOOD_ITEM_REVISION_CONFLICT"
       ) {
-        setSaveIssue({ kind: "conflict" });
+        setSaveIssue({ kind: "conflict", phase: "notice" });
       } else if (error instanceof ApiError && error.status === 404) {
-        setSaveIssue({ kind: "unavailable" });
+        setSaveIssue({ kind: "unavailable", phase: "notice" });
       } else if (error instanceof FoodItemMutationOutcomeError) {
         setSaveIssue({
           kind: error.outcome,
+          phase: "notice",
           ...(error.currentItem ? { currentItem: error.currentItem } : {}),
         });
       } else {
+        setSaveIssue(null);
         setError(
           error instanceof TypeError
             ? "Could not reach your pantry. Check your connection and try again."
@@ -115,12 +125,33 @@ export function useFoodItemForm({
     }
   }
 
+  async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saveIssue) {
+      return;
+    }
+
+    await submit(item?.revision ?? null);
+  }
+
+  async function overwriteReviewed() {
+    if (
+      saveIssue?.phase !== "review" ||
+      !saveIssue.currentItem ||
+      saveIssue.kind === "unavailable"
+    ) {
+      return;
+    }
+
+    await submit(saveIssue.currentItem.revision, true);
+  }
+
   async function reviewLatest() {
     if (!item || !saveIssue || saveIssue.loading) {
       return;
     }
 
-    const reviewingConflict = saveIssue.kind === "conflict";
+    const reviewingKind = saveIssue.kind;
     const generation = ++reviewGeneration.current;
     setSaveIssue((current) =>
       current ? { ...current, loading: true } : current,
@@ -133,7 +164,8 @@ export function useFoodItemForm({
       }
 
       setSaveIssue({
-        kind: reviewingConflict ? "conflict" : "uncertain",
+        kind: reviewingKind,
+        phase: "review",
         currentItem,
       });
     } catch (error) {
@@ -145,12 +177,15 @@ export function useFoodItemForm({
         return;
       }
 
-      setSaveIssue({
-        kind:
-          error instanceof ApiError && error.status === 404
-            ? "unavailable"
-            : "uncertain",
-      });
+      if (error instanceof ApiError && error.status === 404) {
+        setSaveIssue({ kind: "unavailable", phase: "notice" });
+      } else {
+        setSaveIssue({
+          kind: reviewingKind,
+          phase: "notice",
+          readError: true,
+        });
+      }
     }
   }
 
@@ -159,7 +194,14 @@ export function useFoodItemForm({
     error,
     saveIssue,
     handleSubmit,
+    overwriteReviewed,
     reviewLatest,
+    backToNotice: () => {
+      ++reviewGeneration.current;
+      setSaveIssue((current) =>
+        current ? { kind: current.kind, phase: "notice" } : current,
+      );
+    },
     clearSaveIssue: () => {
       ++reviewGeneration.current;
       setSaveIssue(null);

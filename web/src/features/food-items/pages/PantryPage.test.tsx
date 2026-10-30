@@ -113,6 +113,15 @@ async function addDialog(copy: "mobile" | "desktop" = "mobile") {
   return within(screen.getByRole("dialog", { name: "Add item" }));
 }
 
+function containingForm(element: HTMLElement) {
+  const form = element.closest("form");
+  if (!form) {
+    throw new Error("Expected the field to be inside a form");
+  }
+
+  return form;
+}
+
 describe("pantry modals and persistence", () => {
   it("opens a blank add modal, waits for persistence, then closes it", async () => {
     let complete: ((value: Response) => void) | undefined;
@@ -196,9 +205,11 @@ describe("pantry modals and persistence", () => {
       target: { value: "" },
     });
     fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
-    expect(await dialog.findByRole("alert")).toHaveTextContent(
-      "The save outcome is unknown",
-    );
+    expect(
+      await dialog.findByRole("heading", {
+        name: "We couldn't confirm your save",
+      }),
+    ).toHaveFocus();
     expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
     expect(fetch).toHaveBeenCalledWith(
       `/api/v1/food-items/${item.id}`,
@@ -254,15 +265,37 @@ describe("pantry modals and persistence", () => {
     });
     fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
 
-    expect(await dialog.findByRole("alert")).toHaveTextContent(
-      "A newer version was saved",
+    const recoveryHeading = await dialog.findByRole("heading", {
+      name: "A newer version is available",
+    });
+    expect(recoveryHeading).toHaveFocus();
+    const recoveryNotice = recoveryHeading.closest("section");
+    expect(recoveryNotice).toHaveClass(
+      "border-info-border",
+      "border-l-4",
+      "bg-info-subtle",
     );
+    expect(recoveryNotice?.querySelector("svg")).not.toBeNull();
+    expect(
+      dialog.getByText(
+        "This item changed elsewhere. Your edits are still here but haven't been saved.",
+      ),
+    ).toBeVisible();
     expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
     expect(fetch).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(dialog.getByRole("button", { name: "Review newer data" }));
-    expect(await dialog.findByText("Whole milk")).toBeVisible();
-    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
+    fireEvent.submit(containingForm(dialog.getByLabelText(/^Food name/)));
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(dialog.getByRole("button", { name: "Review changes" }));
+    const review = within(
+      await screen.findByRole("dialog", { name: "Review changes" }),
+    );
+    expect(
+      review.getByText("Compare your edits with the latest saved version."),
+    ).toBeVisible();
+    expect(await review.findAllByText("Whole milk")).not.toHaveLength(0);
+    expect(review.getAllByText("Oat milk")).not.toHaveLength(0);
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(
       fetch.mock.calls.filter(
@@ -270,13 +303,10 @@ describe("pantry modals and persistence", () => {
       ),
     ).toHaveLength(1);
 
-    fireEvent.click(
-      dialog.getByRole("button", {
-        name: "Overwrite saved version with my draft",
-      }),
-    );
-    expect(dialog.getByRole("button", { name: "Save changes" })).toHaveFocus();
-    fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
+    const overwrite = review.getByRole("button", {
+      name: "Overwrite saved",
+    });
+    fireEvent.click(overwrite);
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledTimes(3);
     });
@@ -330,16 +360,22 @@ describe("pantry modals and persistence", () => {
       target: { value: "Oat milk" },
     });
     fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
-    await dialog.findByText("A newer version was saved");
+    await dialog.findByText("A newer version is available");
 
-    fireEvent.click(dialog.getByRole("button", { name: "Review newer data" }));
+    fireEvent.click(dialog.getByRole("button", { name: "Review changes" }));
     expect(
-      dialog.getByRole("button", { name: "Loading newer data…" }),
+      dialog.getByRole("button", { name: "Checking saved version…" }),
     ).toBeDisabled();
-    fireEvent.click(dialog.getByRole("button", { name: "Continue editing" }));
-    expect(dialog.queryByRole("alert")).not.toBeInTheDocument();
-    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
-    expect(dialog.getByLabelText(/^Food name/)).toHaveFocus();
+    fireEvent.submit(containingForm(dialog.getByLabelText(/^Food name/)));
+    expect(
+      fetch.mock.calls.filter(
+        ([, init]) => (init as RequestInit | undefined)?.method === "PATCH",
+      ),
+    ).toHaveLength(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    fireEvent.click(dialog.getByRole("button", { name: "Close modal" }));
+    fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
     await act(async () => {
       completeReview?.(
@@ -348,9 +384,124 @@ describe("pantry modals and persistence", () => {
       await Promise.resolve();
     });
 
-    expect(dialog.queryByRole("alert")).not.toBeInTheDocument();
-    expect(dialog.queryByText("Whole milk")).not.toBeInTheDocument();
-    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("prevents duplicate reviewed overwrites while the guarded save is pending", async () => {
+    const current = { ...item, name: "Whole milk", revision: 1 };
+    let completeOverwrite: ((response: Response) => void) | undefined;
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            error: { code: "FOOD_ITEM_REVISION_CONFLICT", message: "Changed." },
+          },
+          { status: 409 },
+        ),
+      )
+      .mockResolvedValueOnce(Response.json(current))
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            completeOverwrite = resolve;
+          }),
+      );
+    stubFoodFetch(fetch);
+    render(
+      <MemoryRouter>
+        <PantryPage />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    fireEvent.change(dialog.getByLabelText(/^Food name/), {
+      target: { value: "Oat milk" },
+    });
+    fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
+    fireEvent.click(
+      await dialog.findByRole("button", { name: "Review changes" }),
+    );
+    const overwrite = await dialog.findByRole("button", {
+      name: "Overwrite saved",
+    });
+    overwrite.focus();
+    fireEvent.click(overwrite);
+    fireEvent.click(overwrite);
+
+    expect(overwrite).toHaveFocus();
+    expect(overwrite).toHaveAttribute("aria-busy", "true");
+    expect(dialog.getByRole("button", { name: "Back" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(
+      fetch.mock.calls.filter(
+        ([, init]) => (init as RequestInit | undefined)?.method === "PATCH",
+      ),
+    ).toHaveLength(2);
+
+    await act(async () => {
+      completeOverwrite?.(
+        Response.json({ ...current, name: "Oat milk", revision: 2 }),
+      );
+      await Promise.resolve();
+    });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("returns an invalid reviewed draft to editing without sending another mutation", async () => {
+    const current = { ...item, name: "Whole milk", revision: 1 };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            error: { code: "FOOD_ITEM_REVISION_CONFLICT", message: "Changed." },
+          },
+          { status: 409 },
+        ),
+      )
+      .mockResolvedValueOnce(Response.json(current))
+      .mockResolvedValueOnce(Response.json(current));
+    stubFoodFetch(fetch);
+    render(
+      <MemoryRouter>
+        <PantryPage />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    fireEvent.change(dialog.getByLabelText(/^Food name/), {
+      target: { value: "Oat milk" },
+    });
+    fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
+    fireEvent.click(
+      await dialog.findByRole("button", { name: "Review changes" }),
+    );
+    fireEvent.click(await dialog.findByRole("button", { name: "Back" }));
+    fireEvent.change(dialog.getByLabelText(/^Food name/), {
+      target: { value: "" },
+    });
+    fireEvent.click(dialog.getByRole("button", { name: "Review changes" }));
+    fireEvent.click(
+      await dialog.findByRole("button", { name: "Overwrite saved" }),
+    );
+
+    expect(await dialog.findByRole("alert")).toHaveTextContent(
+      "Enter a food name with 120 characters or fewer.",
+    );
+    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("");
+    expect(
+      fetch.mock.calls.filter(
+        ([, init]) => (init as RequestInit | undefined)?.method === "PATCH",
+      ),
+    ).toHaveLength(1);
+    await waitFor(() => {
+      expect(
+        dialog.getByRole("button", { name: "Save changes" }),
+      ).toHaveFocus();
+    });
   });
 
   it("discloses product identity and requires an explicit full-draft overwrite", async () => {
@@ -426,41 +577,40 @@ describe("pantry modals and persistence", () => {
       target: { value: "4" },
     });
     fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
-    await dialog.findByText("A newer version was saved");
-    fireEvent.click(dialog.getByRole("button", { name: "Review newer data" }));
+    await dialog.findByText("A newer version is available");
+    fireEvent.click(dialog.getByRole("button", { name: "Review changes" }));
 
-    const recovery = within(await dialog.findByRole("alert"));
+    const recovery = within(
+      await screen.findByRole("dialog", { name: "Review changes" }),
+    );
     expect(
-      await recovery.findByRole("heading", { name: "Your draft" }),
-    ).toBeVisible();
+      recovery.getAllByText(`Barcode ${localProduct.barcode}`, {
+        exact: false,
+      }),
+    ).not.toHaveLength(0);
     expect(
-      recovery.getByText(`Barcode ${localProduct.barcode}`, { exact: false }),
-    ).toBeVisible();
+      recovery.getAllByText(`Product ID ${localProduct.id}`, { exact: false }),
+    ).not.toHaveLength(0);
     expect(
-      recovery.getByText(`Product ID ${localProduct.id}`, { exact: false }),
-    ).toBeVisible();
+      recovery.getAllByText(`Barcode ${serverProduct.barcode}`, {
+        exact: false,
+      }),
+    ).not.toHaveLength(0);
     expect(
-      recovery.getByText(`Barcode ${serverProduct.barcode}`, { exact: false }),
-    ).toBeVisible();
-    expect(
-      recovery.getByText(`Product ID ${serverProduct.id}`, { exact: false }),
-    ).toBeVisible();
+      recovery.getAllByText(`Product ID ${serverProduct.id}`, { exact: false }),
+    ).not.toHaveLength(0);
     expect(
       recovery.getByText(
-        /next Save changes will replace every newer saved value/,
+        "Overwriting replaces all saved item values with your draft, not just the fields you changed.",
       ),
     ).toBeVisible();
-    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("My oat milk");
-    expect(dialog.getByLabelText(/^Quantity/)).toHaveValue(4);
+    expect(recovery.getAllByText("My oat milk")).not.toHaveLength(0);
 
     fireEvent.click(
-      dialog.getByRole("button", {
-        name: "Overwrite saved version with my draft",
+      recovery.getByRole("button", {
+        name: "Overwrite saved",
       }),
     );
-    expect(dialog.getByRole("button", { name: "Save changes" })).toHaveFocus();
-    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("My oat milk");
-    fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => {
       expect(patchBodies).toHaveLength(2);
@@ -478,7 +628,7 @@ describe("pantry modals and persistence", () => {
     });
   });
 
-  it("loads the reviewed server version and restores focus without another PATCH", async () => {
+  it("keeps the reviewed server version, closes, and refreshes without another PATCH", async () => {
     const localItem = {
       ...item,
       productId: localProduct.id,
@@ -519,7 +669,8 @@ describe("pantry modals and persistence", () => {
 
       return Promise.resolve(Response.json(current));
     });
-    stubFoodFetch(fetch, [localItem]);
+    const listedItems = [localItem];
+    stubFoodFetch(fetch, listedItems);
     render(
       <MemoryRouter>
         <PantryPage />
@@ -531,29 +682,36 @@ describe("pantry modals and persistence", () => {
       target: { value: "My oat milk" },
     });
     fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
-    await dialog.findByText("A newer version was saved");
-    fireEvent.click(dialog.getByRole("button", { name: "Review newer data" }));
+    await dialog.findByText("A newer version is available");
+    fireEvent.click(dialog.getByRole("button", { name: "Review changes" }));
+    listedItems[0] = current;
     fireEvent.click(
-      await dialog.findByRole("button", { name: "Use newer saved version" }),
+      await dialog.findByRole("button", { name: "Keep saved & close" }),
     );
 
-    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Server milk");
-    expect(dialog.getByLabelText(/^Food name/)).toHaveFocus();
-    expect(dialog.getByLabelText(/^Quantity/)).toHaveValue(3);
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
     expect(patchCount).toBe(1);
-    fireEvent.click(dialog.getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Edit Server milk" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Discard changes" }),
+    ).not.toBeInTheDocument();
   });
 
-  it("keeps an edit draft after an unreadable successful response", async () => {
+  it("returns from review to the unresolved notice without adopting its revision", async () => {
     const current = { ...item, name: "Whole milk", revision: 1 };
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(
-        new Response("{", {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
+        Response.json(
+          {
+            error: { code: "FOOD_ITEM_REVISION_CONFLICT", message: "Changed." },
+          },
+          { status: 409 },
+        ),
       )
       .mockResolvedValueOnce(Response.json(current));
     stubFoodFetch(fetch);
@@ -568,17 +726,231 @@ describe("pantry modals and persistence", () => {
       target: { value: "Oat milk" },
     });
     fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
-
-    expect(await dialog.findByRole("alert")).toHaveTextContent(
-      "The save outcome is unknown",
+    fireEvent.click(
+      await dialog.findByRole("button", { name: "Review changes" }),
     );
+    fireEvent.click(await dialog.findByRole("button", { name: "Back" }));
+
+    expect(dialog.getByText("A newer version is available")).toBeVisible();
     expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
-    expect(dialog.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    await waitFor(() => {
+      expect(
+        dialog.getByRole("button", { name: "Review changes" }),
+      ).toHaveFocus();
+    });
     expect(
-      dialog.getByRole("button", {
-        name: "Overwrite saved version with my draft",
-      }),
+      dialog.queryByRole("button", { name: "Overwrite saved" }),
+    ).not.toBeInTheDocument();
+    fireEvent.submit(containingForm(dialog.getByLabelText(/^Food name/)));
+    expect(
+      fetch.mock.calls.filter(
+        ([, init]) => (init as RequestInit | undefined)?.method === "PATCH",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("requires another review when loading the saved version fails", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            error: { code: "FOOD_ITEM_REVISION_CONFLICT", message: "Changed." },
+          },
+          { status: 409 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        Response.json(
+          { error: { code: "DATABASE_UNAVAILABLE", message: "Try later." } },
+          { status: 503, headers: { "Retry-After": "10" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        Response.json(
+          { error: { code: "DATABASE_UNAVAILABLE", message: "Try later." } },
+          { status: 503, headers: { "Retry-After": "10" } },
+        ),
+      );
+    stubFoodFetch(fetch);
+    render(
+      <MemoryRouter>
+        <PantryPage />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    fireEvent.change(dialog.getByLabelText(/^Food name/), {
+      target: { value: "Oat milk" },
+    });
+    fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
+    fireEvent.click(
+      await dialog.findByRole("button", { name: "Review changes" }),
+    );
+
+    const failedRead = await dialog.findByText(/could not be loaded/);
+    expect(failedRead).toBeVisible();
+    expect(failedRead).toHaveFocus();
+    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
+    fireEvent.click(dialog.getByRole("button", { name: "Try again" }));
+    await waitFor(() => {
+      expect(failedRead).toHaveFocus();
+    });
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(
+      dialog.queryByRole("button", { name: "Overwrite saved" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("conflicts again when the saved item changes after review", async () => {
+    const reviewed = { ...item, name: "Whole milk", revision: 1 };
+    const patchBodies: { expectedRevision: number }[] = [];
+    const fetch = vi.fn((_url: string, init?: RequestInit) => {
+      if (init?.method === "PATCH") {
+        if (typeof init.body !== "string") {
+          throw new Error("Expected a JSON PATCH body.");
+        }
+        const body = JSON.parse(init.body) as {
+          expectedRevision: number;
+        };
+        patchBodies.push(body);
+
+        return Promise.resolve(
+          Response.json(
+            {
+              error: {
+                code: "FOOD_ITEM_REVISION_CONFLICT",
+                message: "Changed.",
+              },
+            },
+            { status: 409 },
+          ),
+        );
+      }
+
+      return Promise.resolve(Response.json(reviewed));
+    });
+    stubFoodFetch(fetch);
+    render(
+      <MemoryRouter>
+        <PantryPage />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    fireEvent.change(dialog.getByLabelText(/^Food name/), {
+      target: { value: "Oat milk" },
+    });
+    fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
+    fireEvent.click(
+      await dialog.findByRole("button", { name: "Review changes" }),
+    );
+    fireEvent.click(
+      await dialog.findByRole("button", { name: "Overwrite saved" }),
+    );
+
+    expect(
+      await dialog.findByText("A newer version is available"),
     ).toBeVisible();
+    expect(patchBodies).toHaveLength(2);
+    expect(patchBodies[1]?.expectedRevision).toBe(reviewed.revision);
+    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
+  });
+
+  it("preserves the reviewed draft when the item becomes unavailable during overwrite", async () => {
+    const current = { ...item, name: "Whole milk", revision: 1 };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            error: { code: "FOOD_ITEM_REVISION_CONFLICT", message: "Changed." },
+          },
+          { status: 409 },
+        ),
+      )
+      .mockResolvedValueOnce(Response.json(current))
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            error: {
+              code: "FOOD_ITEM_NOT_FOUND",
+              message: "Food item not found.",
+            },
+          },
+          { status: 404 },
+        ),
+      );
+    stubFoodFetch(fetch);
+    render(
+      <MemoryRouter>
+        <PantryPage />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    fireEvent.change(dialog.getByLabelText(/^Food name/), {
+      target: { value: "Oat milk" },
+    });
+    fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
+    fireEvent.click(
+      await dialog.findByRole("button", { name: "Review changes" }),
+    );
+    fireEvent.click(
+      await dialog.findByRole("button", { name: "Overwrite saved" }),
+    );
+
+    const unavailable = within(
+      await screen.findByRole("dialog", { name: "Item unavailable" }),
+    );
+    expect(unavailable.getByText("Oat milk")).toBeVisible();
+    expect(
+      fetch.mock.calls.filter(
+        ([, init]) => (init as RequestInit | undefined)?.method === "PATCH",
+      ),
+    ).toHaveLength(2);
+  });
+
+  it("keeps an edit draft after an unreadable successful response", async () => {
+    const current = { ...item, name: "Whole milk", revision: 1 };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response("{", {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(Response.json(current))
+      .mockResolvedValueOnce(Response.json(current));
+    stubFoodFetch(fetch);
+    render(
+      <MemoryRouter>
+        <PantryPage />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    fireEvent.change(dialog.getByLabelText(/^Food name/), {
+      target: { value: "Oat milk" },
+    });
+    fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
+
+    expect(
+      await dialog.findByRole("heading", {
+        name: "We couldn't confirm your save",
+      }),
+    ).toHaveFocus();
+    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
+    expect(
+      dialog.queryByRole("button", { name: "Save changes" }),
+    ).not.toBeInTheDocument();
+    expect(
+      dialog.getByRole("button", { name: "Check saved version" }),
+    ).toBeVisible();
+    expect(fetch).toHaveBeenCalledTimes(2);
+
+    fireEvent.submit(containingForm(dialog.getByLabelText(/^Food name/)));
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(
       fetch.mock.calls.filter(
@@ -592,6 +964,8 @@ describe("pantry modals and persistence", () => {
   });
 
   it("keeps the draft but prevents another save when the item is unavailable", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
     const fetch = vi.fn().mockResolvedValueOnce(
       Response.json(
         {
@@ -616,11 +990,39 @@ describe("pantry modals and persistence", () => {
     });
     fireEvent.click(dialog.getByRole("button", { name: "Save changes" }));
 
-    expect(await dialog.findByRole("alert")).toHaveTextContent(
-      "This item is no longer available",
+    const unavailable = within(
+      await screen.findByRole("dialog", { name: "Item unavailable" }),
     );
-    expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Oat milk");
-    expect(dialog.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    expect(
+      unavailable.getByRole("heading", { name: "Item unavailable" }),
+    ).toHaveFocus();
+    expect(
+      unavailable.getByText(/removed or is no longer accessible/),
+    ).toBeVisible();
+    expect(unavailable.getByText("Oat milk")).toBeVisible();
+    expect(
+      unavailable.queryByRole("button", { name: /Save/ }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(unavailable.getByRole("button", { name: "Close modal" }));
+    expect(
+      screen.getByRole("dialog", { name: "Discard changes?" }),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Continue editing" }));
+    expect(
+      screen.getByRole("dialog", { name: "Item unavailable" }),
+    ).toBeVisible();
+    fireEvent.click(unavailable.getByRole("button", { name: "Copy details" }));
+    expect(
+      await unavailable.findByRole("button", { name: "Copied" }),
+    ).toHaveAttribute("aria-disabled", "true");
+    expect(unavailable.queryByText("Details copied")).not.toBeInTheDocument();
+    expect(writeText).toHaveBeenCalledWith(
+      expect.stringContaining("Name: Oat milk"),
+    );
+    fireEvent.click(
+      unavailable.getByRole("button", { name: "Discard and close" }),
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(fetch).toHaveBeenCalledOnce();
   });
 

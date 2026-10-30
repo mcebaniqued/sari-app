@@ -1,4 +1,4 @@
-import { expect } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import {
   bananas,
   expectAccessible,
@@ -9,6 +9,160 @@ import {
   rice,
   test,
 } from "./fixtures/pantry";
+
+async function tabPastNativeDateStops(
+  page: Page,
+  dateInput: Locator,
+  destination: Locator,
+) {
+  for (let nativeDateStop = 0; nativeDateStop < 5; nativeDateStop += 1) {
+    await page.keyboard.press("Tab");
+    if (
+      await destination.evaluate(
+        (element) => element === document.activeElement,
+      )
+    ) {
+      return;
+    }
+    await expect(dateInput).toBeFocused();
+  }
+}
+
+async function openEditDialog(page: Page) {
+  const actions = page.getByRole("button", { name: "Actions for Milk" });
+  const usesActionMenu = await actions.isVisible();
+  if (usesActionMenu) {
+    await actions.click();
+  }
+
+  const edit = page.getByRole("button", { name: "Edit Milk" });
+  await edit.focus();
+  await page.keyboard.press("Enter");
+
+  return {
+    dialog: page.getByRole("dialog", { name: "Edit item" }),
+    restoreFocus: usesActionMenu ? actions : edit,
+  };
+}
+
+async function expectEditorContentGeometry(
+  dialog: Locator,
+  submitName: "Add item" | "Save changes",
+) {
+  const dialogBox = requireGeometry(await dialog.boundingBox());
+  const controls = [
+    dialog.getByLabel(/^Food name/),
+    dialog.getByLabel(/^Quantity/),
+    dialog.getByLabel("Unit"),
+    dialog.getByLabel(/^Expiration date/),
+    ...(submitName === "Add item"
+      ? [dialog.getByRole("button", { name: "Input barcode instead" })]
+      : []),
+    dialog.getByRole("button", { name: "Cancel" }),
+    dialog.getByRole("button", { name: submitName, exact: true }),
+  ];
+
+  for (const control of controls) {
+    await expect(control).toBeVisible();
+    const box = requireGeometry(await control.boundingBox());
+    expect(box.width).toBeGreaterThan(0);
+    expect(box.height).toBeGreaterThan(0);
+    expect(box.x).toBeGreaterThanOrEqual(dialogBox.x - 1);
+    expect(box.x + box.width).toBeLessThanOrEqual(
+      dialogBox.x + dialogBox.width + 1,
+    );
+  }
+
+  expect(
+    await dialog.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+}
+
+for (const viewport of [
+  { name: "desktop", width: 1280, height: 720 },
+  { name: "mobile", width: 390, height: 844 },
+] as const) {
+  test(`Add and Edit forms render complete content at the ${viewport.name} viewport`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await foodApi(page, [milk]);
+    await page.goto("/pantry");
+
+    const addTrigger = page.getByRole("button", {
+      name: "Add item",
+      exact: true,
+    });
+    await addTrigger.focus();
+    await page.keyboard.press("Enter");
+    const add = page.getByRole("dialog", { name: "Add item" });
+    await expectEditorContentGeometry(add, "Add item");
+    await add.getByRole("button", { name: "Close modal" }).click();
+    await expect(add).toHaveCount(0);
+    await expect(addTrigger).toBeFocused();
+
+    const { dialog: edit, restoreFocus } = await openEditDialog(page);
+    await expectEditorContentGeometry(edit, "Save changes");
+    await expect(edit.getByLabel(/^Food name/)).toHaveValue("Milk");
+    await edit.getByRole("button", { name: "Cancel" }).click();
+    await expect(edit).toHaveCount(0);
+    await expect(restoreFocus).toBeFocused();
+  });
+}
+
+test("short mobile Add and Edit dialogs scroll without collapsing form content", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 500 });
+  await foodApi(page, [milk]);
+  await page.goto("/pantry");
+
+  const addTrigger = page.getByRole("button", {
+    name: "Add item",
+    exact: true,
+  });
+  await addTrigger.focus();
+  await page.keyboard.press("Enter");
+  const add = page.getByRole("dialog", { name: "Add item" });
+  await expectEditorContentGeometry(add, "Add item");
+  const addSubmit = add.getByRole("button", { name: "Add item", exact: true });
+  const addMetrics = await add.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(addMetrics.scrollHeight).toBeGreaterThan(addMetrics.clientHeight);
+  await addSubmit.scrollIntoViewIfNeeded();
+  await expect(addSubmit).toBeInViewport();
+  expect(await add.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await add.getByRole("button", { name: "Cancel" }).click();
+  await expect(add).toHaveCount(0);
+  await expect(addTrigger).toBeFocused();
+
+  const { dialog: edit, restoreFocus } = await openEditDialog(page);
+  await expectEditorContentGeometry(edit, "Save changes");
+  const name = edit.getByLabel(/^Food name/);
+  await name.fill("Oat milk");
+  const cancel = edit.getByRole("button", { name: "Cancel" });
+  await cancel.scrollIntoViewIfNeeded();
+  await expect(cancel).toBeInViewport();
+  expect(await edit.evaluate((element) => element.scrollTop)).toBeGreaterThan(
+    0,
+  );
+  await cancel.focus();
+  await page.keyboard.press("Enter");
+
+  const confirmation = page.getByRole("dialog", { name: "Discard changes?" });
+  await expect(confirmation).toBeVisible();
+  await confirmation.getByRole("button", { name: "Continue editing" }).click();
+  await expect(name).toHaveValue("Oat milk");
+  await expect(cancel).toBeFocused();
+  await page.keyboard.press("Enter");
+  await confirmation.getByRole("button", { name: "Discard changes" }).click();
+  await expect(edit).toHaveCount(0);
+  await expect(restoreFocus).toBeFocused();
+});
 
 test("table, filter dialog, editor, and confirmation are keyboard accessible", async ({
   page,
@@ -603,24 +757,28 @@ test("failed mobile Edit remains in the dialog and can be retried", async ({
   const dialog = page.getByRole("dialog", { name: "Edit item" });
   await dialog.getByLabel(/^Food name/).fill("Oat milk");
   await dialog.getByRole("button", { name: "Save changes" }).click();
-  await expect(dialog.getByRole("alert")).toContainText(
-    "The save outcome is unknown",
-  );
+  await expect(
+    dialog.getByRole("heading", { name: "We couldn't confirm your save" }),
+  ).toBeFocused();
   await expect(dialog).toBeVisible();
   expect(
     await dialog.evaluate((element) =>
       element.contains(document.activeElement),
     ),
   ).toBe(true);
-  await dialog
-    .getByRole("button", {
-      name: "Overwrite saved version with my draft",
-    })
-    .click();
+  await dialog.getByRole("button", { name: "Check saved version" }).click();
+  const review = page.getByRole("dialog", { name: "Review saved version" });
   await expect(
-    dialog.getByRole("button", { name: "Save changes" }),
+    review.getByRole("heading", { name: "Review saved version" }),
   ).toBeFocused();
-  await dialog.getByRole("button", { name: "Save changes" }).click();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  await expect(
+    review.getByRole("button", { name: "Overwrite saved" }),
+  ).toBeFocused();
+  await page.keyboard.press("Enter");
   await expect(dialog).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Actions for Oat milk" }),
@@ -718,7 +876,13 @@ test("keyboard focus has a separated indicator on pantry controls", async ({
   async function expectIndicator(locator: ReturnType<typeof page.getByRole>) {
     await locator.focus();
     await expect(locator).toHaveCSS("outline-style", "solid");
-    await expect(locator).toHaveCSS("outline-width", "2px");
+    expect(
+      Number.parseFloat(
+        await locator.evaluate(
+          (element) => getComputedStyle(element).outlineWidth,
+        ),
+      ),
+    ).toBeGreaterThanOrEqual(2);
     await expect(locator).toHaveCSS("outline-offset", "2px");
   }
 
@@ -741,4 +905,61 @@ test("keyboard focus has a separated indicator on pantry controls", async ({
   await expectIndicator(dialog.getByLabel("Filter by"));
   await expectIndicator(dialog.getByRole("button", { name: "Reset" }));
   await expectIndicator(dialog.getByRole("button", { name: "Apply" }));
+});
+
+test("editor controls show a strong focus indicator through keyboard navigation", async ({
+  page,
+}) => {
+  await foodApi(page, [milk]);
+  await page.goto("/pantry");
+  await page.getByRole("button", { name: "Edit Milk" }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit item" });
+
+  async function expectEditorIndicator(
+    locator: ReturnType<typeof dialog.getByRole>,
+  ) {
+    await expect(locator).toBeFocused();
+    expect(
+      await locator.evaluate((element) => element.matches(":focus-visible")),
+    ).toBe(true);
+    await expect(locator).toHaveCSS("outline-style", "solid");
+    await expect(locator).toHaveCSS("outline-width", "3px");
+    await expect(locator).toHaveCSS("outline-offset", "2px");
+    await expect(locator).toHaveCSS("outline-color", "rgb(36, 115, 79)");
+  }
+
+  const name = dialog.getByLabel(/^Food name/);
+  const quantity = dialog.getByLabel(/^Quantity/);
+  const unit = dialog.getByLabel("Unit");
+  const expiration = dialog.getByLabel(/^Expiration date/);
+  await expectEditorIndicator(name);
+
+  await page.keyboard.press("Shift+Tab");
+  await expectEditorIndicator(
+    dialog.getByRole("button", { name: "Close modal" }),
+  );
+  await page.keyboard.press("Tab");
+  await expectEditorIndicator(name);
+  await page.keyboard.press("Tab");
+  await expectEditorIndicator(quantity);
+  await page.keyboard.press("Tab");
+  await expectEditorIndicator(unit);
+  await page.keyboard.press("Tab");
+  await expectEditorIndicator(expiration);
+
+  const originalExpiration = await expiration.inputValue();
+  await page.keyboard.press("ArrowUp");
+  await expect(expiration).not.toHaveValue(originalExpiration);
+
+  const cancel = dialog.getByRole("button", { name: "Cancel" });
+  await tabPastNativeDateStops(page, expiration, cancel);
+  await expectEditorIndicator(cancel);
+  await page.keyboard.press("Tab");
+  await expectEditorIndicator(
+    dialog.getByRole("button", { name: "Save changes" }),
+  );
+  await page.keyboard.press("Tab");
+  await expectEditorIndicator(
+    dialog.getByRole("button", { name: "Close modal" }),
+  );
 });
