@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDate } from "./date";
+import { formatDate, formatTimestamp } from "./date";
 
 describe("UI dates", () => {
   it("formats dates and timestamps consistently without local timezone shifts", () => {
@@ -10,5 +10,11 @@ describe("UI dates", () => {
   it("leaves missing or invalid dates blank", () => {
     expect(formatDate("")).toBe("");
     expect(formatDate("not a date")).toBe("");
+  });
+  it("formats timestamps with their time in the documented UTC zone", () => {
+    expect(formatTimestamp("2026-10-19T17:45:00Z")).toBe(
+      "Oct 19, 2026, 5:45 PM UTC",
+    );
+    expect(formatTimestamp("not a date")).toBe("");
   });
 });
