@@ -102,6 +102,14 @@ export default function FoodItemEditorDialog({
       recoveryState === "review-uncertain" ||
       recoveryState === "unavailable"
     ) {
+      const active = document.activeElement;
+      if (
+        active instanceof HTMLElement &&
+        editContent.current?.contains(active)
+      ) {
+        return;
+      }
+
       editContent.current
         ?.closest("dialog")
         ?.querySelector<HTMLElement>("[data-modal-header] h2")
