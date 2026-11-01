@@ -6,7 +6,6 @@ interface ItemDetailsContentProps {
   invalid: boolean;
   item: FoodItem | null;
   loading: boolean;
-  now: Date;
   onRetry: () => void;
   unavailable: boolean;
   verificationError: string;
@@ -18,7 +17,6 @@ export default function ItemDetailsContent({
   invalid,
   item,
   loading,
-  now,
   onRetry,
   unavailable,
   verificationError,
@@ -74,11 +72,6 @@ export default function ItemDetailsContent({
 
   return (
     <>
-      {verifying && (
-        <p role="status" className="mb-4 text-sm text-content-muted">
-          Checking for updates…
-        </p>
-      )}
       {verificationError && (
         <div
           role="alert"
@@ -96,7 +89,12 @@ export default function ItemDetailsContent({
           </button>
         </div>
       )}
-      <ItemDetailsOverview item={item} now={now} />
+      <ItemDetailsOverview item={item} />
+      {verifying && (
+        <p role="status" className="mt-4 text-sm text-content-muted">
+          Checking for updates…
+        </p>
+      )}
     </>
   );
 }

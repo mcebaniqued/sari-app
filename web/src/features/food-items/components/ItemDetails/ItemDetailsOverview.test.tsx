@@ -15,17 +15,30 @@ const item: FoodItem = {
 };
 
 describe("Item Details Overview", () => {
-  it("shows saved values, relative status, and secondary timestamps", () => {
-    render(<ItemDetailsOverview item={item} now={new Date(2026, 10, 1, 12)} />);
+  it("shows saved values in order with secondary timestamps", () => {
+    render(<ItemDetailsOverview item={item} />);
 
+    expect(screen.getAllByRole("term").map((term) => term.textContent)).toEqual(
+      ["Quantity", "Recorded date", "Added", "Updated"],
+    );
     expect(screen.getByText("Nov 04, 2026")).toHaveAttribute(
       "datetime",
       item.expiresOn,
     );
-    expect(screen.getByText("In 3 days")).toBeVisible();
     expect(screen.getByText("1 item")).toBeVisible();
-    expect(screen.getByText("Oct 19, 2026, 5:45 PM UTC")).toBeVisible();
-    expect(screen.getByText("Oct 20, 2026, 6:30 PM UTC")).toBeVisible();
+    expect(screen.getByText(/Oct 19, 2026/)).toHaveAttribute(
+      "datetime",
+      item.createdAt,
+    );
+    expect(screen.getByText(/Oct 20, 2026/)).toHaveAttribute(
+      "datetime",
+      item.updatedAt,
+    );
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+    expect(screen.getByText("1 item").closest("dd")).toHaveClass("font-medium");
+    expect(screen.getByText(/Oct 19, 2026/).closest("dd")).toHaveClass(
+      "text-content-muted",
+    );
     expect(
       screen.queryByRole("button", { name: /add date/i }),
     ).not.toBeInTheDocument();
@@ -33,13 +46,10 @@ describe("Item Details Overview", () => {
 
   it("shows a read-only missing-date state", () => {
     render(
-      <ItemDetailsOverview
-        item={{ ...item, expiresOn: null, quantity: 2 }}
-        now={new Date(2026, 10, 1, 12)}
-      />,
+      <ItemDetailsOverview item={{ ...item, expiresOn: null, quantity: 2 }} />,
     );
 
-    expect(screen.getAllByText("No date")).toHaveLength(2);
+    expect(screen.getByText("No date")).toBeVisible();
     expect(screen.getByText("2 items")).toBeVisible();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });

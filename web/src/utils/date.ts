@@ -40,3 +40,20 @@ export function formatTimestamp(value: string): string {
     year: "numeric",
   }).format(date);
 }
+
+/** Timestamps display in the browser's local timezone without changing date-only values. */
+export function formatLocalTimestamp(value: string): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    hour: "numeric",
+    minute: "2-digit",
+    month: "short",
+    timeZoneName: "short",
+    year: "numeric",
+  }).format(date);
+}

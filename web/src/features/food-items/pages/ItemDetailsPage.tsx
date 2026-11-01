@@ -2,6 +2,7 @@ import type { FoodItem } from "@sari/contracts";
 import { useEffect, useRef } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import Modal from "@/components/Modal/Modal";
+import ExpirationStatus from "../components/Inventory/ExpirationStatus";
 import ItemDetailsContent from "../components/ItemDetails/ItemDetailsContent";
 import { useItemDetails } from "../hooks/useItemDetails";
 import { useLocalDay } from "../hooks/useLocalDay";
@@ -44,21 +45,29 @@ export default function ItemDetailsPage({
     }
   }, [contextual, itemId]);
 
-  const content = (
-    <ItemDetailsContent {...details} now={localDay} onRetry={details.retry} />
-  );
+  const content = <ItemDetailsContent {...details} onRetry={details.retry} />;
+  const relativeStatus = details.item?.expiresOn ? (
+    <ExpirationStatus
+      expiresOn={details.item.expiresOn}
+      now={localDay}
+      prominentLater
+    />
+  ) : null;
 
   if (contextual) {
     return (
       <Modal
         title={title}
+        closeButtonTarget="touch"
+        headerLayout="inline"
+        headerSupportingContent={relativeStatus}
         presentation="responsive"
         scroll="contained"
         onClose={() => {
           void navigate(-1);
         }}
       >
-        <div className="px-6 py-6">{content}</div>
+        <div className="px-6 py-5">{content}</div>
       </Modal>
     );
   }
@@ -78,9 +87,8 @@ export default function ItemDetailsPage({
       >
         {title}
       </h1>
-      <div className="mt-8 rounded-panel border border-border-default bg-surface p-6">
-        {content}
-      </div>
+      {relativeStatus && <div className="mt-1.5">{relativeStatus}</div>}
+      <div className="mt-5">{content}</div>
     </article>
   );
 }

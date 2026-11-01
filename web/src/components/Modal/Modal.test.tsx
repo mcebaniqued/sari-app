@@ -7,8 +7,11 @@ interface ExampleProps {
   autofocus?: boolean;
   autofocusContent?: ReactNode;
   busy?: boolean;
+  closeButtonTarget?: "compact" | "touch";
   dismissal?: ModalDismissalPolicy;
   headerActions?: ReactNode;
+  headerLayout?: "responsive" | "inline";
+  headerSupportingContent?: ReactNode;
   presentation?: "centered" | "responsive";
   scroll?: "dialog" | "contained";
   title?: string;
@@ -18,8 +21,11 @@ function Example({
   autofocus = true,
   autofocusContent,
   busy = false,
+  closeButtonTarget,
   dismissal,
   headerActions,
+  headerLayout,
+  headerSupportingContent,
   presentation,
   scroll,
   title = "Example modal",
@@ -39,8 +45,11 @@ function Example({
         <Modal
           title={title}
           description="Some details"
+          {...(closeButtonTarget ? { closeButtonTarget } : {})}
           {...(dismissal ? { dismissal } : { dismissible: !busy })}
           {...(headerActions ? { headerActions } : {})}
+          {...(headerLayout ? { headerLayout } : {})}
+          {...(headerSupportingContent ? { headerSupportingContent } : {})}
           {...(presentation ? { presentation } : {})}
           {...(scroll ? { scroll } : {})}
           onClose={() => {
@@ -117,6 +126,32 @@ describe("reusable modal", () => {
     );
     expect(action.compareDocumentPosition(close)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
+  it("opts into a constrained inline header and touch-sized Close", () => {
+    render(
+      <Example
+        closeButtonTarget="touch"
+        headerLayout="inline"
+        headerSupportingContent={<span>In 3 days</span>}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Open example" }));
+
+    const heading = screen.getByRole("heading", { name: "Example modal" });
+    const header = heading.parentElement?.parentElement;
+    expect(header).toHaveAttribute("data-header-layout", "inline");
+    expect(header).toHaveClass(
+      "max-h-[50dvh]",
+      "grid-cols-[minmax(0,1fr)_auto]",
+    );
+    expect(heading.parentElement).toHaveClass("overflow-y-auto");
+    expect(screen.getByText("In 3 days").parentElement).toHaveAttribute(
+      "data-modal-header-supporting",
+    );
+    expect(screen.getByRole("button", { name: "Close modal" })).toHaveClass(
+      "size-11",
     );
   });
 
@@ -354,5 +389,12 @@ describe("reusable modal", () => {
     expect(dialog).toHaveAttribute("data-presentation", "centered");
     expect(dialog).not.toHaveClass("modal-contained", "modal-responsive");
     expect(dialog.querySelector("[data-modal-scroll-region]")).toBeNull();
+    expect(dialog.querySelector("[data-modal-header]")).toHaveAttribute(
+      "data-header-layout",
+      "responsive",
+    );
+    expect(screen.getByRole("button", { name: "Close modal" })).toHaveClass(
+      "size-8",
+    );
   });
 });
