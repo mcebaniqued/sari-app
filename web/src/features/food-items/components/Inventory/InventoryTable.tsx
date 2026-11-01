@@ -11,6 +11,7 @@ interface InventoryTableProps extends FoodItemActions {
   selectedIds: Set<string>;
   selectAllRef: RefObject<HTMLInputElement | null>;
   onSelectionChange: (ids: Set<string>) => void;
+  onOpenDetails: (item: FoodItem) => void;
 }
 
 export default function InventoryTable({
@@ -19,6 +20,7 @@ export default function InventoryTable({
   selectedIds,
   selectAllRef,
   onSelectionChange,
+  onOpenDetails,
   ...actions
 }: InventoryTableProps) {
   const selectedCount = items.filter((item) => selectedIds.has(item.id)).length;
@@ -113,7 +115,15 @@ export default function InventoryTable({
               className="truncate px-3 py-2 text-left font-medium"
               title={item.name}
             >
-              {item.name}
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenDetails(item);
+                }}
+                className="max-w-full truncate rounded-control text-left text-brand underline-offset-4 hover:underline"
+              >
+                {item.name}
+              </button>
             </th>
             <td className="px-3 py-2 text-right">
               {item.quantity} {item.unit === "item" ? "items" : item.unit}
