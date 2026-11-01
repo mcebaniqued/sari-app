@@ -43,88 +43,6 @@ const fullyDismissible: ModalDismissalPolicy = {
   escape: true,
 };
 
-interface DocumentScrollLock {
-  count: number;
-  scrollX: number;
-  scrollY: number;
-  rootOverflow: string;
-  rootOverscrollBehavior: string;
-  bodyHadOverflowHidden: boolean;
-  bodyLeft: string;
-  bodyOverflow: string;
-  bodyOverscrollBehavior: string;
-  bodyPosition: string;
-  bodyTop: string;
-  bodyWidth: string;
-}
-
-let documentScrollLock: DocumentScrollLock | null = null;
-
-function lockDocumentScroll() {
-  const root = document.documentElement;
-  const body = document.body;
-  if (documentScrollLock) {
-    documentScrollLock.count += 1;
-  } else {
-    documentScrollLock = {
-      count: 1,
-      scrollX: window.scrollX,
-      scrollY: window.scrollY,
-      rootOverflow: root.style.overflow,
-      rootOverscrollBehavior: root.style.overscrollBehavior,
-      bodyHadOverflowHidden: body.classList.contains("overflow-hidden"),
-      bodyLeft: body.style.left,
-      bodyOverflow: body.style.overflow,
-      bodyOverscrollBehavior: body.style.overscrollBehavior,
-      bodyPosition: body.style.position,
-      bodyTop: body.style.top,
-      bodyWidth: body.style.width,
-    };
-
-    root.style.overflow = "hidden";
-    root.style.overscrollBehavior = "none";
-    body.classList.add("overflow-hidden");
-    body.style.position = "fixed";
-    body.style.top = `-${documentScrollLock.scrollY}px`;
-    body.style.left = `-${documentScrollLock.scrollX}px`;
-    body.style.width = "100%";
-    body.style.overflow = "hidden";
-    body.style.overscrollBehavior = "none";
-  }
-
-  let released = false;
-
-  return () => {
-    if (released || !documentScrollLock) {
-      return;
-    }
-    released = true;
-    documentScrollLock.count -= 1;
-    if (documentScrollLock.count > 0) {
-      return;
-    }
-
-    const releasedLock = documentScrollLock;
-    documentScrollLock = null;
-    root.style.overflow = releasedLock.rootOverflow;
-    root.style.overscrollBehavior = releasedLock.rootOverscrollBehavior;
-    body.style.position = releasedLock.bodyPosition;
-    body.style.top = releasedLock.bodyTop;
-    body.style.left = releasedLock.bodyLeft;
-    body.style.width = releasedLock.bodyWidth;
-    body.style.overflow = releasedLock.bodyOverflow;
-    body.style.overscrollBehavior = releasedLock.bodyOverscrollBehavior;
-    if (!releasedLock.bodyHadOverflowHidden) {
-      body.classList.remove("overflow-hidden");
-    }
-    window.scrollTo(releasedLock.scrollX, releasedLock.scrollY);
-    if (document.scrollingElement) {
-      document.scrollingElement.scrollLeft = releasedLock.scrollX;
-      document.scrollingElement.scrollTop = releasedLock.scrollY;
-    }
-  };
-}
-
 function focusAutofocusCandidate(dialog: HTMLDialogElement) {
   const candidates = dialog.querySelectorAll<HTMLElement>("[data-autofocus]");
 
@@ -196,7 +114,8 @@ export default function Modal({
     }
 
     const previousFocus = document.activeElement;
-    const unlockDocumentScroll = lockDocumentScroll();
+    const scrollWasLocked = document.body.classList.contains("overflow-hidden");
+    document.body.classList.add("overflow-hidden");
     dialog.showModal();
 
     if (!focusAutofocusCandidate(dialog)) {
@@ -207,12 +126,14 @@ export default function Modal({
       if (dialog.open) {
         dialog.close();
       }
+      if (!scrollWasLocked) {
+        document.body.classList.remove("overflow-hidden");
+      }
       if (previousFocus instanceof HTMLElement && previousFocus.isConnected) {
-        previousFocus.focus({ preventScroll: true });
+        previousFocus.focus();
       } else {
         restoreFocusFallback();
       }
-      unlockDocumentScroll();
     };
   }, []);
 
@@ -220,7 +141,7 @@ export default function Modal({
     "fixed inset-0 m-auto w-[min(480px,calc(100vw-2rem))] overflow-x-hidden rounded-modal border border-border-default bg-surface p-0 text-content shadow-modal backdrop:bg-overlay",
     scroll === "contained"
       ? "modal-contained max-h-[calc(100dvh-3rem)] overflow-hidden"
-      : "max-h-[calc(100dvh-3rem)] overflow-y-auto overscroll-contain",
+      : "max-h-[calc(100dvh-3rem)] overflow-y-auto",
     presentation === "responsive" ? "modal-responsive" : "",
     dismissalPolicy.backdrop
       ? "backdrop:cursor-pointer"
