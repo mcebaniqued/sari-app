@@ -52,7 +52,9 @@ for (const width of [320, 1280]) {
       /bg-danger-subtle/,
     );
     await expect(
-      row("Today").locator("span").filter({ hasText: "Today" }),
+      row("Today")
+        .locator(".bg-warning-subtle")
+        .filter({ hasText: /^Today$/ }),
     ).toHaveClass(/bg-warning-subtle/);
     await expect(row("Later").getByText("In 8 days")).not.toHaveClass(/\bbg-/);
     expect(

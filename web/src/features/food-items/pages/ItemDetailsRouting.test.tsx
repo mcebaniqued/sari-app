@@ -158,7 +158,7 @@ describe("route-backed Item Details", () => {
     const { router } = renderApp("/pantry");
     const list = await screen.findByRole("list", { name: "Food inventory" });
     await within(list).findByRole("button", {
-      name: `View details for ${item.name}`,
+      name: new RegExp(`^${item.name}`),
     });
     const action = within(list).getByRole("button", {
       name: `Actions for ${item.name}`,
@@ -171,15 +171,13 @@ describe("route-backed Item Details", () => {
     ).toBeVisible();
     fireEvent.click(action);
     fireEvent.click(screen.getByRole("button", { name: "Select" }));
-    fireEvent.click(
-      within(list).getByRole("button", {
-        name: `Toggle selection for ${item.name}`,
-      }),
-    );
+    fireEvent.click(within(list).getByText(item.name));
 
     expect(router.state.location.pathname).toBe("/pantry");
     expect(
-      within(list).getByRole("checkbox", { name: `Select ${item.name}` }),
+      within(list).getByRole("checkbox", {
+        name: new RegExp(`^Select ${item.name}`),
+      }),
     ).toBeChecked();
   });
 

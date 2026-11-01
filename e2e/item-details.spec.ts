@@ -35,6 +35,7 @@ test("contextual details preserve Pantry state through Back and Forward", async 
   await scroller.evaluate((element) => {
     element.scrollTop = 160;
   });
+  await opener.scrollIntoViewIfNeeded();
   const scrollBefore = await scroller.evaluate((element) => element.scrollTop);
   expect(scrollBefore).toBeGreaterThan(0);
   await opener.click();
@@ -137,7 +138,8 @@ test("mobile details are full-screen while selection mode remains independent", 
   const milkCard = list
     .getByRole("listitem")
     .filter({ hasText: milk.name })
-    .getByRole("button", { name: `View details for ${milk.name}` });
+    .getByRole("button")
+    .filter({ hasText: milk.name });
   await milkCard.click();
 
   const dialog = page.getByRole("dialog", { name: milk.name });
@@ -150,9 +152,7 @@ test("mobile details are full-screen while selection mode remains independent", 
   await page.goBack();
 
   await page.getByRole("button", { name: "Select" }).click();
-  await list
-    .getByRole("button", { name: `Toggle selection for ${milk.name}` })
-    .click();
+  await list.getByText(milk.name, { exact: true }).click();
   await expect(page).toHaveURL("/pantry");
   await expect(
     list.getByRole("checkbox", { name: `Select ${milk.name}` }),

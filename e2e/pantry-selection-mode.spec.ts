@@ -284,13 +284,26 @@ test("contextual selection preserves intentional global-header scrolling", async
     (globalHeader?.y ?? 0) + (globalHeader?.height ?? 0) - 1,
   );
 
-  await page.mouse.wheel(0, 250);
+  const checkbox = list.getByRole("checkbox", { name: "Select Food 10" });
+  await checkbox.scrollIntoViewIfNeeded();
+  await page.evaluate(() => {
+    const header = document.querySelector("header")?.getBoundingClientRect();
+    window.scrollBy(0, Math.max((header?.y ?? 0) + (header?.height ?? 0), 0));
+  });
+  await expect(checkbox).toBeInViewport();
   await expectGlobalHeaderOffscreen(page);
-  await list.getByRole("checkbox", { name: "Select Food 10" }).check();
+  const beforeSelection = await page.evaluate(() => scrollY);
+
+  await checkbox.evaluate((element) => {
+    element.focus({ preventScroll: true });
+  });
+  await page.keyboard.press("Space");
+  await expect(checkbox).toBeChecked();
   await expect(
     page.getByRole("heading", { level: 1, name: "1 selected" }),
   ).toBeVisible();
   await expectGlobalHeaderOffscreen(page);
+  await expect.poll(() => page.evaluate(() => scrollY)).toBe(beforeSelection);
 
   await page.mouse.wheel(0, -2_000);
   await expect.poll(() => page.evaluate(() => scrollY)).toBeLessThan(80);
