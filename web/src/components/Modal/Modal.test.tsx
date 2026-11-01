@@ -1,6 +1,12 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { type ReactNode, useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Modal, { type ModalDismissalPolicy } from "./Modal";
 
 interface ExampleProps {
@@ -61,7 +67,65 @@ function Example({
   );
 }
 
+function StackedExample() {
+  const [outerOpen, setOuterOpen] = useState(false);
+  const [innerOpen, setInnerOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        onClick={() => {
+          setOuterOpen(true);
+        }}
+      >
+        Open outer
+      </button>
+      {outerOpen && (
+        <Modal
+          title="Outer modal"
+          onClose={() => {
+            setOuterOpen(false);
+          }}
+        >
+          <button
+            onClick={() => {
+              setInnerOpen(true);
+            }}
+          >
+            Open inner
+          </button>
+        </Modal>
+      )}
+      {innerOpen && (
+        <Modal
+          title="Inner modal"
+          onClose={() => {
+            setInnerOpen(false);
+          }}
+        >
+          Inner content
+        </Modal>
+      )}
+    </>
+  );
+}
+
 describe("reusable modal", () => {
+  let scrollToMock = vi.fn();
+
+  beforeEach(() => {
+    scrollToMock = vi.fn();
+    vi.spyOn(window, "scrollTo").mockImplementation(scrollToMock);
+  });
+
+  afterEach(() => {
+    cleanup();
+    document.documentElement.removeAttribute("style");
+    document.body.removeAttribute("style");
+    document.body.classList.remove("overflow-hidden");
+    vi.restoreAllMocks();
+  });
+
   it("labels the dialog, focuses its field, locks scroll, and restores focus on close", () => {
     render(<Example />);
     const opener = screen.getByRole("button", { name: "Open example" });
@@ -72,10 +136,77 @@ describe("reusable modal", () => {
     ).toHaveAccessibleDescription("Some details");
     expect(screen.getByLabelText("Example field")).toHaveFocus();
     expect(document.body).toHaveClass("overflow-hidden");
+    expect(document.documentElement).toHaveStyle({ overflow: "hidden" });
+    expect(document.body).toHaveStyle({ position: "fixed" });
     fireEvent.click(screen.getByRole("button", { name: "Close modal" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(document.body).not.toHaveClass("overflow-hidden");
+    expect(document.documentElement.style.overflow).toBe("");
+    expect(document.body.style.position).toBe("");
     expect(opener).toHaveFocus();
+  });
+
+  it("restores the original scroll position and inline styles", () => {
+    const scrollX = vi.spyOn(window, "scrollX", "get").mockReturnValue(12);
+    const scrollY = vi.spyOn(window, "scrollY", "get").mockReturnValue(640);
+    document.documentElement.style.overflow = "clip";
+    document.documentElement.style.overscrollBehavior = "contain";
+    document.body.style.position = "relative";
+    document.body.style.top = "2px";
+    document.body.style.width = "75%";
+
+    render(<Example />);
+    fireEvent.click(screen.getByRole("button", { name: "Open example" }));
+
+    expect(document.documentElement).toHaveStyle({
+      overflow: "hidden",
+      overscrollBehavior: "none",
+    });
+    expect(document.body).toHaveStyle({
+      position: "fixed",
+      top: "-640px",
+      left: "-12px",
+      width: "100%",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Close modal" }));
+
+    expect(document.documentElement).toHaveStyle({
+      overflow: "clip",
+      overscrollBehavior: "contain",
+    });
+    expect(document.body.style.position).toBe("relative");
+    expect(document.body.style.top).toBe("2px");
+    expect(document.body.style.left).toBe("");
+    expect(document.body.style.width).toBe("75%");
+    expect(scrollToMock).toHaveBeenCalledWith(12, 640);
+    scrollX.mockRestore();
+    scrollY.mockRestore();
+  });
+
+  it("keeps scrolling locked until the final overlapping modal closes", () => {
+    render(<StackedExample />);
+    fireEvent.click(screen.getByRole("button", { name: "Open outer" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open inner" }));
+
+    expect(document.body).toHaveStyle({ position: "fixed" });
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Inner modal" })).getByRole(
+        "button",
+        { name: "Close modal" },
+      ),
+    );
+    expect(document.body).toHaveStyle({ position: "fixed" });
+    expect(scrollToMock).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Outer modal" })).getByRole(
+        "button",
+        { name: "Close modal" },
+      ),
+    );
+    expect(document.body.style.position).toBe("");
+    expect(scrollToMock).toHaveBeenCalledOnce();
   });
 
   it("handles Escape but prevents dismissal while a mutation is pending", () => {

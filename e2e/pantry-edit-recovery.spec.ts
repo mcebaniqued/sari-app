@@ -247,9 +247,34 @@ test("conflict review uses the stacked full-page layout on a narrow viewport", a
   await page.setViewportSize({ width: 390, height: 844 });
   await conflictingEditApi(page);
   await page.goto("/pantry");
-  await page.getByRole("button", { name: "Actions for Milk" }).click();
-  await page.getByRole("button", { name: "Edit Milk" }).click();
+  await page.evaluate(() => {
+    const spacer = document.createElement("div");
+    spacer.setAttribute("aria-hidden", "true");
+    spacer.style.height = "2000px";
+    document.body.append(spacer);
+  });
+  await page.evaluate(() => window.scrollTo(0, 400));
+  const marker = page
+    .getByRole("list", { name: "Food inventory" })
+    .getByText("Milk", { exact: true });
+  await page
+    .getByRole("button", { name: "Actions for Milk" })
+    .evaluate((button: HTMLButtonElement) => {
+      button.click();
+    });
+  await page
+    .getByRole("button", { name: "Edit Milk" })
+    .evaluate((button: HTMLButtonElement) => {
+      button.click();
+    });
   const edit = page.getByRole("dialog", { name: "Edit item" });
+  await expect(edit).toBeVisible();
+  const lockedPageScroll = await page.evaluate(() =>
+    Math.abs(Number.parseFloat(document.body.style.top)),
+  );
+  const initialMarkerTop = await marker.evaluate(
+    (element) => element.getBoundingClientRect().top,
+  );
   await edit.getByLabel(/^Food name/).fill("My oat milk");
   await edit.getByRole("button", { name: "Save changes" }).click();
   await edit.getByRole("button", { name: "Review changes" }).click();
@@ -266,10 +291,48 @@ test("conflict review uses the stacked full-page layout on a narrow viewport", a
     review.getByRole("button", { name: "Overwrite saved" }),
   ).toBeVisible();
   expect(
+    await page.evaluate(
+      () => getComputedStyle(document.scrollingElement!).overflowY,
+    ),
+  ).toBe("hidden");
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  expect(
+    await marker.evaluate((element) => element.getBoundingClientRect().top),
+  ).toBeCloseTo(initialMarkerTop);
+  const scrollRegion = review.locator("[data-modal-scroll-region]");
+  expect(
+    await scrollRegion.evaluate(
+      (element) => element.scrollHeight > element.clientHeight,
+    ),
+  ).toBe(true);
+  const scrollBounds = await scrollRegion.boundingBox();
+  expect(scrollBounds).not.toBeNull();
+  await page.mouse.move(
+    (scrollBounds?.x ?? 0) + (scrollBounds?.width ?? 0) / 2,
+    (scrollBounds?.y ?? 0) + (scrollBounds?.height ?? 0) / 2,
+  );
+  await page.mouse.wheel(0, 500);
+  await expect
+    .poll(() => scrollRegion.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
+  await scrollRegion.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await page.mouse.wheel(0, 1000);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  expect(
+    await marker.evaluate((element) => element.getBoundingClientRect().top),
+  ).toBeCloseTo(initialMarkerTop);
+  expect(
     await review.evaluate(
       (element) => element.scrollWidth <= element.clientWidth,
     ),
   ).toBe(true);
+  await review.getByRole("button", { name: "Keep saved & close" }).click();
+  await expect(review).toHaveCount(0);
+  await expect
+    .poll(() => page.evaluate(() => window.scrollY))
+    .toBe(lockedPageScroll);
 });
 
 test("a change after review conflicts instead of overwriting the newer item", async ({

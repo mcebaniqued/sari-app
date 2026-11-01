@@ -110,6 +110,69 @@ test("contained content remains reachable at a constrained height", async ({
   ).toBe(true);
 });
 
+test("modal scrolling does not move the underlying mobile page", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 500 });
+  await page.goto(fixturePath);
+  await page.evaluate(() => {
+    window.scrollTo(0, 400);
+  });
+  const initialPageScroll = await page.evaluate(() => window.scrollY);
+  expect(initialPageScroll).toBeGreaterThan(0);
+  const marker = page.getByTestId("background-position-marker");
+  const initialMarkerBox = await marker.boundingBox();
+
+  const opener = page.getByRole("button", { name: "Open fixture" });
+  await opener.click();
+  const dialog = page.getByRole("dialog");
+  const scrollRegion = dialog.locator("[data-modal-scroll-region]");
+  const lockedPageScroll = await page.evaluate(() => window.scrollY);
+  await expect(dialog).toBeVisible();
+  expect(await marker.boundingBox()).toEqual(initialMarkerBox);
+  expect(
+    await page.evaluate(
+      () => getComputedStyle(document.scrollingElement!).overflowY,
+    ),
+  ).toBe("hidden");
+
+  const regionBox = await scrollRegion.boundingBox();
+  expect(regionBox).not.toBeNull();
+  await page.mouse.move(
+    (regionBox?.x ?? 0) + (regionBox?.width ?? 0) / 2,
+    (regionBox?.y ?? 0) + (regionBox?.height ?? 0) / 2,
+  );
+  await page.mouse.wheel(0, 500);
+  await expect
+    .poll(() => scrollRegion.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
+  expect(await page.evaluate(() => window.scrollY)).toBe(lockedPageScroll);
+  expect(await marker.boundingBox()).toEqual(initialMarkerBox);
+
+  await scrollRegion.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await page.mouse.wheel(0, 1000);
+  expect(await page.evaluate(() => window.scrollY)).toBe(lockedPageScroll);
+  expect(await marker.boundingBox()).toEqual(initialMarkerBox);
+  await scrollRegion.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await page.mouse.wheel(0, -1000);
+  expect(await page.evaluate(() => window.scrollY)).toBe(lockedPageScroll);
+  expect(await marker.boundingBox()).toEqual(initialMarkerBox);
+
+  await dialog.getByRole("button", { name: "Close modal" }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(await page.evaluate(() => window.scrollY)).toBe(initialPageScroll);
+  await page.evaluate(() => {
+    window.scrollBy(0, 100);
+  });
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(
+    initialPageScroll,
+  );
+});
+
 for (const viewport of [
   { label: "320 CSS-pixel width", width: 320, height: 600 },
   { label: "200% desktop zoom equivalent", width: 640, height: 450 },

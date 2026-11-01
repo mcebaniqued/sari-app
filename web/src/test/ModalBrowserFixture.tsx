@@ -19,15 +19,19 @@ function ModalBrowserFixture() {
     : { backdrop, closeButton: true, escape: true };
 
   return (
-    <main className="p-6">
+    <main className="min-h-[250vh] p-6">
       <button
         type="button"
         onClick={() => {
           setOpen(true);
         }}
+        className="fixed top-6 left-6"
       >
         Open fixture
       </button>
+      <p data-testid="background-position-marker" className="mt-[100vh]">
+        Background position marker
+      </p>
       {open && (
         <Modal
           title={longTitle}
