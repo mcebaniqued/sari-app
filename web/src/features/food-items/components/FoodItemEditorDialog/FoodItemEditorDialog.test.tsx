@@ -36,7 +36,7 @@ function EditorHarness({ editorItem = item }: { editorItem?: FoodItem }) {
           item={editorItem}
           busy={false}
           onSave={vi.fn()}
-          onAcceptCurrentItem={vi.fn()}
+          onKeepSavedAndClose={vi.fn()}
           onClose={() => {
             setOpen(false);
           }}
@@ -68,7 +68,7 @@ function DismissalHarness({
           item={item}
           busy={false}
           onSave={onSave}
-          onAcceptCurrentItem={vi.fn()}
+          onKeepSavedAndClose={vi.fn()}
           onClose={() => {
             setOpen(false);
           }}

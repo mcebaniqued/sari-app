@@ -1,6 +1,6 @@
-import type { CreateFoodItem, FoodItem, FoodProduct } from "@sari/contracts";
+import type { CreateFoodItem, FoodItem } from "@sari/contracts";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { LuCheck, LuPlus } from "react-icons/lu";
+import { LuCheck, LuInfo, LuPlus } from "react-icons/lu";
 import { useBarcodeProduct } from "../../hooks/useBarcodeProduct";
 import {
   normalizedFoodItemEdit,
@@ -10,91 +10,54 @@ import { useFoodItemForm } from "../../hooks/useFoodItemForm";
 import BarcodeEntry from "../BarcodeEntry/BarcodeEntry";
 import ProductReview from "../BarcodeEntry/ProductReview";
 import FoodItemFields from "./FoodItemFields";
+import {
+  FoodItemRecoveryView,
+  FoodItemUnavailableView,
+} from "./FoodItemRecoveryView";
+
+export type FoodItemRecoveryState =
+  | "editing"
+  | "conflict-notice"
+  | "uncertain-notice"
+  | "review-conflict"
+  | "review-uncertain"
+  | "unavailable";
 
 interface FoodItemFormProps {
   item: FoodItem | null;
   disabled: boolean;
-  onSave: (values: CreateFoodItem) => Promise<void>;
+  onSave: (
+    values: CreateFoodItem,
+    expectedRevision: number | null,
+  ) => Promise<void>;
   onCancel: () => void;
+  onDiscardAndClose?: () => void;
   onDirtyChange?: (dirty: boolean) => void;
-  onAcceptCurrentItem?: (item: FoodItem, useServerValues: boolean) => void;
+  onRecoveryStateChange?: (state: FoodItemRecoveryState) => void;
+  onKeepSavedAndClose: (item: FoodItem) => void;
 }
 
-interface FoodItemVersionSummaryProps {
-  heading: string;
-  values: {
-    name: string;
-    quantity: number | string;
-    unit: string;
-    expiresOn: string | null;
-    productId: string | null;
-    barcode: string | null;
-  };
-  product: FoodProduct | null;
-}
-
-function productLinkDescription(
-  productId: string | null,
-  barcode: string | null,
-  product: FoodProduct | null,
-) {
-  if (!productId && !barcode) {
-    return "Not linked";
-  }
-
-  return [
-    product?.id === productId ? product.name : null,
-    barcode ? `Barcode ${barcode}` : null,
-    productId ? `Product ID ${productId}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}
-
-function FoodItemVersionSummary({
-  heading,
-  values,
-  product,
-}: FoodItemVersionSummaryProps) {
-  return (
-    <section className="space-y-2 rounded-control bg-surface p-3 text-content">
-      <h4 className="font-semibold">{heading}</h4>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-        <dt className="font-medium">Name</dt>
-        <dd>{values.name}</dd>
-        <dt className="font-medium">Quantity</dt>
-        <dd>
-          {values.quantity} {values.unit}
-        </dd>
-        <dt className="font-medium">Expires</dt>
-        <dd>
-          {values.expiresOn === ""
-            ? "Not set"
-            : (values.expiresOn ?? "Not set")}
-        </dd>
-        <dt className="font-medium">Product link</dt>
-        <dd className="break-all">
-          {productLinkDescription(values.productId, values.barcode, product)}
-        </dd>
-      </dl>
-    </section>
-  );
-}
+const footerButton =
+  "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control border border-border-default bg-surface px-3 py-2 text-sm font-medium text-content hover:bg-surface-hover disabled:opacity-50 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand sm:w-auto";
+const primaryFooterButton =
+  "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-brand px-4 py-2.5 text-sm font-semibold text-content-inverse hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand sm:w-auto";
 
 export default function FoodItemForm({
   item,
   disabled,
   onSave,
   onCancel,
+  onDiscardAndClose,
   onDirtyChange,
-  onAcceptCurrentItem,
+  onRecoveryStateChange,
+  onKeepSavedAndClose,
 }: FoodItemFormProps) {
   const [mode, setMode] = useState<"manual" | "barcode">("manual");
   const [barcodeValue, setBarcodeValue] = useState("");
-
   const entryRef = useRef<HTMLDivElement>(null);
-  const saveIssueRef = useRef<HTMLElement>(null);
-  const recoveryFocus = useRef<"name" | "save" | null>(null);
+  const noticeHeadingRef = useRef<HTMLHeadingElement>(null);
+  const readErrorRef = useRef<HTMLParagraphElement>(null);
+  const recoveryFocus = useRef<"save" | "review" | null>(null);
   const draft = useFoodItemDraft(item);
   const barcode = useBarcodeProduct(item, draft);
   const linked =
@@ -104,6 +67,10 @@ export default function FoodItemForm({
   const linkage = useMemo(
     () => ({ productId: barcode.productId, barcode: barcode.barcode }),
     [barcode.barcode, barcode.productId],
+  );
+  const draftVersion = useMemo(
+    () => ({ ...draft.values, ...linkage }),
+    [draft.values, linkage],
   );
   const initialEdit = useRef(
     item
@@ -126,8 +93,9 @@ export default function FoodItemForm({
     error,
     saveIssue,
     handleSubmit,
+    overwriteReviewed,
     reviewLatest,
-    clearSaveIssue,
+    backToNotice,
   } = useFoodItemForm({
     disabled,
     item,
@@ -136,10 +104,25 @@ export default function FoodItemForm({
     ...(linked ? { linkage } : {}),
   });
 
+  const recoveryState: FoodItemRecoveryState = saveIssue
+    ? saveIssue.kind === "unavailable"
+      ? "unavailable"
+      : saveIssue.phase === "review"
+        ? saveIssue.kind === "conflict"
+          ? "review-conflict"
+          : "review-uncertain"
+        : saveIssue.kind === "conflict"
+          ? "conflict-notice"
+          : "uncertain-notice"
+    : "editing";
+
+  useEffect(() => {
+    onRecoveryStateChange?.(recoveryState);
+  }, [onRecoveryStateChange, recoveryState]);
+
   useEffect(() => {
     if (!item || !initialEdit.current) {
       onDirtyChange?.(false);
-
       return;
     }
 
@@ -155,33 +138,43 @@ export default function FoodItemForm({
       ?.focus();
   }, [mode]);
 
-  useEffect(() => {
-    if (
-      !saving &&
-      (error || saveIssue) &&
-      !entryRef.current?.closest("dialog")?.contains(document.activeElement)
-    ) {
-      if (saveIssue) {
-        saveIssueRef.current?.focus();
+  useLayoutEffect(() => {
+    if (saveIssue?.phase === "notice" && !saveIssue.loading) {
+      if (recoveryFocus.current === "review") {
+        const frame = requestAnimationFrame(() => {
+          entryRef.current
+            ?.querySelector<HTMLElement>('[data-recovery-action="review"]')
+            ?.focus();
+          recoveryFocus.current = null;
+        });
+
+        return () => {
+          cancelAnimationFrame(frame);
+        };
+      } else if (saveIssue.readError) {
+        readErrorRef.current?.focus();
       } else {
-        entryRef.current
-          ?.querySelector<HTMLButtonElement>('button[type="submit"]')
-          ?.focus();
+        noticeHeadingRef.current?.focus();
       }
+      recoveryFocus.current = null;
     }
-  }, [error, saveIssue, saving]);
+  }, [saveIssue]);
 
   useLayoutEffect(() => {
     if (saveIssue || !recoveryFocus.current) {
       return;
     }
 
-    const selector =
-      recoveryFocus.current === "name"
-        ? "[data-autofocus]"
-        : 'button[type="submit"]';
-    entryRef.current?.querySelector<HTMLElement>(selector)?.focus();
-    recoveryFocus.current = null;
+    const frame = requestAnimationFrame(() => {
+      entryRef.current
+        ?.querySelector<HTMLElement>('button[type="submit"]')
+        ?.focus();
+      recoveryFocus.current = null;
+    });
+
+    return () => {
+      cancelAnimationFrame(frame);
+    };
   }, [saveIssue]);
 
   function switchMode(next: "manual" | "barcode") {
@@ -189,41 +182,56 @@ export default function FoodItemForm({
     setMode(next);
   }
 
-  function acceptCurrentItem(currentItem: FoodItem, useServerValues: boolean) {
-    recoveryFocus.current = useServerValues ? "name" : "save";
-    onAcceptCurrentItem?.(currentItem, useServerValues);
-    if (useServerValues) {
-      draft.replaceWithItem(currentItem);
-      barcode.replaceWithItem(currentItem);
-      initialEdit.current = normalizedFoodItemEdit(
-        {
-          name: currentItem.name,
-          quantity: String(currentItem.quantity),
-          unit: currentItem.unit,
-          expiresOn: currentItem.expiresOn ?? "",
-        },
-        {
-          productId: currentItem.productId ?? null,
-          barcode: currentItem.barcode ?? null,
-        },
-      );
-    }
-    clearSaveIssue();
+  function returnToNotice() {
+    recoveryFocus.current = "review";
+    backToNotice();
   }
 
-  function continueEditing() {
-    recoveryFocus.current = "name";
-    clearSaveIssue();
+  if (saveIssue?.kind === "unavailable") {
+    return (
+      <div ref={entryRef}>
+        <FoodItemUnavailableView
+          draft={draftVersion}
+          product={barcode.product}
+          onDiscard={onDiscardAndClose ?? onCancel}
+        />
+      </div>
+    );
   }
 
-  function acceptReviewedItem(useServerValues: boolean) {
-    if (saveIssue?.currentItem) {
-      acceptCurrentItem(saveIssue.currentItem, useServerValues);
-    }
+  if (saveIssue?.phase === "review" && saveIssue.currentItem) {
+    const reviewedItem = saveIssue.currentItem;
+
+    return (
+      <div ref={entryRef}>
+        <FoodItemRecoveryView
+          kind={saveIssue.kind}
+          draft={draftVersion}
+          saved={reviewedItem}
+          product={barcode.product}
+          pending={saving || disabled}
+          onBack={returnToNotice}
+          onKeepSaved={() => {
+            onKeepSavedAndClose(reviewedItem);
+          }}
+          onOverwrite={() => {
+            recoveryFocus.current = "save";
+            void overwriteReviewed();
+          }}
+        />
+      </div>
+    );
   }
+
+  const notice = saveIssue?.phase === "notice" ? saveIssue : null;
+  const reviewLabel = notice?.readError
+    ? "Try again"
+    : notice?.kind === "conflict"
+      ? "Review changes"
+      : "Check saved version";
 
   return (
-    <div ref={entryRef} aria-busy={saving}>
+    <div ref={entryRef} aria-busy={saving || Boolean(notice?.loading)}>
       {mode === "barcode" ? (
         <BarcodeEntry
           disabled={disabled}
@@ -277,141 +285,38 @@ export default function FoodItemForm({
                 {error} Your entries have been kept.
               </p>
             )}
-            {saveIssue && (
+            {notice && (
               <section
-                ref={saveIssueRef}
-                role="alert"
-                tabIndex={-1}
                 aria-labelledby="food-save-issue-title"
-                className="space-y-3 rounded-lg border border-danger-border bg-danger-subtle p-3 text-sm text-danger"
+                className="space-y-2 rounded-lg border border-info-border border-l-4 bg-info-subtle p-4 text-sm text-content"
               >
-                <h3 id="food-save-issue-title" className="font-semibold">
-                  {saveIssue.kind === "conflict"
-                    ? "A newer version was saved"
-                    : saveIssue.kind === "unavailable"
-                      ? "This item is no longer available"
-                      : "The save outcome is unknown"}
+                <h3
+                  ref={noticeHeadingRef}
+                  id="food-save-issue-title"
+                  tabIndex={-1}
+                  className="flex items-center gap-2 rounded-control font-semibold text-info focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                >
+                  <LuInfo aria-hidden="true" className="size-5 shrink-0" />
+                  {notice.kind === "conflict"
+                    ? "A newer version is available"
+                    : "We couldn't confirm your save"}
                 </h3>
-                <p>
-                  {saveIssue.kind === "conflict"
-                    ? saveIssue.currentItem
-                      ? "Your complete draft is still here. Compare it with the newer saved version below. Using your draft will not save immediately, but the next Save changes will replace every newer saved value shown here."
-                      : "Your complete draft is still here. Review the newer saved version, or continue editing; revision protection will prevent an accidental overwrite."
-                    : saveIssue.kind === "unavailable"
-                      ? "The item could not be found or is no longer available to you. Your draft is still here, but it cannot be saved as this item."
-                      : saveIssue.currentItem
-                        ? "Sari did not repeat the save. The current server version is shown below, but neither matching values nor an unchanged revision proves that the earlier save has finished. If you authorize another save, revision protection will make it conflict if another write finishes first."
-                        : "Sari did not repeat the save and could not read the current item. Check the server again before attempting another save."}
+                <p className="leading-relaxed text-content-muted">
+                  {notice.kind === "conflict"
+                    ? "This item changed elsewhere. Your edits are still here but haven't been saved."
+                    : "Your changes may have been saved. Check the saved version before trying again."}
                 </p>
-                {saveIssue.currentItem &&
-                  (saveIssue.kind === "conflict" ||
-                    saveIssue.kind === "uncertain") && (
-                    <div className="space-y-2">
-                      <FoodItemVersionSummary
-                        heading="Your draft"
-                        values={{
-                          ...draft.values,
-                          ...linkage,
-                        }}
-                        product={barcode.product}
-                      />
-                      <FoodItemVersionSummary
-                        heading={
-                          saveIssue.kind === "conflict"
-                            ? "Newer saved version"
-                            : "Current server version"
-                        }
-                        values={{
-                          name: saveIssue.currentItem.name,
-                          quantity: saveIssue.currentItem.quantity,
-                          unit: saveIssue.currentItem.unit,
-                          expiresOn: saveIssue.currentItem.expiresOn,
-                          productId: saveIssue.currentItem.productId ?? null,
-                          barcode: saveIssue.currentItem.barcode ?? null,
-                        }}
-                        product={barcode.product}
-                      />
-                    </div>
-                  )}
-                <div className="flex flex-wrap gap-2">
-                  {saveIssue.kind === "conflict" &&
-                    (saveIssue.currentItem ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            acceptReviewedItem(true);
-                          }}
-                          className="min-h-11 rounded-control bg-brand px-3 py-2 font-semibold text-content-inverse focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                        >
-                          Use newer saved version
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            acceptReviewedItem(false);
-                          }}
-                          className="min-h-11 rounded-control border border-border-default bg-surface px-3 py-2 font-medium text-content focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                        >
-                          Overwrite saved version with my draft
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          disabled={saveIssue.loading}
-                          onClick={() => void reviewLatest()}
-                          className="min-h-11 rounded-control bg-brand px-3 py-2 font-semibold text-content-inverse focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
-                        >
-                          {saveIssue.loading
-                            ? "Loading newer data…"
-                            : "Review newer data"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={continueEditing}
-                          className="min-h-11 rounded-control border border-border-default bg-surface px-3 py-2 font-medium text-content focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                        >
-                          Continue editing
-                        </button>
-                      </>
-                    ))}
-                  {saveIssue.kind === "uncertain" &&
-                    (saveIssue.currentItem ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            acceptReviewedItem(true);
-                          }}
-                          className="min-h-11 rounded-control bg-brand px-3 py-2 font-semibold text-content-inverse focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                        >
-                          Use current server version
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            acceptReviewedItem(false);
-                          }}
-                          className="min-h-11 rounded-control border border-border-default bg-surface px-3 py-2 font-medium text-content focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                        >
-                          Overwrite saved version with my draft
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={saveIssue.loading}
-                        onClick={() => void reviewLatest()}
-                        className="min-h-11 rounded-control bg-brand px-3 py-2 font-semibold text-content-inverse focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
-                      >
-                        {saveIssue.loading
-                          ? "Checking server…"
-                          : "Check server data"}
-                      </button>
-                    ))}
-                </div>
+                {notice.readError && (
+                  <p
+                    ref={readErrorRef}
+                    role="status"
+                    tabIndex={-1}
+                    className="rounded-control text-content-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                  >
+                    The saved version could not be loaded. Your draft is still
+                    here. Try again when the item is available.
+                  </p>
+                )}
               </section>
             )}
           </fieldset>
@@ -429,27 +334,39 @@ export default function FoodItemForm({
               </button>
             </div>
           )}
-          <div className="flex items-center justify-end gap-3 border-t border-border-default bg-surface-subtle/60 px-6 py-4">
+          <div className="flex flex-col-reverse gap-3 border-t border-border-default bg-surface-subtle/60 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
             <button
               type="button"
-              disabled={disabled || saving}
+              disabled={disabled || saving || Boolean(notice?.loading)}
               onClick={onCancel}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-control border border-border-default bg-surface px-3 py-2 text-sm font-medium text-content hover:bg-surface-hover disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+              className={footerButton}
             >
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={disabled || saving || Boolean(saveIssue)}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-brand px-4 py-2.5 text-sm font-semibold text-content-inverse hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-            >
-              {item ? (
-                <LuCheck aria-hidden="true" />
-              ) : (
-                <LuPlus aria-hidden="true" />
-              )}
-              {saving ? "Saving…" : item ? "Save changes" : "Add item"}
-            </button>
+            {notice ? (
+              <button
+                type="button"
+                data-recovery-action="review"
+                disabled={disabled || saving || notice.loading}
+                onClick={() => void reviewLatest()}
+                className={primaryFooterButton}
+              >
+                {notice.loading ? "Checking saved version…" : reviewLabel}
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={disabled || saving}
+                className={primaryFooterButton}
+              >
+                {item ? (
+                  <LuCheck aria-hidden="true" />
+                ) : (
+                  <LuPlus aria-hidden="true" />
+                )}
+                {saving ? "Saving…" : item ? "Save changes" : "Add item"}
+              </button>
+            )}
           </div>
         </form>
       )}

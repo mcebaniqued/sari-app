@@ -298,6 +298,53 @@ describe("reusable modal", () => {
     ).toHaveClass("sticky");
   });
 
+  it("preserves child state when the scroll strategy changes", () => {
+    function StatefulContent() {
+      const [value, setValue] = useState("Original draft");
+
+      return (
+        <input
+          aria-label="Draft value"
+          value={value}
+          onChange={(event) => {
+            setValue(event.target.value);
+          }}
+        />
+      );
+    }
+
+    function SwitchingScrollExample() {
+      const [scroll, setScroll] = useState<"dialog" | "contained">("dialog");
+
+      return (
+        <Modal
+          title="Switching modal"
+          scroll={scroll}
+          headerActions={
+            <button
+              type="button"
+              onClick={() => {
+                setScroll("contained");
+              }}
+            >
+              Show recovery
+            </button>
+          }
+          onClose={() => void 0}
+        >
+          <StatefulContent />
+        </Modal>
+      );
+    }
+
+    render(<SwitchingScrollExample />);
+    const draft = screen.getByLabelText("Draft value");
+    fireEvent.change(draft, { target: { value: "Unsaved draft" } });
+    fireEvent.click(screen.getByRole("button", { name: "Show recovery" }));
+
+    expect(screen.getByLabelText("Draft value")).toHaveValue("Unsaved draft");
+  });
+
   it("retains legacy centered whole-dialog scrolling by default", () => {
     render(<Example />);
     fireEvent.click(screen.getByRole("button", { name: "Open example" }));

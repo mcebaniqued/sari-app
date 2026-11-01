@@ -150,17 +150,18 @@ export default function Modal({
     .filter(Boolean)
     .join(" ");
 
-  const content =
-    scroll === "contained" ? (
-      <div
-        data-modal-scroll-region
-        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
-      >
-        {children}
-      </div>
-    ) : (
-      children
-    );
+  const content = (
+    <div
+      data-modal-scroll-region={scroll === "contained" ? "" : undefined}
+      className={
+        scroll === "contained"
+          ? "min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
+          : undefined
+      }
+    >
+      {children}
+    </div>
+  );
 
   return createPortal(
     <dialog
@@ -258,7 +259,7 @@ export default function Modal({
             disabled={!dismissalPolicy.closeButton}
             onClick={onClose}
             aria-label="Close modal"
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-control text-content-muted hover:bg-surface-hover hover:text-content disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-control text-content-muted hover:bg-surface-hover hover:text-content disabled:opacity-40 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand"
           >
             <LuX aria-hidden="true" className="size-5" />
           </button>

@@ -21,6 +21,9 @@
   --color-warning: #7a4b00;
   --color-warning-subtle: #fff4d6;
   --color-warning-border: #e7c980;
+  --color-info: #1d4ed8;
+  --color-info-subtle: #eff6ff;
+  --color-info-border: #93c5fd;
   --color-overlay: #14261e70;
   --radius-control: 8px;
   --radius-panel: 12px;
