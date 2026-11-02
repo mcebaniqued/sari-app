@@ -20,7 +20,11 @@ function newerItem(current: FoodItem | null, incoming: FoodItem) {
   return current;
 }
 
-export function useItemDetails(itemId: string, seedItem?: FoodItem) {
+export function useItemDetails(
+  itemId: string,
+  seedItem?: FoodItem,
+  handleAccessDenied?: (error: unknown) => boolean,
+) {
   const trustedSeed = seedItem?.id === itemId ? seedItem : null;
   const [item, setItem] = useState<FoodItem | null>(trustedSeed);
   const [loading, setLoading] = useState(!trustedSeed);
@@ -78,6 +82,9 @@ export function useItemDetails(itemId: string, seedItem?: FoodItem) {
 
           return;
         }
+        if (handleAccessDenied?.(cause)) {
+          return;
+        }
 
         const message = getApiErrorMessage(
           cause,
@@ -103,7 +110,7 @@ export function useItemDetails(itemId: string, seedItem?: FoodItem) {
     return () => {
       controller.abort();
     };
-  }, [itemId, retryVersion, seedItem, valid]);
+  }, [handleAccessDenied, itemId, retryVersion, seedItem, valid]);
 
   return {
     item,

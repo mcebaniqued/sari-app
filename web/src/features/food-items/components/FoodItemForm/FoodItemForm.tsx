@@ -1,12 +1,7 @@
-import type { CreateFoodItem, FoodItem } from "@sari/contracts";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { FoodItem } from "@sari/contracts";
+import { useEffect } from "react";
 import { LuCheck, LuInfo, LuPlus } from "react-icons/lu";
-import { useBarcodeProduct } from "../../hooks/useBarcodeProduct";
-import {
-  normalizedFoodItemEdit,
-  useFoodItemDraft,
-} from "../../hooks/useFoodItemDraft";
-import { useFoodItemForm } from "../../hooks/useFoodItemForm";
+import type { FoodItemEditorSession } from "../../hooks/useFoodItemEditorSession";
 import BarcodeEntry from "../BarcodeEntry/BarcodeEntry";
 import ProductReview from "../BarcodeEntry/ProductReview";
 import FoodItemFields from "./FoodItemFields";
@@ -15,26 +10,12 @@ import {
   FoodItemUnavailableView,
 } from "./FoodItemRecoveryView";
 
-export type FoodItemRecoveryState =
-  | "editing"
-  | "conflict-notice"
-  | "uncertain-notice"
-  | "review-conflict"
-  | "review-uncertain"
-  | "unavailable";
-
 interface FoodItemFormProps {
-  item: FoodItem | null;
   disabled: boolean;
-  onSave: (
-    values: CreateFoodItem,
-    expectedRevision: number | null,
-  ) => Promise<void>;
   onCancel: () => void;
   onDiscardAndClose?: () => void;
-  onDirtyChange?: (dirty: boolean) => void;
-  onRecoveryStateChange?: (state: FoodItemRecoveryState) => void;
   onKeepSavedAndClose: (item: FoodItem) => void;
+  session: FoodItemEditorSession;
 }
 
 const footerButton =
@@ -43,149 +24,48 @@ const primaryFooterButton =
   "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-brand px-4 py-2.5 text-sm font-semibold text-content-inverse hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand sm:w-auto";
 
 export default function FoodItemForm({
-  item,
   disabled,
-  onSave,
   onCancel,
   onDiscardAndClose,
-  onDirtyChange,
-  onRecoveryStateChange,
   onKeepSavedAndClose,
+  session,
 }: FoodItemFormProps) {
-  const [mode, setMode] = useState<"manual" | "barcode">("manual");
-  const [barcodeValue, setBarcodeValue] = useState("");
-  const entryRef = useRef<HTMLDivElement>(null);
-  const noticeHeadingRef = useRef<HTMLHeadingElement>(null);
-  const readErrorRef = useRef<HTMLParagraphElement>(null);
-  const recoveryFocus = useRef<"save" | "review" | null>(null);
-  const draft = useFoodItemDraft(item);
-  const barcode = useBarcodeProduct(item, draft);
-  const linked =
-    barcode.productId !== null ||
-    barcode.barcode !== null ||
-    Boolean(item?.productId ?? item?.barcode);
-  const linkage = useMemo(
-    () => ({ productId: barcode.productId, barcode: barcode.barcode }),
-    [barcode.barcode, barcode.productId],
-  );
-  const draftVersion = useMemo(
-    () => ({ ...draft.values, ...linkage }),
-    [draft.values, linkage],
-  );
-  const initialEdit = useRef(
-    item
-      ? normalizedFoodItemEdit(
-          {
-            name: item.name,
-            quantity: String(item.quantity),
-            unit: item.unit,
-            expiresOn: item.expiresOn ?? "",
-          },
-          {
-            productId: item.productId ?? null,
-            barcode: item.barcode ?? null,
-          },
-        )
-      : null,
-  );
   const {
-    saving,
-    error,
-    saveIssue,
-    handleSubmit,
-    overwriteReviewed,
-    reviewLatest,
-    backToNotice,
-  } = useFoodItemForm({
-    disabled,
+    barcode,
+    barcodeValue,
+    draft,
+    draftVersion,
+    entryRef,
+    form: {
+      error,
+      handleSubmit,
+      overwriteReviewed,
+      reviewLatest,
+      saveIssue,
+      saving,
+    },
     item,
-    onSave,
-    values: draft.values,
-    ...(linked ? { linkage } : {}),
-  });
-
-  const recoveryState: FoodItemRecoveryState = saveIssue
-    ? saveIssue.kind === "unavailable"
-      ? "unavailable"
-      : saveIssue.phase === "review"
-        ? saveIssue.kind === "conflict"
-          ? "review-conflict"
-          : "review-uncertain"
-        : saveIssue.kind === "conflict"
-          ? "conflict-notice"
-          : "uncertain-notice"
-    : "editing";
+    mode,
+    noticeHeadingRef,
+    readErrorRef,
+    recoveryFocusRef,
+    returnToNotice,
+    setBarcodeValue,
+    switchMode,
+  } = session;
 
   useEffect(() => {
-    onRecoveryStateChange?.(recoveryState);
-  }, [onRecoveryStateChange, recoveryState]);
-
-  useEffect(() => {
-    if (!item || !initialEdit.current) {
-      onDirtyChange?.(false);
+    if (
+      document.activeElement instanceof HTMLElement &&
+      document.activeElement !== document.body &&
+      document.activeElement.isConnected
+    ) {
       return;
     }
-
-    const current = normalizedFoodItemEdit(draft.values, linkage);
-    onDirtyChange?.(
-      JSON.stringify(current) !== JSON.stringify(initialEdit.current),
-    );
-  }, [draft.values, item, linkage, onDirtyChange]);
-
-  useEffect(() => {
     entryRef.current
       ?.querySelector<HTMLInputElement>("[data-autofocus]")
       ?.focus();
-  }, [mode]);
-
-  useLayoutEffect(() => {
-    if (saveIssue?.phase === "notice" && !saveIssue.loading) {
-      if (recoveryFocus.current === "review") {
-        const frame = requestAnimationFrame(() => {
-          entryRef.current
-            ?.querySelector<HTMLElement>('[data-recovery-action="review"]')
-            ?.focus();
-          recoveryFocus.current = null;
-        });
-
-        return () => {
-          cancelAnimationFrame(frame);
-        };
-      } else if (saveIssue.readError) {
-        readErrorRef.current?.focus();
-      } else {
-        noticeHeadingRef.current?.focus();
-      }
-      recoveryFocus.current = null;
-    }
-  }, [saveIssue]);
-
-  useLayoutEffect(() => {
-    if (saveIssue || !recoveryFocus.current) {
-      return;
-    }
-
-    const frame = requestAnimationFrame(() => {
-      entryRef.current
-        ?.querySelector<HTMLElement>('button[type="submit"]')
-        ?.focus();
-      recoveryFocus.current = null;
-    });
-
-    return () => {
-      cancelAnimationFrame(frame);
-    };
-  }, [saveIssue]);
-
-  function switchMode(next: "manual" | "barcode") {
-    barcode.cancelLookup();
-    setMode(next);
-  }
-
-  function returnToNotice() {
-    recoveryFocus.current = "review";
-    backToNotice();
-  }
+  }, [entryRef, mode]);
 
   if (saveIssue?.kind === "unavailable") {
     return (
@@ -215,7 +95,7 @@ export default function FoodItemForm({
             onKeepSavedAndClose(reviewedItem);
           }}
           onOverwrite={() => {
-            recoveryFocus.current = "save";
+            recoveryFocusRef.current = "save";
             void overwriteReviewed();
           }}
         />
@@ -241,7 +121,7 @@ export default function FoodItemForm({
           onLookup={(value) => {
             void barcode.lookup(value).then((found) => {
               if (found) {
-                setMode("manual");
+                switchMode("manual");
               }
             });
           }}
@@ -337,6 +217,7 @@ export default function FoodItemForm({
           <div className="flex flex-col-reverse gap-3 border-t border-border-default bg-surface-subtle/60 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
             <button
               type="button"
+              data-editor-focus="cancel"
               disabled={disabled || saving || Boolean(notice?.loading)}
               onClick={onCancel}
               className={footerButton}

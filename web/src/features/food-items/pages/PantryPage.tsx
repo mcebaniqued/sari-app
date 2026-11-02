@@ -16,7 +16,7 @@ import PantryToolbar from "../components/Inventory/PantryToolbar";
 import { useInventory } from "../hooks/useInventory";
 import { useLocalDay } from "../hooks/useLocalDay";
 import { usePantryItems } from "../hooks/usePantryItems";
-import { registerPantryContext } from "../itemDetailsNavigation";
+import { registerPantryContext } from "../pantryRouteNavigation";
 
 export default function PantryPage() {
   const location = useLocation();
@@ -44,7 +44,7 @@ export default function PantryPage() {
   const desktopBulkDelete = useRef(false);
   const filterButton = useRef<HTMLButtonElement>(null);
   const pendingMobileActionFocus = useRef<{
-    kind: "edit" | "delete";
+    kind: "delete";
     id: string;
     index: number;
   } | null>(null);
@@ -53,13 +53,78 @@ export default function PantryPage() {
   const mobileSelecting = selecting || inventory.selected.length > 0;
 
   useLayoutEffect(
-    () => registerPantryContext(pantryContextId),
-    [pantryContextId],
+    () =>
+      registerPantryContext(pantryContextId, {
+        onItemsChanged: inventory.invalidate,
+        restoreItemFocus(itemId) {
+          const action = [
+            ...document.querySelectorAll<HTMLButtonElement>(
+              "[data-row-action][data-item-id]",
+            ),
+          ].find(
+            (candidate) =>
+              candidate.dataset.itemId === itemId &&
+              candidate.getClientRects().length > 0,
+          );
+          const edit = [
+            ...document.querySelectorAll<HTMLButtonElement>(
+              'button[aria-label^="Edit "]',
+            ),
+          ].find(
+            (candidate) =>
+              candidate.closest<HTMLElement>("[data-item-id]")?.dataset
+                .itemId === itemId && candidate.getClientRects().length > 0,
+          );
+          const target = action ?? edit;
+          const background = target?.closest<HTMLElement>(
+            "[data-route-background]",
+          );
+          const focus = () => {
+            if (
+              !target?.isConnected ||
+              target.disabled ||
+              target.closest("[inert], [hidden], [aria-hidden='true']")
+            ) {
+              return false;
+            }
+
+            target.focus({ preventScroll: true });
+
+            return true;
+          };
+
+          if (focus() || !background) {
+            return;
+          }
+
+          const observer = new MutationObserver(() => {
+            if (focus()) {
+              observer.disconnect();
+            }
+          });
+          observer.observe(background, {
+            attributeFilter: ["inert"],
+            attributes: true,
+          });
+        },
+      }),
+    [inventory.invalidate, pantryContextId],
   );
 
   function openDetails(item: (typeof inventory.items)[number]) {
     void navigate(`/pantry/items/${item.id}`, {
       state: {
+        pantryContextId,
+        pantryLocation: location,
+        seedItem: item,
+      },
+    });
+  }
+
+  function openEdit(item: (typeof inventory.items)[number]) {
+    void navigate(`/pantry/items/${item.id}/edit`, {
+      state: {
+        editOrigin: "pantry",
         pantryContextId,
         pantryLocation: location,
         seedItem: item,
@@ -147,10 +212,7 @@ export default function PantryPage() {
 
   useEffect(() => {
     const pending = pendingMobileActionFocus.current;
-    if (
-      !pending ||
-      (pending.kind === "edit" ? pantry.editor : pantry.deleteTargets)
-    ) {
+    if (!pending || pantry.deleteTargets) {
       return;
     }
     if (inventory.loading) {
@@ -162,10 +224,9 @@ export default function PantryPage() {
         "[data-row-action]",
       ) ?? [],
     );
-    const sameItem =
-      pending.kind === "edit"
-        ? actions.find((action) => action.dataset.itemId === pending.id)
-        : undefined;
+    const sameItem = actions.find(
+      (action) => action.dataset.itemId === pending.id,
+    );
     (
       sameItem ??
       actions[pending.index] ??
@@ -173,7 +234,7 @@ export default function PantryPage() {
       mobileAddButton.current
     )?.focus();
     pendingMobileActionFocus.current = null;
-  }, [inventory.items, inventory.loading, pantry.deleteTargets, pantry.editor]);
+  }, [inventory.items, inventory.loading, pantry.deleteTargets]);
 
   useLayoutEffect(() => {
     if (desktopScroll.current) {
@@ -266,7 +327,7 @@ export default function PantryPage() {
 
   const actions = {
     disabled: pantry.busy,
-    onEdit: pantry.startEdit,
+    onEdit: openEdit,
     onDelete: pantry.startDelete,
   };
   const empty = inventory.total === 0 && !inventory.loading && !inventory.error;
@@ -467,14 +528,7 @@ export default function PantryPage() {
             onOpenDetails={openDetails}
             {...actions}
             onEdit={(item) => {
-              pendingMobileActionFocus.current = {
-                kind: "edit",
-                id: item.id,
-                index: inventory.items.findIndex(
-                  (entry) => entry.id === item.id,
-                ),
-              };
-              pantry.startEdit(item);
+              openEdit(item);
             }}
             onDelete={(targets) => {
               const target = targets[0];

@@ -130,6 +130,7 @@ test("barcode suggestions are reviewed, privately renamed, saved, and unlinked",
   await expect(edit.getByLabel(/^Food name/)).toHaveValue("My breakfast oats");
   await expect(edit.getByLabel(/^Quantity/)).toHaveValue("500");
   await edit.getByRole("button", { name: "Save changes" }).click();
+  await page.getByRole("button", { name: "Close modal" }).click();
   await page
     .getByRole("button", { name: "Edit My breakfast oats", exact: true })
     .click();

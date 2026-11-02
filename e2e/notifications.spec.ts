@@ -24,6 +24,7 @@ test("notifications are centered below the CTA and auto-dismiss after a hover pa
     .getByRole("status")
     .filter({ hasText: "Oat milk updated." });
   await expect(notification).toBeVisible();
+  await page.getByRole("button", { name: "Close modal" }).click();
   const bounds = requireGeometry(await notification.boundingBox());
   const add = requireGeometry(
     await page

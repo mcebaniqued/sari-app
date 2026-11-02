@@ -273,7 +273,7 @@ describe("protected food item edits", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue editing" }));
     expect(screen.getByRole("dialog", { name: "Edit item" })).toBeVisible();
     expect(name).toHaveValue("Oat milk");
-    expect(quantity).toHaveFocus();
+    expect(screen.getByLabelText(/^Quantity/)).toHaveFocus();
   });
 
   it("guards Cancel and allowed backdrop dismissal, then discards", async () => {

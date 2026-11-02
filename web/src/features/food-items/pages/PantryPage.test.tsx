@@ -7,10 +7,12 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { notify } from "@/components/Toast/notifications";
-import PantryPage from "./PantryPage";
+import type { PantryRouteNavigationState } from "../pantryRouteNavigation";
+import EditItemPage from "./EditItemPage";
+import PantryPageView from "./PantryPage";
 
 vi.mock("@/components/Toast/notifications", () => ({ notify: vi.fn() }));
 afterEach(() => vi.unstubAllGlobals());
@@ -55,11 +57,39 @@ const serverProduct: FoodProduct = {
   sourceUrl: "https://fdc.nal.usda.gov/food-details/67890/nutrients",
 };
 
+function ContextualEditRoute() {
+  const location = useLocation();
+  const state = location.state as PantryRouteNavigationState;
+
+  return (
+    <EditItemPage
+      contextual
+      navigationState={state}
+      seedItem={state.seedItem}
+    />
+  );
+}
+
+function PantryPage() {
+  return (
+    <>
+      <PantryPageView />
+      <Routes>
+        <Route
+          path="/pantry/items/:itemId/edit"
+          element={<ContextualEditRoute />}
+        />
+      </Routes>
+    </>
+  );
+}
+
 function stubFoodFetch(
   mutation: (url: string, init?: RequestInit) => Promise<Response>,
   initialItems: FoodItem[] = [item, other],
 ) {
   let loads = 0;
+  const verified = new Set<string>();
   vi.stubGlobal(
     "matchMedia",
     vi.fn(() => ({
@@ -84,6 +114,17 @@ function stubFoodFetch(
             limit: 20,
           }),
         );
+      }
+
+      if (!init?.method || init.method === "GET") {
+        const matched = initialItems.find(
+          (item) => url === `/api/v1/food-items/${item.id}`,
+        );
+        if (matched && !verified.has(matched.id)) {
+          verified.add(matched.id);
+
+          return Promise.resolve(Response.json(matched));
+        }
       }
 
       return mutation(url, init);
@@ -120,6 +161,16 @@ function containingForm(element: HTMLElement) {
   }
 
   return form;
+}
+
+async function editDialog() {
+  const name = await screen.findByLabelText(/^Food name/);
+  const dialog = name.closest("dialog");
+  if (!dialog) {
+    throw new Error("Expected Edit to use its desktop dialog presentation");
+  }
+
+  return within(dialog);
 }
 
 describe("pantry modals and persistence", () => {
@@ -195,7 +246,7 @@ describe("pantry modals and persistence", () => {
       </MemoryRouter>,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
-    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    const dialog = await editDialog();
     expect(dialog.getByLabelText(/^Food name/)).toHaveValue("Milk");
     expect(dialog.getByLabelText(/^Quantity/)).toHaveValue(0.5);
     fireEvent.change(dialog.getByLabelText(/^Food name/), {
@@ -259,7 +310,7 @@ describe("pantry modals and persistence", () => {
       </MemoryRouter>,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
-    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    const dialog = await editDialog();
     fireEvent.change(dialog.getByLabelText(/^Food name/), {
       target: { value: "Oat milk" },
     });
@@ -355,7 +406,7 @@ describe("pantry modals and persistence", () => {
       </MemoryRouter>,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
-    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    const dialog = await editDialog();
     fireEvent.change(dialog.getByLabelText(/^Food name/), {
       target: { value: "Oat milk" },
     });
@@ -414,7 +465,7 @@ describe("pantry modals and persistence", () => {
       </MemoryRouter>,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
-    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    const dialog = await editDialog();
     fireEvent.change(dialog.getByLabelText(/^Food name/), {
       target: { value: "Oat milk" },
     });
@@ -471,7 +522,7 @@ describe("pantry modals and persistence", () => {
       </MemoryRouter>,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
-    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    const dialog = await editDialog();
     fireEvent.change(dialog.getByLabelText(/^Food name/), {
       target: { value: "Oat milk" },
     });
@@ -569,7 +620,7 @@ describe("pantry modals and persistence", () => {
       </MemoryRouter>,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
-    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    const dialog = await editDialog();
     fireEvent.change(dialog.getByLabelText(/^Food name/), {
       target: { value: "My oat milk" },
     });
@@ -677,7 +728,7 @@ describe("pantry modals and persistence", () => {
       </MemoryRouter>,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
-    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    const dialog = await editDialog();
     fireEvent.change(dialog.getByLabelText(/^Food name/), {
       target: { value: "My oat milk" },
     });
@@ -721,7 +772,7 @@ describe("pantry modals and persistence", () => {
       </MemoryRouter>,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
-    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    const dialog = await editDialog();
     fireEvent.change(dialog.getByLabelText(/^Food name/), {
       target: { value: "Oat milk" },
     });
@@ -779,7 +830,7 @@ describe("pantry modals and persistence", () => {
       </MemoryRouter>,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
-    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    const dialog = await editDialog();
     fireEvent.change(dialog.getByLabelText(/^Food name/), {
       target: { value: "Oat milk" },
     });
@@ -837,7 +888,7 @@ describe("pantry modals and persistence", () => {
       </MemoryRouter>,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
-    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    const dialog = await editDialog();
     fireEvent.change(dialog.getByLabelText(/^Food name/), {
       target: { value: "Oat milk" },
     });
@@ -888,7 +939,7 @@ describe("pantry modals and persistence", () => {
       </MemoryRouter>,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
-    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    const dialog = await editDialog();
     fireEvent.change(dialog.getByLabelText(/^Food name/), {
       target: { value: "Oat milk" },
     });
@@ -930,7 +981,7 @@ describe("pantry modals and persistence", () => {
       </MemoryRouter>,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
-    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    const dialog = await editDialog();
     fireEvent.change(dialog.getByLabelText(/^Food name/), {
       target: { value: "Oat milk" },
     });
@@ -984,7 +1035,7 @@ describe("pantry modals and persistence", () => {
       </MemoryRouter>,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
-    const dialog = within(screen.getByRole("dialog", { name: "Edit item" }));
+    const dialog = await editDialog();
     fireEvent.change(dialog.getByLabelText(/^Food name/), {
       target: { value: "Oat milk" },
     });
