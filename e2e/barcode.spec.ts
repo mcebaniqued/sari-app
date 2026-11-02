@@ -130,12 +130,25 @@ test("barcode suggestions are reviewed, privately renamed, saved, and unlinked",
   await expect(edit.getByLabel(/^Food name/)).toHaveValue("My breakfast oats");
   await expect(edit.getByLabel(/^Quantity/)).toHaveValue("500");
   await edit.getByRole("button", { name: "Save changes" }).click();
-  await page.getByRole("button", { name: "Close modal" }).click();
+
+  // Pantry-origin edits return directly to Pantry.
+  await expect(edit).toHaveCount(0);
+  await expect(page).toHaveURL(/\/pantry$/);
+  await expect(nameCells(page)).toHaveText(["My breakfast oats"]);
+
+  // Reopen the item and verify the product link was removed.
   await page
     .getByRole("button", { name: "Edit My breakfast oats", exact: true })
     .click();
+
+  const reopenedEdit = page.getByRole("dialog", {
+    name: "Edit item",
+    exact: true,
+  });
+
+  await expect(reopenedEdit).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Remove product link" }),
+    reopenedEdit.getByRole("button", { name: "Remove product link" }),
   ).toHaveCount(0);
 });
 

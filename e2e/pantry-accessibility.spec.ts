@@ -670,17 +670,21 @@ test("mobile Edit supports Back, Cancel, and Save navigation", async ({
   await edit.click();
   await editor.getByLabel(/^Food name/).fill("Z milk");
   await editor.getByRole("button", { name: "Save changes" }).click();
+
+  // Pantry-origin saves return directly to Pantry.
   await expect(editor).toHaveCount(0);
-  const details = page.getByRole("dialog", { name: "Z milk" });
-  await expect(details).toBeVisible();
-  await expect(details.getByRole("heading", { name: "Z milk" })).toBeFocused();
-  await page.goBack();
+  await expect(page).toHaveURL(/\/pantry$/);
+  await expect(page.getByRole("dialog", { name: "Z milk" })).toHaveCount(0);
+
+  // Verify the saved item and existing sort order.
   await expect(
     page
       .getByRole("list", { name: "Food inventory" })
       .getByRole("listitem")
       .first(),
   ).toContainText("Rice");
+
+  // Verify focus returns to the edited item's Actions button.
   await expect(
     page.getByRole("button", { name: "Actions for Z milk" }),
   ).toBeFocused();
@@ -847,9 +851,23 @@ test("failed mobile Edit remains on the page and can be retried", async ({
   await expect(
     review.getByRole("button", { name: "Overwrite saved" }),
   ).toBeFocused();
+  // Retry succeeds and returns directly to Pantry.
   await page.keyboard.press("Enter");
+
   await expect(editor).toHaveCount(0);
-  await expect(page.getByRole("dialog", { name: "Oat milk" })).toBeVisible();
+  await expect(review).toHaveCount(0);
+  await expect(page).toHaveURL(/\/pantry$/);
+
+  // The saved item is visible without opening Item Details.
+  await expect(
+    page.getByRole("list", { name: "Food inventory" }).getByRole("listitem"),
+  ).toContainText(["Oat milk", "Rice"]);
+
+  await expect(page.getByRole("dialog", { name: "Oat milk" })).toHaveCount(0);
+
+  await expect(
+    page.getByRole("button", { name: "Actions for Oat milk" }),
+  ).toBeFocused();
 });
 
 for (const { target, fallback, id, items, followupRole, followupName } of [

@@ -51,12 +51,25 @@ export default function PantryPage() {
   const queryKey = JSON.stringify([inventory.query, pantry.revision]);
   const { hasMore, loading, error, loadMore } = inventory;
   const mobileSelecting = selecting || inventory.selected.length > 0;
+  const focusObservers = useRef(new Set<MutationObserver>());
 
-  useLayoutEffect(
-    () =>
-      registerPantryContext(pantryContextId, {
-        onItemsChanged: inventory.invalidate,
-        restoreItemFocus(itemId) {
+  useLayoutEffect(() => {
+    const observers = focusObservers.current;
+    const unregister = registerPantryContext(pantryContextId, {
+      onItemsChanged: inventory.invalidate,
+
+      restoreItemFocus(itemId) {
+        // Cancel pending focus restoration before starting another.
+        for (const observer of observers) {
+          observer.disconnect();
+        }
+        observers.clear();
+
+        const background = document.querySelector<HTMLElement>(
+          "[data-route-background]",
+        );
+
+        const focus = () => {
           const action = [
             ...document.querySelectorAll<HTMLButtonElement>(
               "[data-row-action][data-item-id]",
@@ -66,6 +79,7 @@ export default function PantryPage() {
               candidate.dataset.itemId === itemId &&
               candidate.getClientRects().length > 0,
           );
+
           const edit = [
             ...document.querySelectorAll<HTMLButtonElement>(
               'button[aria-label^="Edit "]',
@@ -75,41 +89,53 @@ export default function PantryPage() {
               candidate.closest<HTMLElement>("[data-item-id]")?.dataset
                 .itemId === itemId && candidate.getClientRects().length > 0,
           );
+
           const target = action ?? edit;
-          const background = target?.closest<HTMLElement>(
-            "[data-route-background]",
-          );
-          const focus = () => {
-            if (
-              !target?.isConnected ||
-              target.disabled ||
-              target.closest("[inert], [hidden], [aria-hidden='true']")
-            ) {
-              return false;
-            }
 
-            target.focus({ preventScroll: true });
-
-            return true;
-          };
-
-          if (focus() || !background) {
-            return;
+          if (
+            !target ||
+            target.disabled ||
+            target.closest("[inert], [hidden], [aria-hidden='true']")
+          ) {
+            return false;
           }
 
-          const observer = new MutationObserver(() => {
-            if (focus()) {
-              observer.disconnect();
-            }
-          });
-          observer.observe(background, {
-            attributeFilter: ["inert"],
-            attributes: true,
-          });
-        },
-      }),
-    [inventory.invalidate, pantryContextId],
-  );
+          target.focus({ preventScroll: true });
+          return document.activeElement === target;
+        };
+
+        if (focus() || !background) {
+          return;
+        }
+
+        const observer = new MutationObserver(() => {
+          if (focus()) {
+            observer.disconnect();
+            observers.delete(observer);
+          }
+        });
+
+        observers.add(observer);
+
+        observer.observe(background, {
+          attributes: true,
+          attributeFilter: ["inert"],
+          childList: true,
+          subtree: true,
+        });
+      },
+    });
+
+    return () => {
+      unregister();
+
+      for (const observer of observers) {
+        observer.disconnect();
+      }
+
+      observers.clear();
+    };
+  }, [inventory.invalidate, pantryContextId]);
 
   function openDetails(item: (typeof inventory.items)[number]) {
     void navigate(`/pantry/items/${item.id}`, {
@@ -334,7 +360,7 @@ export default function PantryPage() {
 
   return (
     <div className="flex min-h-0 flex-col md:h-full">
-      <div className="sticky top-[var(--pantry-header-offset,0px)] z-20 -mx-4 bg-page px-4 pb-3 pt-4 transition-[top] duration-200 motion-reduce:transition-none md:static md:mx-0 md:px-0 md:pb-4 md:pt-0">
+      <div className="sticky top-(--pantry-header-offset,0px) z-20 -mx-4 bg-page px-4 pb-3 pt-4 transition-[top] duration-200 motion-reduce:transition-none md:static md:mx-0 md:px-0 md:pb-4 md:pt-0">
         <div className={mobileSelecting ? "hidden md:block" : ""}>
           <div className="mb-3 flex items-center justify-between gap-3 md:mb-5">
             <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight">

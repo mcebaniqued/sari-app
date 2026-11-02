@@ -758,7 +758,7 @@ test("successful add, edit, and delete refetch the first page with applied query
     await dialog.getByLabel(/^Food name/).fill("Food 000");
     await dialog.getByRole("button", { name: "Save changes" }).click();
     await expect(dialog).toHaveCount(0);
-    await page.getByRole("button", { name: "Close modal" }).click();
+    await expect(page).toHaveURL(/\/pantry$/);
   });
   await expect(nameCells(page).first()).toHaveText("Food 000");
   await expectResetAfter(async () => {
