@@ -38,11 +38,27 @@ async function openEditDialog(page: Page) {
   const edit = page.getByRole("button", { name: "Edit Milk" });
   await edit.focus();
   await page.keyboard.press("Enter");
+  const viewport = page.viewportSize();
+  const dialog =
+    viewport && (viewport.width <= 640 || viewport.height <= 512)
+      ? page.getByRole("article").filter({
+          has: page.getByRole("heading", { name: "Edit item" }),
+        })
+      : page.getByRole("dialog", { name: "Edit item" });
+  await expect(dialog).toBeVisible();
 
   return {
-    dialog: page.getByRole("dialog", { name: "Edit item" }),
+    dialog,
     restoreFocus: usesActionMenu ? actions : edit,
   };
+}
+
+function editSurface(page: Page, heading: string) {
+  return page.getByRole("dialog", { name: heading }).or(
+    page.getByRole("article").filter({
+      has: page.getByRole("heading", { name: heading }),
+    }),
+  );
 }
 
 async function expectEditorContentGeometry(
@@ -611,7 +627,7 @@ test("mobile row actions close when focus leaves and restore focus on Escape", a
   await expect(actions).toHaveAttribute("aria-expanded", "false");
 });
 
-test("mobile Edit returns focus to its item after Escape, Cancel, and save", async ({
+test("mobile Edit supports Back, Cancel, and Save navigation", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 800 });
@@ -619,7 +635,7 @@ test("mobile Edit returns focus to its item after Escape, Cancel, and save", asy
   await page.goto("/pantry");
   const actions = page.getByRole("button", { name: "Actions for Milk" });
   const edit = page.getByRole("button", { name: "Edit Milk" });
-  const dialog = page.getByRole("dialog", { name: "Edit item" });
+  const editor = editSurface(page, "Edit item");
 
   await actions.focus();
   await page.keyboard.press("Enter");
@@ -628,17 +644,19 @@ test("mobile Edit returns focus to its item after Escape, Cancel, and save", asy
   await page.keyboard.press("Tab");
   await expect(edit).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(dialog.getByLabel(/^Food name/)).toBeFocused();
-  await expect(dialog).toHaveAttribute("aria-modal", "true");
-  await page.keyboard.press("Escape");
-  await expect(dialog).toHaveCount(0);
+  await expect(
+    editor.getByRole("heading", { name: "Edit item" }),
+  ).toBeFocused();
+  await expect(page.getByRole("dialog", { name: "Edit item" })).toHaveCount(0);
+  await editor.getByRole("button", { name: "Back" }).click();
+  await expect(editor).toHaveCount(0);
   await expect(actions).toBeFocused();
 
   await page.keyboard.press("Space");
   await expect(edit).toBeVisible();
   await edit.click();
-  await dialog.getByRole("button", { name: "Cancel" }).click();
-  await expect(dialog).toHaveCount(0);
+  await editor.getByRole("button", { name: "Cancel" }).click();
+  await expect(editor).toHaveCount(0);
   await expect(actions).toBeFocused();
 
   await page.getByRole("button", { name: /^Sort by:/ }).click();
@@ -650,18 +668,65 @@ test("mobile Edit returns focus to its item after Escape, Cancel, and save", asy
   await sortDialog.getByRole("button", { name: "Apply" }).click();
   await actions.click();
   await edit.click();
-  await dialog.getByLabel(/^Food name/).fill("Z milk");
-  await dialog.getByRole("button", { name: "Save changes" }).click();
-  await expect(dialog).toHaveCount(0);
+  await editor.getByLabel(/^Food name/).fill("Z milk");
+  await editor.getByRole("button", { name: "Save changes" }).click();
+
+  // Pantry-origin saves return directly to Pantry.
+  await expect(editor).toHaveCount(0);
+  await expect(page).toHaveURL(/\/pantry$/);
+  await expect(page.getByRole("dialog", { name: "Z milk" })).toHaveCount(0);
+
+  // Verify the saved item and existing sort order.
   await expect(
     page
       .getByRole("list", { name: "Food inventory" })
       .getByRole("listitem")
       .first(),
   ).toContainText("Rice");
+
+  // Verify focus returns to the edited item's Actions button.
   await expect(
     page.getByRole("button", { name: "Actions for Z milk" }),
   ).toBeFocused();
+});
+
+test("mobile Escape uses guarded Cancel and restores the Actions control", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 800 });
+  await foodApi(page, [milk]);
+  await page.goto("/pantry");
+  const actions = page.getByRole("button", { name: "Actions for Milk" });
+  await actions.click();
+  await page.getByRole("button", { name: "Edit Milk" }).click();
+  const editor = editSurface(page, "Edit item");
+  const quantity = editor.getByLabel(/^Quantity/);
+  await editor.getByLabel(/^Food name/).fill("Escape draft");
+  await quantity.focus();
+
+  await page.keyboard.press("Escape");
+  const confirmation = page.getByRole("dialog", { name: "Discard changes?" });
+  await expect(confirmation).toBeVisible();
+  await expect(
+    confirmation.getByRole("button", { name: "Continue editing" }),
+  ).toBeFocused();
+  await confirmation.getByRole("button", { name: "Continue editing" }).click();
+  await expect(quantity).toBeFocused();
+  await expect(editor.getByLabel(/^Food name/)).toHaveValue("Escape draft");
+
+  await page.keyboard.press("Escape");
+  await confirmation.getByRole("button", { name: "Discard changes" }).click();
+  await expect(editor).toHaveCount(0);
+  await expect(actions).toBeFocused();
+
+  await actions.click();
+  await page.getByRole("button", { name: "Edit Milk" }).click();
+  await expect(
+    editor.getByRole("heading", { name: "Edit item" }),
+  ).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(editor).toHaveCount(0);
+  await expect(actions).toBeFocused();
 });
 
 test("changed Edit keeps its draft and focus through discard confirmation", async ({
@@ -740,7 +805,7 @@ test("mobile Delete cancellation restores focus and keeps dialog focus contained
   expect(api.deleted).toEqual([]);
 });
 
-test("failed mobile Edit remains in the dialog and can be retried", async ({
+test("failed mobile Edit remains on the page and can be retried", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 800 });
@@ -763,32 +828,43 @@ test("failed mobile Edit remains in the dialog and can be retried", async ({
   const actions = page.getByRole("button", { name: "Actions for Milk" });
   await actions.click();
   await page.getByRole("button", { name: "Edit Milk" }).click();
-  const dialog = page.getByRole("dialog", { name: "Edit item" });
-  await dialog.getByLabel(/^Food name/).fill("Oat milk");
-  await dialog.getByRole("button", { name: "Save changes" }).click();
+  const editor = editSurface(page, "Edit item");
+  await editor.getByLabel(/^Food name/).fill("Oat milk");
+  await editor.getByRole("button", { name: "Save changes" }).click();
   await expect(
-    dialog.getByRole("heading", { name: "We couldn't confirm your save" }),
+    editor.getByRole("heading", { name: "We couldn't confirm your save" }),
   ).toBeFocused();
-  await expect(dialog).toBeVisible();
+  await expect(editor).toBeVisible();
   expect(
-    await dialog.evaluate((element) =>
+    await editor.evaluate((element) =>
       element.contains(document.activeElement),
     ),
   ).toBe(true);
-  await dialog.getByRole("button", { name: "Check saved version" }).click();
-  const review = page.getByRole("dialog", { name: "Review saved version" });
+  await editor.getByRole("button", { name: "Check saved version" }).click();
+  const review = editSurface(page, "Review saved version");
   await expect(
     review.getByRole("heading", { name: "Review saved version" }),
   ).toBeFocused();
   await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
-  await page.keyboard.press("Tab");
   await expect(
     review.getByRole("button", { name: "Overwrite saved" }),
   ).toBeFocused();
+  // Retry succeeds and returns directly to Pantry.
   await page.keyboard.press("Enter");
-  await expect(dialog).toHaveCount(0);
+
+  await expect(editor).toHaveCount(0);
+  await expect(review).toHaveCount(0);
+  await expect(page).toHaveURL(/\/pantry$/);
+
+  // The saved item is visible without opening Item Details.
+  await expect(
+    page.getByRole("list", { name: "Food inventory" }).getByRole("listitem"),
+  ).toContainText(["Oat milk", "Rice"]);
+
+  await expect(page.getByRole("dialog", { name: "Oat milk" })).toHaveCount(0);
+
   await expect(
     page.getByRole("button", { name: "Actions for Oat milk" }),
   ).toBeFocused();

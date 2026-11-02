@@ -1,4 +1,4 @@
-import type { FoodProduct } from "@sari/contracts";
+import type { CreateFoodItem, FoodItem, FoodProduct } from "@sari/contracts";
 import {
   act,
   fireEvent,
@@ -8,6 +8,7 @@ import {
 } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { useFoodItemEditorSession } from "../../hooks/useFoodItemEditorSession";
 import FoodItemForm from "./FoodItemForm";
 
 const product: FoodProduct = {
@@ -28,17 +29,35 @@ const product: FoodProduct = {
 };
 afterEach(() => vi.unstubAllGlobals());
 
+function FormHarness({
+  onSave,
+}: {
+  onSave: (
+    values: CreateFoodItem,
+    expectedRevision: number | null,
+  ) => Promise<void>;
+}) {
+  const session = useFoodItemEditorSession({
+    disabled: false,
+    item: null,
+    onSave,
+  });
+
+  return (
+    <FoodItemForm
+      disabled={false}
+      onCancel={vi.fn()}
+      onKeepSavedAndClose={vi.fn<(item: FoodItem) => void>()}
+      session={session}
+    />
+  );
+}
+
 function setup() {
   const onSave = vi.fn().mockResolvedValue(undefined);
   render(
     <MemoryRouter>
-      <FoodItemForm
-        item={null}
-        disabled={false}
-        onSave={onSave}
-        onCancel={vi.fn()}
-        onKeepSavedAndClose={vi.fn()}
-      />
+      <FormHarness onSave={onSave} />
     </MemoryRouter>,
   );
 

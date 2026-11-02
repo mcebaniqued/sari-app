@@ -19,7 +19,7 @@ describe("Item Details Overview", () => {
     render(<ItemDetailsOverview item={item} />);
 
     expect(screen.getAllByRole("term").map((term) => term.textContent)).toEqual(
-      ["Quantity", "Recorded date", "Added", "Updated"],
+      ["Quantity", "Expiration date", "Added", "Updated"],
     );
     expect(screen.getByText("Nov 04, 2026")).toHaveAttribute(
       "datetime",
@@ -50,6 +50,7 @@ describe("Item Details Overview", () => {
     );
 
     expect(screen.getByText("No date")).toBeVisible();
+    expect(screen.getByText("Expiration date")).toBeVisible();
     expect(screen.getByText("2 items")).toBeVisible();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });

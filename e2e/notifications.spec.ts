@@ -23,7 +23,11 @@ test("notifications are centered below the CTA and auto-dismiss after a hover pa
   const notification = page
     .getByRole("status")
     .filter({ hasText: "Oat milk updated." });
+
   await expect(notification).toBeVisible();
+  await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL(/\/pantry$/);
+  await expect(nameCells(page)).toHaveText(["Oat milk"]);
   const bounds = requireGeometry(await notification.boundingBox());
   const add = requireGeometry(
     await page

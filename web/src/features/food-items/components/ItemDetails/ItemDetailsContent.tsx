@@ -9,7 +9,6 @@ interface ItemDetailsContentProps {
   onRetry: () => void;
   unavailable: boolean;
   verificationError: string;
-  verifying: boolean;
 }
 
 export default function ItemDetailsContent({
@@ -20,7 +19,6 @@ export default function ItemDetailsContent({
   onRetry,
   unavailable,
   verificationError,
-  verifying,
 }: ItemDetailsContentProps) {
   if (invalid) {
     return (
@@ -90,11 +88,6 @@ export default function ItemDetailsContent({
         </div>
       )}
       <ItemDetailsOverview item={item} />
-      {verifying && (
-        <p role="status" className="mt-4 text-sm text-content-muted">
-          Checking for updates…
-        </p>
-      )}
     </>
   );
 }

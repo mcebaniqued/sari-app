@@ -19,11 +19,15 @@ const item: FoodItem = {
 };
 
 async function pantry(page: Page) {
-  await page.route("**/api/v1/food-items**", (route) =>
-    route.fulfill({
-      json: { items: [item], total: 1, start: 0, limit: 20 },
-    }),
-  );
+  await page.route("**/api/v1/food-items**", (route) => {
+    const url = new URL(route.request().url());
+
+    return route.fulfill({
+      json: url.pathname.endsWith(`/${item.id}`)
+        ? item
+        : { items: [item], total: 1, start: 0, limit: 20 },
+    });
+  });
 }
 
 for (const { path, code, title } of [

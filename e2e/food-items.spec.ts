@@ -536,11 +536,9 @@ test("mobile list, selection, item actions, and viewport changes share one resul
   ).toBe(true);
   await page.getByRole("button", { name: "Actions for Milk" }).click();
   await list.getByRole("button", { name: "Edit Milk" }).click();
-  await expect(page.getByRole("dialog", { name: "Edit item" })).toBeVisible();
-  await page
-    .getByRole("dialog", { name: "Edit item" })
-    .getByRole("button", { name: "Cancel" })
-    .click();
+  await expect(page.getByRole("heading", { name: "Edit item" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Edit item" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Cancel" }).click();
   await page.getByRole("button", { name: "Select", exact: true }).click();
   await list.getByRole("checkbox", { name: "Select Milk" }).check();
   await expect(
@@ -760,6 +758,7 @@ test("successful add, edit, and delete refetch the first page with applied query
     await dialog.getByLabel(/^Food name/).fill("Food 000");
     await dialog.getByRole("button", { name: "Save changes" }).click();
     await expect(dialog).toHaveCount(0);
+    await expect(page).toHaveURL(/\/pantry$/);
   });
   await expect(nameCells(page).first()).toHaveText("Food 000");
   await expectResetAfter(async () => {

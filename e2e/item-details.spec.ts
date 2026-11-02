@@ -136,7 +136,7 @@ test("direct navigation and refresh render standalone safe states", async ({
   const metadata = page.locator('dl[aria-label="Item details"]');
   await expect(metadata.locator("dt")).toHaveText([
     "Quantity",
-    "Recorded date",
+    "Expiration date",
     "Added",
     "Updated",
   ]);

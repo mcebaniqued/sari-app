@@ -1,26 +1,37 @@
 import type { FoodItem } from "@sari/contracts";
 import { useEffect, useRef } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { LuPencil } from "react-icons/lu";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import Modal from "@/components/Modal/Modal";
+import { useAccessDenied } from "@/hooks/useAccessDenied";
 import ExpirationStatus from "../components/Inventory/ExpirationStatus";
 import ItemDetailsContent from "../components/ItemDetails/ItemDetailsContent";
 import { useItemDetails } from "../hooks/useItemDetails";
 import { useLocalDay } from "../hooks/useLocalDay";
+import {
+  type PantryRouteNavigationState,
+  restorePantryItemFocus,
+} from "../pantryRouteNavigation";
 
 interface ItemDetailsProps {
   contextual?: boolean;
+  navigationState?: PantryRouteNavigationState;
   seedItem?: FoodItem;
 }
 
 export default function ItemDetailsPage({
   contextual = false,
+  navigationState,
   seedItem,
 }: ItemDetailsProps) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const handleAccessDenied = useAccessDenied();
   const { itemId = "" } = useParams();
   const heading = useRef<HTMLHeadingElement>(null);
+  const returnAfterCompletedEdit = useRef(false);
   const localDay = useLocalDay();
-  const details = useItemDetails(itemId, seedItem);
+  const details = useItemDetails(itemId, seedItem, handleAccessDenied);
   const title = details.invalid
     ? "Invalid item link"
     : details.unavailable
@@ -45,6 +56,33 @@ export default function ItemDetailsPage({
     }
   }, [contextual, itemId]);
 
+  useEffect(() => {
+    if (!contextual || !navigationState) {
+      return;
+    }
+
+    if (navigationState.completedEdit) {
+      const saved = navigationState.completedEdit;
+      returnAfterCompletedEdit.current = true;
+      void navigate(location.pathname, {
+        replace: true,
+        state: {
+          ...navigationState,
+          completedEdit: undefined,
+          editOrigin: undefined,
+          seedItem: saved,
+        },
+      });
+
+      return;
+    }
+
+    if (returnAfterCompletedEdit.current) {
+      returnAfterCompletedEdit.current = false;
+      void navigate(-1);
+    }
+  }, [contextual, location.pathname, navigate, navigationState]);
+
   const content = <ItemDetailsContent {...details} onRetry={details.retry} />;
   const relativeStatus = details.item?.expiresOn ? (
     <ExpirationStatus
@@ -53,16 +91,54 @@ export default function ItemDetailsPage({
       prominentLater
     />
   ) : null;
+  const canEdit = Boolean(details.item && !details.unavailable);
+  const editButton = (
+    <button
+      type="button"
+      disabled={!canEdit}
+      onClick={() => {
+        if (!details.item) {
+          return;
+        }
+        void navigate(`/pantry/items/${details.item.id}/edit`, {
+          ...(contextual && navigationState
+            ? {
+                state: {
+                  ...navigationState,
+                  editOrigin: "details",
+                  seedItem: details.item,
+                },
+              }
+            : {}),
+        });
+      }}
+      className="inline-flex size-11 shrink-0 items-center justify-center rounded-control text-content-muted hover:bg-surface-hover hover:text-content disabled:opacity-40 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand"
+      aria-label="Edit item"
+    >
+      <LuPencil aria-hidden="true" className="size-5" />
+    </button>
+  );
 
   if (contextual) {
     return (
       <Modal
         title={title}
         closeButtonTarget="touch"
+        headerActions={editButton}
         headerLayout="inline"
         headerSupportingContent={relativeStatus}
         presentation="responsive"
         scroll="contained"
+        onRestoreFocusFallback={
+          navigationState?.editOrigin === "pantry"
+            ? () => {
+                restorePantryItemFocus(
+                  navigationState.pantryContextId,
+                  navigationState.seedItem.id,
+                );
+              }
+            : undefined
+        }
         onClose={() => {
           void navigate(-1);
         }}
@@ -80,13 +156,16 @@ export default function ItemDetailsPage({
       >
         Back to pantry
       </Link>
-      <h1
-        ref={heading}
-        tabIndex={-1}
-        className="mt-4 wrap-anywhere rounded-control text-3xl font-semibold tracking-tight"
-      >
-        {title}
-      </h1>
+      <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
+        <h1
+          ref={heading}
+          tabIndex={-1}
+          className="min-w-0 flex-1 wrap-anywhere rounded-control text-3xl font-semibold tracking-tight"
+        >
+          {title}
+        </h1>
+        {editButton}
+      </div>
       {relativeStatus && <div className="mt-1.5">{relativeStatus}</div>}
       <div className="mt-5">{content}</div>
     </article>

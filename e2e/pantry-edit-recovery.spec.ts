@@ -41,7 +41,7 @@ async function productApi(page: Page) {
 async function conflictingEditApi(page: Page, conflictAfterReview = false) {
   await foodApi(page, [linkedMilk]);
   await productApi(page);
-  let current = newerMilk;
+  let current = linkedMilk;
   const patches: Array<{
     expectedRevision: number;
     changes: Partial<FoodItem>;
@@ -52,6 +52,9 @@ async function conflictingEditApi(page: Page, conflictAfterReview = false) {
       const body = request.postDataJSON() as (typeof patches)[number];
       patches.push(body);
       if (patches.length === 1 || conflictAfterReview) {
+        if (patches.length === 1) {
+          current = newerMilk;
+        }
         await route.fulfill({
           status: 409,
           json: {
@@ -105,7 +108,7 @@ test("dirty Edit blocks in-app navigation", async ({ page }) => {
   await expect(confirmation).toBeVisible();
   await confirmation.getByRole("button", { name: "Continue editing" }).click();
   await expect(name).toHaveValue("Oat milk");
-  await expect(page).toHaveURL(/\/pantry$/);
+  await expect(page).toHaveURL(`/pantry/items/${milk.id}/edit`);
 });
 
 test("dirty Edit blocks browser Back navigation", async ({ page }) => {
@@ -129,12 +132,13 @@ test("dirty Edit blocks browser Back navigation", async ({ page }) => {
   const confirmation = page.getByRole("dialog", { name: "Discard changes?" });
   await expect(confirmation).toBeVisible();
   await confirmation.getByRole("button", { name: "Discard changes" }).click();
-  await expect(page).toHaveURL(/\/missing$/);
+  await expect(page).toHaveURL(/\/pantry$/);
 });
 
 test("dirty Edit blocks browser Forward navigation", async ({ page }) => {
   await foodApi(page, [milk]);
-  await page.goto("/pantry");
+  await page.goto(`/pantry/items/${milk.id}/edit`);
+  await expect(page.getByLabel(/^Food name/)).toHaveValue("Milk");
   await page.evaluate(() => {
     const state = history.state as { idx?: number } | null;
     const nextState = { ...state, idx: (state?.idx ?? 0) + 1 };
@@ -148,13 +152,8 @@ test("dirty Edit blocks browser Forward navigation", async ({ page }) => {
   await page.evaluate(() => {
     history.back();
   });
-  await expect(page).toHaveURL(/\/pantry$/);
-  await expect(page.getByRole("heading", { name: "My Pantry" })).toBeVisible();
-  await page.getByRole("button", { name: "Edit Milk" }).click();
-  await page
-    .getByRole("dialog", { name: "Edit item" })
-    .getByLabel(/^Food name/)
-    .fill("Oat milk");
+  await expect(page).toHaveURL(`/pantry/items/${milk.id}/edit`);
+  await page.getByLabel(/^Food name/).fill("Oat milk");
 
   await page.evaluate(() => history.forward());
   const confirmation = page.getByRole("dialog", { name: "Discard changes?" });
@@ -249,12 +248,17 @@ test("conflict review uses the stacked full-page layout on a narrow viewport", a
   await page.goto("/pantry");
   await page.getByRole("button", { name: "Actions for Milk" }).click();
   await page.getByRole("button", { name: "Edit Milk" }).click();
-  const edit = page.getByRole("dialog", { name: "Edit item" });
+  const edit = page.getByRole("article").filter({
+    has: page.getByRole("heading", { name: "Edit item" }),
+  });
   await edit.getByLabel(/^Food name/).fill("My oat milk");
   await edit.getByRole("button", { name: "Save changes" }).click();
   await edit.getByRole("button", { name: "Review changes" }).click();
 
-  const review = page.getByRole("dialog", { name: "Review changes" });
+  const review = page.getByRole("article").filter({
+    has: page.getByRole("heading", { name: "Review changes" }),
+  });
+  await expect(review).toBeVisible();
   const bounds = await review.boundingBox();
   expect(bounds).not.toBeNull();
   expect(bounds?.x).toBe(0);
@@ -262,9 +266,18 @@ test("conflict review uses the stacked full-page layout on a narrow viewport", a
   expect(bounds?.width).toBe(390);
   expect(bounds?.height).toBe(844);
   await expect(review.getByRole("table")).toBeHidden();
+  await page.keyboard.press("Tab");
+  await expect(
+    review.getByRole("button", { name: "Back" }).last(),
+  ).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(
+    review.getByRole("button", { name: "Keep saved & close" }),
+  ).toBeFocused();
+  await page.keyboard.press("Tab");
   await expect(
     review.getByRole("button", { name: "Overwrite saved" }),
-  ).toBeVisible();
+  ).toBeFocused();
   expect(
     await review.evaluate(
       (element) => element.scrollWidth <= element.clientWidth,

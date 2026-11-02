@@ -1,5 +1,5 @@
-import type { FoodItem } from "@sari/contracts";
-import { useEffect, useRef, useState } from "react";
+import { type FoodItem, foodItemSchema } from "@sari/contracts";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "@/api/apiFetch";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { getFoodItem } from "../api/foodItemsApi";
@@ -20,11 +20,26 @@ function newerItem(current: FoodItem | null, incoming: FoodItem) {
   return current;
 }
 
-export function useItemDetails(itemId: string, seedItem?: FoodItem) {
-  const trustedSeed = seedItem?.id === itemId ? seedItem : null;
+interface ItemDetailsOptions {
+  verifySeed?: boolean;
+}
+
+export function useItemDetails(
+  itemId: string,
+  seedItem?: FoodItem,
+  handleAccessDenied?: (error: unknown) => boolean,
+  { verifySeed = true }: ItemDetailsOptions = {},
+) {
+  const trustedSeed = useMemo(() => {
+    if (!seedItem || typeof seedItem.revision !== "number") {
+      return null;
+    }
+    const result = foodItemSchema.safeParse(seedItem);
+
+    return result.success && result.data.id === itemId ? result.data : null;
+  }, [itemId, seedItem]);
   const [item, setItem] = useState<FoodItem | null>(trustedSeed);
   const [loading, setLoading] = useState(!trustedSeed);
-  const [verifying, setVerifying] = useState(Boolean(trustedSeed));
   const [initialError, setInitialError] = useState("");
   const [verificationError, setVerificationError] = useState("");
   const [unavailable, setUnavailable] = useState(false);
@@ -36,7 +51,7 @@ export function useItemDetails(itemId: string, seedItem?: FoodItem) {
   useEffect(() => {
     const requestGeneration = ++generation.current;
     const controller = new AbortController();
-    const seed = seedItem?.id === itemId ? seedItem : null;
+    const seed = trustedSeed;
     const itemChanged = activeItemId.current !== itemId;
     activeItemId.current = itemId;
 
@@ -46,7 +61,14 @@ export function useItemDetails(itemId: string, seedItem?: FoodItem) {
     setUnavailable(false);
     if (!valid) {
       setLoading(false);
-      setVerifying(false);
+
+      return () => {
+        controller.abort();
+      };
+    }
+
+    if (seed && !verifySeed) {
+      setLoading(false);
 
       return () => {
         controller.abort();
@@ -54,7 +76,6 @@ export function useItemDetails(itemId: string, seedItem?: FoodItem) {
     }
 
     setLoading(!seed);
-    setVerifying(Boolean(seed));
     void getFoodItem(itemId, controller.signal)
       .then((verified) => {
         if (
@@ -78,6 +99,9 @@ export function useItemDetails(itemId: string, seedItem?: FoodItem) {
 
           return;
         }
+        if (handleAccessDenied?.(cause)) {
+          return;
+        }
 
         const message = getApiErrorMessage(
           cause,
@@ -97,18 +121,23 @@ export function useItemDetails(itemId: string, seedItem?: FoodItem) {
           return;
         }
         setLoading(false);
-        setVerifying(false);
       });
 
     return () => {
       controller.abort();
     };
-  }, [itemId, retryVersion, seedItem, valid]);
+  }, [
+    handleAccessDenied,
+    itemId,
+    retryVersion,
+    trustedSeed,
+    valid,
+    verifySeed,
+  ]);
 
   return {
     item,
     loading,
-    verifying,
     initialError,
     verificationError,
     invalid: !valid,

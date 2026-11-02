@@ -2,12 +2,9 @@ import type { CreateFoodItem, FoodItem } from "@sari/contracts";
 import { useCallback, useRef, useState } from "react";
 import { notify } from "@/components/Toast/notifications";
 import { useAccessDenied } from "@/hooks/useAccessDenied";
-import {
-  createFoodItem,
-  deleteFoodItems,
-  updateFoodItem,
-} from "../api/foodItemsApi";
+import { deleteFoodItems } from "../api/foodItemsApi";
 import type { FoodItemEditorState } from "../types/foodItems";
+import { useSaveFoodItem } from "./useSaveFoodItem";
 
 /** Coordinate mutations; retain a creation key only while retrying the same draft. */
 export function usePantryItems(onChanged?: () => void) {
@@ -15,76 +12,42 @@ export function usePantryItems(onChanged?: () => void) {
   const [editor, setEditor] = useState<FoodItemEditorState | null>(null);
   const [deleteTargets, setDeleteTargets] = useState<FoodItem[] | null>(null);
   const [deleteError, setDeleteError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
-  const mutationRef = useRef(false);
-  const createOperation = useRef<{ body: string; key: string } | null>(null);
+  const deleteMutationRef = useRef(false);
   const handleAccessDenied = useAccessDenied();
-
-  const startEdit = useCallback((item: FoodItem) => {
-    setEditor({ item });
-  }, []);
+  const handleChanged = useCallback(() => {
+    setRevision((value) => value + 1);
+    onChanged?.();
+  }, [onChanged]);
+  const {
+    busy: saveBusy,
+    resetCreateOperation,
+    saveItem,
+  } = useSaveFoodItem(handleChanged);
+  const busy = saveBusy || deleteBusy;
 
   const startDelete = useCallback((targets: FoodItem[]) => {
     setDeleteError("");
     setDeleteTargets([...targets]);
   }, []);
 
-  function creationKeyFor(values: CreateFoodItem) {
-    const body = JSON.stringify(values);
-    if (createOperation.current?.body !== body) {
-      createOperation.current = { body, key: crypto.randomUUID() };
-    }
-
-    return createOperation.current.key;
-  }
-
   async function handleSave(
     values: CreateFoodItem,
     expectedRevision: number | null,
   ) {
-    if (mutationRef.current) {
-      throw new Error("Another change is in progress.");
-    }
-
-    mutationRef.current = true;
-    setBusy(true);
     const original = editor?.item;
-
-    try {
-      let saved: FoodItem;
-      if (original) {
-        if (expectedRevision === null) {
-          throw new Error("An edited item requires an expected revision.");
-        }
-        saved = await updateFoodItem(original.id, {
-          expectedRevision,
-          changes: values,
-        });
-      } else {
-        saved = await createFoodItem(values, creationKeyFor(values));
-      }
-
-      setRevision((value) => value + 1);
-      onChanged?.();
-      notify(
-        "success",
-        `${saved.name} ${original ? "updated" : "added to your pantry"}.`,
-      );
-      setEditor(null);
-    } finally {
-      mutationRef.current = false;
-      setBusy(false);
-    }
+    await saveItem(original ?? null, values, expectedRevision);
+    setEditor(null);
   }
 
   async function handleDelete() {
-    if (mutationRef.current || !deleteTargets?.length) {
+    if (deleteMutationRef.current || saveBusy || !deleteTargets?.length) {
       return;
     }
 
-    mutationRef.current = true;
-    setBusy(true);
+    deleteMutationRef.current = true;
+    setDeleteBusy(true);
     setDeleteError("");
 
     try {
@@ -156,15 +119,15 @@ export function usePantryItems(onChanged?: () => void) {
         setDeleteTargets(null);
       }
     } finally {
-      mutationRef.current = false;
-      setBusy(false);
+      deleteMutationRef.current = false;
+      setDeleteBusy(false);
     }
   }
 
   const startAdd = useCallback(() => {
-    createOperation.current = null;
+    resetCreateOperation();
     setEditor({ item: null });
-  }, []);
+  }, [resetCreateOperation]);
 
   const closeEditor = useCallback(() => {
     setEditor(null);
@@ -190,7 +153,6 @@ export function usePantryItems(onChanged?: () => void) {
     deleteError,
     busy,
     startAdd,
-    startEdit,
     startDelete,
     closeEditor,
     keepSavedAndClose,
