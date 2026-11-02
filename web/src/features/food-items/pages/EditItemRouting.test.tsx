@@ -231,7 +231,7 @@ describe("route-backed Pantry Edit", () => {
     const { router } = renderApp("/pantry");
     fireEvent.click(await screen.findByRole("button", { name: "Milk" }));
     const details = await screen.findByRole("dialog", { name: "Milk" });
-    const edit = within(details).getByRole("button", { name: "Edit" });
+    const edit = within(details).getByRole("button", { name: "Edit item" });
 
     expect(edit).toBeEnabled();
     fireEvent.click(edit);
@@ -280,7 +280,7 @@ describe("route-backed Pantry Edit", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Milk" }));
     const details = await screen.findByRole("dialog", { name: "Milk" });
     await within(details).findByText(/Showing saved Pantry data/);
-    const edit = within(details).getByRole("button", { name: "Edit" });
+    const edit = within(details).getByRole("button", { name: "Edit item" });
     const readsBeforeEdit = itemGets;
 
     expect(edit).toBeEnabled();
@@ -362,7 +362,7 @@ describe("route-backed Pantry Edit", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Milk" }));
     const details = await screen.findByRole("dialog", { name: "Milk" });
     fireEvent.click(
-      await within(details).findByRole("button", { name: "Edit" }),
+      await within(details).findByRole("button", { name: "Edit item" }),
     );
     const name = await screen.findByLabelText(/^Food name/);
     fireEvent.change(name, { target: { value: "Forward-safe milk" } });
@@ -389,7 +389,7 @@ describe("route-backed Pantry Edit", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Milk" }));
     const details = await screen.findByRole("dialog", { name: "Milk" });
     fireEvent.click(
-      await within(details).findByRole("button", { name: "Edit" }),
+      await within(details).findByRole("button", { name: "Edit item" }),
     );
     const name = await screen.findByLabelText(/^Food name/);
     fireEvent.change(name, { target: { value: "Draft milk" } });
