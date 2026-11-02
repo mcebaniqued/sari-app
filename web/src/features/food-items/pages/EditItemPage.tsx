@@ -248,7 +248,7 @@ export default function EditItemPage({
     );
   }
 
-  if (!details.item && (details.loading || details.verifying)) {
+  if (!details.item && details.loading) {
     return (
       <LoadState
         contextualPage={contextualPage}

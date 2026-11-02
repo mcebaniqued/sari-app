@@ -40,9 +40,6 @@ export function useItemDetails(
   }, [itemId, seedItem]);
   const [item, setItem] = useState<FoodItem | null>(trustedSeed);
   const [loading, setLoading] = useState(!trustedSeed);
-  const [verifying, setVerifying] = useState(
-    Boolean(trustedSeed && verifySeed),
-  );
   const [initialError, setInitialError] = useState("");
   const [verificationError, setVerificationError] = useState("");
   const [unavailable, setUnavailable] = useState(false);
@@ -64,7 +61,6 @@ export function useItemDetails(
     setUnavailable(false);
     if (!valid) {
       setLoading(false);
-      setVerifying(false);
 
       return () => {
         controller.abort();
@@ -73,7 +69,6 @@ export function useItemDetails(
 
     if (seed && !verifySeed) {
       setLoading(false);
-      setVerifying(false);
 
       return () => {
         controller.abort();
@@ -81,7 +76,6 @@ export function useItemDetails(
     }
 
     setLoading(!seed);
-    setVerifying(Boolean(seed));
     void getFoodItem(itemId, controller.signal)
       .then((verified) => {
         if (
@@ -127,7 +121,6 @@ export function useItemDetails(
           return;
         }
         setLoading(false);
-        setVerifying(false);
       });
 
     return () => {
@@ -145,7 +138,6 @@ export function useItemDetails(
   return {
     item,
     loading,
-    verifying,
     initialError,
     verificationError,
     invalid: !valid,
