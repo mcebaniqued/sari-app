@@ -193,6 +193,17 @@ export default function EditItemPage({
 
   const finish = useCallback(
     (saved: FoodItem) => {
+      // Pantry-origin edits return directly to Pantry.
+      if (contextual && navigationState?.editOrigin === "pantry") {
+        restorePantryItemFocus(navigationState.pantryContextId, itemId);
+
+        void navigate(navigationState.pantryLocation, {
+          replace: true,
+        });
+        return;
+      }
+
+      // Keep existing Details-origin and direct-route behavior.
       if (contextual && navigationState?.editOrigin === "details") {
         void navigate(detailsPath, {
           replace: true,
@@ -202,6 +213,7 @@ export default function EditItemPage({
         return;
       }
 
+      // Preserve direct-route behavior.
       void navigate(detailsPath, {
         replace: true,
         ...(contextual && navigationState
@@ -214,7 +226,7 @@ export default function EditItemPage({
           : {}),
       });
     },
-    [contextual, detailsPath, navigate, navigationState],
+    [contextual, detailsPath, itemId, navigate, navigationState],
   );
 
   useEffect(() => {

@@ -160,7 +160,7 @@ afterEach(() => {
 });
 
 describe("route-backed Pantry Edit", () => {
-  it("uses the desktop modal and saves to updated contextual Details", async () => {
+  it("uses the desktop modal and returns Pantry-origin saves to Pantry", async () => {
     const api = foodApi();
     const { router } = renderApp("/pantry");
     fireEvent.click(await screen.findByRole("button", { name: "Edit Milk" }));
@@ -171,35 +171,46 @@ describe("route-backed Pantry Edit", () => {
     if (!dialog) {
       throw new Error("Expected the desktop editor to use a dialog.");
     }
+
     expect(api.itemGets()).toBe(0);
     expect(router.state.location.pathname).toBe(
       `/pantry/items/${item.id}/edit`,
     );
+
     fireEvent.change(name, { target: { value: "Fresh milk" } });
     fireEvent.click(
-      within(dialog).getByRole("button", {
-        name: "Save changes",
-      }),
+      within(dialog).getByRole("button", { name: "Save changes" }),
     );
 
     await screen.findByRole("button", { name: "Saving…" });
+
     await waitFor(() => {
       expect(api.patches).toHaveLength(1);
     });
-    await screen.findByRole("button", { name: "Save changes" });
-    expect(screen.queryByRole("alert")).toBeNull();
+
     expect(await screen.findByText("Fresh milk updated.")).toBeVisible();
+
+    // Pantry-origin saves close Edit without opening Item Details.
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe(`/pantry/items/${item.id}`);
+      expect(router.state.location.pathname).toBe("/pantry");
     });
-    expect(
-      await screen.findByRole("dialog", { name: "Fresh milk" }),
-    ).toBeVisible();
+
+    expect(screen.queryByRole("dialog", { name: "Edit item" })).toBeNull();
     expect(screen.getByRole("heading", { name: "My Pantry" })).toBeVisible();
+
     expect(api.patches[0]).toMatchObject({
       expectedRevision: item.revision,
       changes: { name: "Fresh milk" },
     });
+
+    // Forward must not reopen the completed editor.
+    await router.navigate(1);
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe("/pantry");
+    });
+
+    expect(screen.queryByLabelText(/^Food name/)).not.toBeInTheDocument();
   });
 
   it("opens Details Edit while its background verification is pending", async () => {
