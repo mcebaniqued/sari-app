@@ -78,6 +78,42 @@ function DismissalHarness({
   );
 }
 
+function BaselineHarness({
+  onSave,
+}: {
+  onSave: (
+    values: CreateFoodItem,
+    expectedRevision: number | null,
+  ) => Promise<void>;
+}) {
+  const [editorItem, setEditorItem] = useState(item);
+
+  return (
+    <UnsavedChangesProvider>
+      <button
+        type="button"
+        onClick={() => {
+          setEditorItem({
+            ...item,
+            name: "Server milk",
+            revision: item.revision + 1,
+            updatedAt: "2026-11-01T01:00:00Z",
+          });
+        }}
+      >
+        Receive newer item
+      </button>
+      <FoodItemEditorDialog
+        item={editorItem}
+        busy={false}
+        onSave={onSave}
+        onKeepSavedAndClose={vi.fn()}
+        onClose={vi.fn()}
+      />
+    </UnsavedChangesProvider>
+  );
+}
+
 function setup(
   initialEntries = ["/pantry"],
   editorItem = item,
@@ -120,6 +156,34 @@ function setupDismissal() {
 }
 
 describe("protected food item edits", () => {
+  it("keeps the initial draft and expected revision when the item prop changes", async () => {
+    const onSave = vi
+      .fn<
+        (
+          values: CreateFoodItem,
+          expectedRevision: number | null,
+        ) => Promise<void>
+      >()
+      .mockResolvedValue(undefined);
+    const router = createMemoryRouter(
+      [{ path: "/pantry", element: <BaselineHarness onSave={onSave} /> }],
+      { initialEntries: ["/pantry"] },
+    );
+    render(<RouterProvider router={router} />);
+    const name = screen.getByLabelText(/^Food name/);
+    fireEvent.change(name, { target: { value: "Draft milk" } });
+    fireEvent.click(screen.getByRole("button", { name: "Receive newer item" }));
+
+    expect(name).toHaveValue("Draft milk");
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Draft milk" }),
+        item.revision,
+      );
+    });
+  });
+
   it("closes an unchanged edit from the Close modal button without confirmation", async () => {
     const { editButton } = setupDismissal();
     const closeButton = screen.getByRole("button", { name: "Close modal" });

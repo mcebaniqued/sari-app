@@ -23,6 +23,36 @@ const secondId = "112345678901234567890123";
 beforeEach(() => vi.mocked(getFoodItem).mockReset());
 
 describe("item details loading", () => {
+  it("uses a valid seed without verification when requested", () => {
+    const cached = item(firstId, 1);
+
+    const { result } = renderHook(() =>
+      useItemDetails(firstId, cached, undefined, { verifySeed: false }),
+    );
+
+    expect(result.current.item).toEqual(cached);
+    expect(result.current.loading).toBe(false);
+    expect(result.current.verifying).toBe(false);
+    expect(getFoodItem).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invalid seed revision and loads the item instead", async () => {
+    const invalidSeed = { ...item(firstId, 1), revision: -1 };
+    const loaded = item(firstId, 2);
+    vi.mocked(getFoodItem).mockResolvedValue(loaded);
+
+    const { result } = renderHook(() =>
+      useItemDetails(firstId, invalidSeed, undefined, { verifySeed: false }),
+    );
+
+    expect(result.current.item).toBeNull();
+    expect(result.current.loading).toBe(true);
+    await waitFor(() => {
+      expect(result.current.item).toEqual(loaded);
+    });
+    expect(getFoodItem).toHaveBeenCalledTimes(1);
+  });
+
   it("shows a trusted seed while verification updates it", async () => {
     const cached = item(firstId, 1);
     const verified = item(firstId, 2);

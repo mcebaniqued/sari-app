@@ -26,18 +26,19 @@ export function useFoodItemEditorSession({
   item,
   onSave,
 }: FoodItemEditorSessionOptions) {
+  const [baselineItem] = useState(item);
   const [mode, setMode] = useState<"manual" | "barcode">("manual");
   const [barcodeValue, setBarcodeValue] = useState("");
   const entryRef = useRef<HTMLDivElement>(null);
   const noticeHeadingRef = useRef<HTMLHeadingElement>(null);
   const readErrorRef = useRef<HTMLParagraphElement>(null);
   const recoveryFocusRef = useRef<"save" | "review" | null>(null);
-  const draft = useFoodItemDraft(item);
-  const barcode = useBarcodeProduct(item, draft);
+  const draft = useFoodItemDraft(baselineItem);
+  const barcode = useBarcodeProduct(baselineItem, draft);
   const linked =
     barcode.productId !== null ||
     barcode.barcode !== null ||
-    Boolean(item?.productId ?? item?.barcode);
+    Boolean(baselineItem?.productId ?? baselineItem?.barcode);
   const linkage = useMemo(
     () => ({ productId: barcode.productId, barcode: barcode.barcode }),
     [barcode.barcode, barcode.productId],
@@ -47,24 +48,24 @@ export function useFoodItemEditorSession({
     [draft.values, linkage],
   );
   const [initialEdit] = useState(() =>
-    item
+    baselineItem
       ? normalizedFoodItemEdit(
           {
-            name: item.name,
-            quantity: String(item.quantity),
-            unit: item.unit,
-            expiresOn: item.expiresOn ?? "",
+            name: baselineItem.name,
+            quantity: String(baselineItem.quantity),
+            unit: baselineItem.unit,
+            expiresOn: baselineItem.expiresOn ?? "",
           },
           {
-            productId: item.productId ?? null,
-            barcode: item.barcode ?? null,
+            productId: baselineItem.productId ?? null,
+            barcode: baselineItem.barcode ?? null,
           },
         )
       : null,
   );
   const form = useFoodItemForm({
     disabled,
-    item,
+    item: baselineItem,
     onSave,
     values: draft.values,
     ...(linked ? { linkage } : {}),
@@ -143,7 +144,7 @@ export function useFoodItemEditorSession({
     draftVersion,
     entryRef,
     form,
-    item,
+    item: baselineItem,
     linkage,
     linked,
     mode,

@@ -89,7 +89,6 @@ function stubFoodFetch(
   initialItems: FoodItem[] = [item, other],
 ) {
   let loads = 0;
-  const verified = new Set<string>();
   vi.stubGlobal(
     "matchMedia",
     vi.fn(() => ({
@@ -114,17 +113,6 @@ function stubFoodFetch(
             limit: 20,
           }),
         );
-      }
-
-      if (!init?.method || init.method === "GET") {
-        const matched = initialItems.find(
-          (item) => url === `/api/v1/food-items/${item.id}`,
-        );
-        if (matched && !verified.has(matched.id)) {
-          verified.add(matched.id);
-
-          return Promise.resolve(Response.json(matched));
-        }
       }
 
       return mutation(url, init);

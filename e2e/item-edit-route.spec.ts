@@ -1,4 +1,5 @@
 import { expect } from "@playwright/test";
+import type { FoodItem } from "@sari/contracts";
 import { foodApi, milk, test } from "./fixtures/pantry";
 
 test("Details Edit saves back to updated Details without reopening on Forward", async ({
@@ -27,6 +28,52 @@ test("Details Edit saves back to updated Details without reopening on Forward", 
   await expect(page).toHaveURL(`/pantry/items/${milk.id}`);
   await expect(page.getByRole("dialog", { name: "Fresh milk" })).toBeVisible();
   await expect(page.getByRole("dialog", { name: "Edit item" })).toHaveCount(0);
+});
+
+test("seeded Pantry Edit opens immediately without an item-detail request", async ({
+  page,
+}) => {
+  await foodApi(page, [milk]);
+  let itemGets = 0;
+  await page.route(`**/api/v1/food-items/${milk.id}`, async (route) => {
+    itemGets++;
+    await route.fallback();
+  });
+  await page.goto("/pantry");
+  await page.getByRole("button", { name: "Edit Milk" }).click();
+
+  await expect(page.getByLabel(/^Food name/)).toHaveValue("Milk");
+  expect(itemGets).toBe(0);
+});
+
+test("Details Edit opens while background verification is pending", async ({
+  page,
+}) => {
+  await foodApi(page, [milk]);
+  let releaseItem: (() => void) | undefined;
+  const itemReady = new Promise<void>((resolve) => {
+    releaseItem = resolve;
+  });
+  let itemGets = 0;
+  await page.route(`**/api/v1/food-items/${milk.id}`, async (route) => {
+    itemGets++;
+    await itemReady;
+    await route.fallback();
+  });
+  await page.goto("/pantry");
+  await page
+    .getByRole("table", { name: "Food inventory" })
+    .getByRole("button", { name: milk.name, exact: true })
+    .click();
+  const details = page.getByRole("dialog", { name: milk.name });
+  const edit = details.getByRole("button", { name: "Edit" });
+
+  await expect(edit).toBeEnabled();
+  const readsBeforeEdit = itemGets;
+  await edit.click();
+  await expect(page.getByLabel(/^Food name/)).toHaveValue("Milk");
+  expect(itemGets).toBe(readsBeforeEdit);
+  releaseItem?.();
 });
 
 test("direct Edit refreshes independently and Cancel falls back to Details", async ({
@@ -112,9 +159,7 @@ test("direct Edit shows its loading state and honors authorization failures", as
     await route.fulfill({ json: milk });
   });
   await page.goto(`/pantry/items/${milk.id}/edit`);
-  await expect(
-    page.getByText("Checking the latest saved version before editing…"),
-  ).toBeVisible();
+  await expect(page.getByText("Loading item for editing…")).toBeVisible();
   releaseItem?.();
   await expect(page.getByLabel(/^Food name/)).toHaveValue(milk.name);
 
@@ -178,7 +223,48 @@ test("mobile Edit scrolls naturally and keeps one draft through viewport changes
   const cancel = mobileEditor.getByRole("button", { name: "Cancel" });
   await cancel.scrollIntoViewIfNeeded();
   await expect(cancel).toBeInViewport();
-  expect(
-    await mobileEditor.evaluate((element) => element.scrollTop),
-  ).toBeGreaterThan(0);
+  const overflow = await mobileEditor.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+    scrollTop: element.scrollTop,
+  }));
+  expect(overflow.scrollHeight).toBeGreaterThan(overflow.clientHeight);
+  expect(overflow.scrollTop).toBeGreaterThan(0);
+});
+
+test("fitting mobile Edit contains gestures and preserves Pantry scroll", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const items: FoodItem[] = Array.from({ length: 20 }, (_, index) => ({
+    ...milk,
+    id: index.toString(16).padStart(24, "0"),
+    name: index === 8 ? "Target milk" : `Pantry item ${index}`,
+  }));
+  await foodApi(page, items);
+  await page.goto("/pantry");
+  const actions = page.getByRole("button", { name: "Actions for Target milk" });
+  await actions.scrollIntoViewIfNeeded();
+  await actions.click();
+  const pantryScroll = await page.evaluate(() => window.scrollY);
+  await page.getByRole("button", { name: "Edit Target milk" }).click();
+  const mobileEditor = page.getByRole("article").filter({
+    has: page.getByRole("heading", { name: "Edit item" }),
+  });
+  const fit = await mobileEditor.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+
+  expect(fit.scrollHeight).toBeLessThanOrEqual(fit.clientHeight);
+  await mobileEditor.hover();
+  await page.mouse.wheel(0, 400);
+  await expect
+    .poll(() => page.evaluate(() => window.scrollY))
+    .toBe(pantryScroll);
+  expect(await mobileEditor.evaluate((element) => element.scrollTop)).toBe(0);
+
+  await mobileEditor.getByRole("button", { name: "Cancel" }).click();
+  await expect(actions).toBeFocused();
+  expect(await page.evaluate(() => window.scrollY)).toBe(pantryScroll);
 });

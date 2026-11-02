@@ -52,6 +52,7 @@ function renderApp(entry: InitialEntry) {
 
 function foodApi() {
   let current = item;
+  let itemGets = 0;
   const patches: unknown[] = [];
 
   vi.stubGlobal(
@@ -66,6 +67,8 @@ function foodApi() {
         url === `/api/v1/food-items/${item.id}` &&
         (!init?.method || init.method === "GET")
       ) {
+        itemGets++;
+
         return Promise.resolve(Response.json(current));
       }
       if (url === `/api/v1/food-items/${item.id}` && init?.method === "PATCH") {
@@ -90,7 +93,7 @@ function foodApi() {
     }),
   );
 
-  return { patches };
+  return { itemGets: () => itemGets, patches };
 }
 
 beforeEach(() => {
@@ -168,6 +171,7 @@ describe("route-backed Pantry Edit", () => {
     if (!dialog) {
       throw new Error("Expected the desktop editor to use a dialog.");
     }
+    expect(api.itemGets()).toBe(0);
     expect(router.state.location.pathname).toBe(
       `/pantry/items/${item.id}/edit`,
     );
@@ -196,6 +200,94 @@ describe("route-backed Pantry Edit", () => {
       expectedRevision: item.revision,
       changes: { name: "Fresh milk" },
     });
+  });
+
+  it("opens Details Edit while its background verification is pending", async () => {
+    let itemGets = 0;
+    let resolveItem: ((response: Response) => void) | undefined;
+    const pendingItem = new Promise<Response>((resolve) => {
+      resolveItem = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init?: RequestInit) => {
+        if (url.startsWith("/api/v1/food-items?")) {
+          return Promise.resolve(
+            Response.json({ items: [item], total: 1, start: 0, limit: 20 }),
+          );
+        }
+        if (
+          url === `/api/v1/food-items/${item.id}` &&
+          (!init?.method || init.method === "GET")
+        ) {
+          itemGets++;
+
+          return pendingItem;
+        }
+
+        throw new Error(`Unexpected request: ${url}`);
+      }),
+    );
+    const { router } = renderApp("/pantry");
+    fireEvent.click(await screen.findByRole("button", { name: "Milk" }));
+    const details = await screen.findByRole("dialog", { name: "Milk" });
+    const edit = within(details).getByRole("button", { name: "Edit" });
+
+    expect(edit).toBeEnabled();
+    fireEvent.click(edit);
+
+    expect(await screen.findByLabelText(/^Food name/)).toHaveValue("Milk");
+    expect(router.state.location.pathname).toBe(
+      `/pantry/items/${item.id}/edit`,
+    );
+    expect(itemGets).toBe(1);
+    resolveItem?.(Response.json(item));
+  });
+
+  it("opens Details Edit after transient background verification failure", async () => {
+    let itemGets = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init?: RequestInit) => {
+        if (url.startsWith("/api/v1/food-items?")) {
+          return Promise.resolve(
+            Response.json({ items: [item], total: 1, start: 0, limit: 20 }),
+          );
+        }
+        if (
+          url === `/api/v1/food-items/${item.id}` &&
+          (!init?.method || init.method === "GET")
+        ) {
+          itemGets++;
+
+          return Promise.resolve(
+            Response.json(
+              {
+                error: {
+                  code: "DATABASE_UNAVAILABLE",
+                  message: "Unavailable.",
+                },
+              },
+              { status: 503 },
+            ),
+          );
+        }
+
+        throw new Error(`Unexpected request: ${url}`);
+      }),
+    );
+    renderApp("/pantry");
+    fireEvent.click(await screen.findByRole("button", { name: "Milk" }));
+    const details = await screen.findByRole("dialog", { name: "Milk" });
+    await within(details).findByText(/Showing saved Pantry data/);
+    const edit = within(details).getByRole("button", { name: "Edit" });
+    const readsBeforeEdit = itemGets;
+
+    expect(edit).toBeEnabled();
+    fireEvent.click(edit);
+
+    expect(await screen.findByLabelText(/^Food name/)).toHaveValue("Milk");
+    expect(itemGets).toBe(readsBeforeEdit);
   });
 
   it("uses a page on constrained viewports and preserves the draft across transitions", async () => {

@@ -101,7 +101,7 @@ function LoadState({
     <article
       className={
         contextualPage
-          ? "fixed inset-0 z-40 overflow-y-auto overscroll-contain bg-page px-[max(1rem,env(safe-area-inset-left))] pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] text-content"
+          ? "fixed inset-0 z-40 overflow-y-auto overscroll-none bg-page px-[max(1rem,env(safe-area-inset-left))] pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] text-content"
           : "mx-auto max-w-3xl"
       }
     >
@@ -137,7 +137,9 @@ export default function EditItemPage({
   const finishStarted = useRef(false);
   const { itemId = "" } = useParams();
   const constrained = useConstrainedViewport();
-  const details = useItemDetails(itemId, seedItem, handleAccessDenied);
+  const details = useItemDetails(itemId, seedItem, handleAccessDenied, {
+    verifySeed: false,
+  });
   const contextualPage = contextual && constrained;
   const presentation = contextual && !constrained ? "modal" : "page";
   const onChanged = useCallback(() => {
@@ -246,11 +248,11 @@ export default function EditItemPage({
     );
   }
 
-  if (details.loading || details.verifying) {
+  if (!details.item && (details.loading || details.verifying)) {
     return (
       <LoadState
         contextualPage={contextualPage}
-        message="Checking the latest saved version before editing…"
+        message="Loading item for editing…"
         onBack={close}
         presentation={presentation}
         title="Edit item"
@@ -259,7 +261,7 @@ export default function EditItemPage({
   }
 
   const loadError = details.initialError || details.verificationError;
-  if (loadError || !details.item) {
+  if (!details.item) {
     return (
       <LoadState
         contextualPage={contextualPage}

@@ -91,13 +91,7 @@ export default function ItemDetailsPage({
       prominentLater
     />
   ) : null;
-  const canEdit = Boolean(
-    details.item &&
-    !details.loading &&
-    !details.verifying &&
-    !details.verificationError &&
-    !details.unavailable,
-  );
+  const canEdit = Boolean(details.item && !details.unavailable);
   const editButton = (
     <button
       type="button"

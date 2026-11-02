@@ -1,5 +1,5 @@
-import type { FoodItem } from "@sari/contracts";
-import { useEffect, useRef, useState } from "react";
+import { type FoodItem, foodItemSchema } from "@sari/contracts";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "@/api/apiFetch";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { getFoodItem } from "../api/foodItemsApi";
@@ -20,15 +20,29 @@ function newerItem(current: FoodItem | null, incoming: FoodItem) {
   return current;
 }
 
+interface ItemDetailsOptions {
+  verifySeed?: boolean;
+}
+
 export function useItemDetails(
   itemId: string,
   seedItem?: FoodItem,
   handleAccessDenied?: (error: unknown) => boolean,
+  { verifySeed = true }: ItemDetailsOptions = {},
 ) {
-  const trustedSeed = seedItem?.id === itemId ? seedItem : null;
+  const trustedSeed = useMemo(() => {
+    if (!seedItem || typeof seedItem.revision !== "number") {
+      return null;
+    }
+    const result = foodItemSchema.safeParse(seedItem);
+
+    return result.success && result.data.id === itemId ? result.data : null;
+  }, [itemId, seedItem]);
   const [item, setItem] = useState<FoodItem | null>(trustedSeed);
   const [loading, setLoading] = useState(!trustedSeed);
-  const [verifying, setVerifying] = useState(Boolean(trustedSeed));
+  const [verifying, setVerifying] = useState(
+    Boolean(trustedSeed && verifySeed),
+  );
   const [initialError, setInitialError] = useState("");
   const [verificationError, setVerificationError] = useState("");
   const [unavailable, setUnavailable] = useState(false);
@@ -40,7 +54,7 @@ export function useItemDetails(
   useEffect(() => {
     const requestGeneration = ++generation.current;
     const controller = new AbortController();
-    const seed = seedItem?.id === itemId ? seedItem : null;
+    const seed = trustedSeed;
     const itemChanged = activeItemId.current !== itemId;
     activeItemId.current = itemId;
 
@@ -49,6 +63,15 @@ export function useItemDetails(
     setVerificationError("");
     setUnavailable(false);
     if (!valid) {
+      setLoading(false);
+      setVerifying(false);
+
+      return () => {
+        controller.abort();
+      };
+    }
+
+    if (seed && !verifySeed) {
       setLoading(false);
       setVerifying(false);
 
@@ -110,7 +133,14 @@ export function useItemDetails(
     return () => {
       controller.abort();
     };
-  }, [handleAccessDenied, itemId, retryVersion, seedItem, valid]);
+  }, [
+    handleAccessDenied,
+    itemId,
+    retryVersion,
+    trustedSeed,
+    valid,
+    verifySeed,
+  ]);
 
   return {
     item,

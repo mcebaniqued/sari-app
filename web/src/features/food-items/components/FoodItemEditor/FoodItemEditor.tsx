@@ -436,7 +436,7 @@ export default function FoodItemEditor({
       ref={pageSurface}
       className={
         contextualPage
-          ? "fixed inset-0 z-40 overflow-y-auto overscroll-contain scroll-pb-[max(1rem,env(safe-area-inset-bottom))] bg-page text-content"
+          ? "fixed inset-0 z-40 overflow-y-auto overscroll-none scroll-pb-[max(1rem,env(safe-area-inset-bottom))] bg-page text-content"
           : "mx-auto max-w-3xl"
       }
     >
