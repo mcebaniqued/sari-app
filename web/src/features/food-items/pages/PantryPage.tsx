@@ -360,7 +360,7 @@ export default function PantryPage() {
 
   return (
     <div className="flex min-h-0 flex-col md:h-full">
-      <div className="sticky top-(--pantry-header-offset,0px) z-20 -mx-4 bg-page px-4 pb-3 pt-4 transition-[top] duration-200 motion-reduce:transition-none md:static md:mx-0 md:px-0 md:pb-4 md:pt-0">
+      <div className="sticky top-0 z-20 -mx-4 bg-page px-4 pb-3 pt-4 md:static md:mx-0 md:px-0 md:pb-4 md:pt-0">
         <div className={mobileSelecting ? "hidden md:block" : ""}>
           <div className="mb-3 flex items-center justify-between gap-3 md:mb-5">
             <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight">
