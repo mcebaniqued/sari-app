@@ -112,9 +112,10 @@ export default function ItemDetailsPage({
             : {}),
         });
       }}
-      className="inline-flex min-h-11 items-center gap-2 rounded-control border border-border-default bg-surface px-3 text-sm font-medium hover:bg-surface-hover disabled:opacity-50"
+      className="inline-flex size-11 shrink-0 items-center justify-center rounded-control text-content-muted hover:bg-surface-hover hover:text-content disabled:opacity-40 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand"
+      aria-label="Edit item"
     >
-      <LuPencil aria-hidden="true" /> Edit
+      <LuPencil aria-hidden="true" className="size-5" />
     </button>
   );
 
