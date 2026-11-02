@@ -610,7 +610,7 @@ test("mobile selection exits cleanly and keeps deletion contextual", async ({
   expect(api.deleted).toEqual([milk.id, rice.id]);
 });
 
-test("mobile header reveals on upward scroll and Back to top restores it", async ({
+test("mobile global header stays offscreen until Back to top restores it", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 500 });
@@ -619,38 +619,42 @@ test("mobile header reveals on upward scroll and Back to top restores it", async
   await expect(
     page.getByRole("list", { name: "Food inventory" }).getByRole("listitem"),
   ).toHaveCount(20);
-  await page.evaluate(() => window.scrollTo(0, 1100));
+
+  const globalHeader = page.locator("header").first();
+  const heading = page.getByRole("heading", { name: "My Pantry" });
+  const contextualHeader = heading.locator("../../..");
+  const globalHeaderBottom = async () => {
+    const rect = await globalHeader.boundingBox();
+    return (rect?.y ?? 0) + (rect?.height ?? 0);
+  };
+
+  await expect(globalHeader).toHaveCSS("position", "relative");
+  await expect(contextualHeader).toHaveCSS("position", "sticky");
+
+  await page.evaluate(() => window.scrollTo(0, 1300));
+  await expect
+    .poll(() => page.evaluate(() => window.scrollY))
+    .toBeGreaterThan(1000);
+  await expect.poll(globalHeaderBottom).toBeLessThanOrEqual(1);
+  await expect(heading).toBeInViewport();
+
+  // Scrolling upward midway must not reveal the global Sari header.
+  await page.evaluate(() => window.scrollBy(0, -200));
   await expect
     .poll(() => page.evaluate(() => window.scrollY))
     .toBeGreaterThan(800);
-  await expect(page.locator("header")).toHaveClass(/-translate-y-full/);
-  await expect
-    .poll(
-      async () =>
-        (await page.getByRole("heading", { name: "My Pantry" }).boundingBox())
-          ?.y,
-    )
-    .toBeGreaterThanOrEqual(0);
-  await page.evaluate(() => window.scrollBy(0, -200));
-  await expect(page.locator("header")).toHaveClass(/translate-y-0/);
-  await expect
-    .poll(async () => {
-      const header = await page.locator("header").boundingBox();
-      const heading = await page
-        .getByRole("heading", { name: "My Pantry" })
-        .boundingBox();
-      return (heading?.y ?? 0) - ((header?.y ?? 0) + (header?.height ?? 0));
-    })
-    .toBeGreaterThanOrEqual(-1);
-  await page.evaluate(() => window.scrollBy(0, 5));
-  await expect(page.locator("header")).toHaveClass(/translate-y-0/);
+  await expect.poll(globalHeaderBottom).toBeLessThanOrEqual(1);
+  await expect(heading).toBeInViewport();
+
   await page.getByRole("searchbox", { name: "Search food items" }).focus();
   await page.evaluate(() => window.scrollBy(0, 150));
-  await expect(page.locator("header")).toHaveClass(/translate-y-0/);
-  await page.evaluate(() => window.scrollTo(0, 1300));
+  await expect.poll(globalHeaderBottom).toBeLessThanOrEqual(1);
+
   await page.getByRole("button", { name: "Back to top" }).click();
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
-  await expect(page.locator("header")).toHaveClass(/translate-y-0/);
+  await expect
+    .poll(async () => (await globalHeader.boundingBox())?.y ?? -100)
+    .toBeGreaterThanOrEqual(-1);
 });
 
 test("failed loading offers retry and a rapid query change rejects stale results", async ({

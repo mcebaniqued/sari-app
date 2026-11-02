@@ -5,15 +5,15 @@ import UserMenu from "./UserMenu";
 export default function AppHeader({
   firstName,
   onLogout,
-  hiddenOnMobile = false,
+  scrollsOnMobile = false,
 }: {
   firstName: string | undefined;
   onLogout: () => Promise<void>;
-  hiddenOnMobile?: boolean;
+  scrollsOnMobile?: boolean;
 }) {
   return (
     <header
-      className={`sticky top-0 z-30 border-b border-border-default bg-surface transition-transform duration-200 motion-reduce:transition-none md:translate-y-0 ${hiddenOnMobile ? "-translate-y-full" : "translate-y-0"}`}
+      className={`z-30 border-b border-border-default bg-surface ${scrollsOnMobile ? "relative md:sticky md:top-0" : "sticky top-0"}`}
     >
       <div className="mx-auto flex h-18 max-w-360 items-center gap-8 px-4 sm:px-8 lg:px-12">
         <Link

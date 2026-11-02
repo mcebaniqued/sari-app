@@ -259,7 +259,7 @@ test("exiting mobile selection preserves a hidden global header and scroll posit
     .toBeGreaterThanOrEqual(before - 150);
 });
 
-test("contextual selection preserves intentional global-header scrolling", async ({
+test("contextual selection reveals global header only at the document top", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 600 });
@@ -272,24 +272,17 @@ test("contextual selection preserves intentional global-header scrolling", async
   await scrollDownPastHeader(page);
 
   await page.mouse.wheel(0, -250);
-  await expect
-    .poll(async () => {
-      const bounds = await page.locator("header").first().boundingBox();
-      return bounds?.y ?? -100;
-    })
-    .toBeGreaterThanOrEqual(-1);
-  const globalHeader = await page.locator("header").first().boundingBox();
+
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(72);
+
+  await expectGlobalHeaderOffscreen(page);
+
   const contextualHeader = await done.locator("../..").boundingBox();
-  expect(contextualHeader?.y ?? 0).toBeGreaterThanOrEqual(
-    (globalHeader?.y ?? 0) + (globalHeader?.height ?? 0) - 1,
-  );
+  expect(contextualHeader?.y ?? -1).toBeGreaterThanOrEqual(-1);
+  await expect(done).toBeInViewport();
 
   const checkbox = list.getByRole("checkbox", { name: "Select Food 10" });
   await checkbox.scrollIntoViewIfNeeded();
-  await page.evaluate(() => {
-    const header = document.querySelector("header")?.getBoundingClientRect();
-    window.scrollBy(0, Math.max((header?.y ?? 0) + (header?.height ?? 0), 0));
-  });
   await expect(checkbox).toBeInViewport();
   await expectGlobalHeaderOffscreen(page);
   const beforeSelection = await page.evaluate(() => scrollY);
@@ -305,8 +298,10 @@ test("contextual selection preserves intentional global-header scrolling", async
   await expectGlobalHeaderOffscreen(page);
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(beforeSelection);
 
-  await page.mouse.wheel(0, -2_000);
-  await expect.poll(() => page.evaluate(() => scrollY)).toBeLessThan(80);
+  await page.evaluate(() => window.scrollTo(0, 0));
+
+  await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
+
   await expect
     .poll(async () => {
       const bounds = await page.locator("header").first().boundingBox();
@@ -343,19 +338,16 @@ test("mobile contextual header and bottom actions stay usable during long scroll
   await page.evaluate(() =>
     window.scrollTo(0, document.documentElement.scrollHeight),
   );
-  const globalHeader = page.locator("header").first();
+  const stickyHeader = done.locator("../..");
   const barBounds = await actions.boundingBox();
   const lastItemBounds = await list.getByRole("listitem").last().boundingBox();
+  await expect(stickyHeader).toHaveCSS("position", "sticky");
   await expect
-    .poll(async () => {
-      const globalBounds = await globalHeader.boundingBox();
-      const contextualBounds = await done.locator("..").boundingBox();
-      return (
-        (contextualBounds?.y ?? 0) -
-        Math.max(0, (globalBounds?.y ?? 0) + (globalBounds?.height ?? 0))
-      );
-    })
+    .poll(async () => (await stickyHeader.boundingBox())?.y ?? -100)
     .toBeGreaterThanOrEqual(-1);
+  await expect
+    .poll(async () => (await stickyHeader.boundingBox())?.y ?? 100)
+    .toBeLessThanOrEqual(1);
   await expect(done).toBeInViewport();
   await expect(actions).toBeInViewport();
   expect(
