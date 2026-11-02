@@ -64,9 +64,10 @@ export async function listFoodItems(
   return foodItemListSchema.parse(response);
 }
 
-export async function getFoodItem(id: string) {
+export async function getFoodItem(id: string, signal?: AbortSignal) {
   const response = await apiFetch<unknown>(`/food-items/${id}`, {
     headers: revisionHeaders,
+    ...(signal ? { signal } : {}),
   });
 
   return foodItemSchema.parse(response);

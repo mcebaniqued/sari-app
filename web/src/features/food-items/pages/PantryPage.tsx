@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LuArrowUp, LuLayoutGrid, LuTrash2 } from "react-icons/lu";
+import { useLocation, useNavigate } from "react-router-dom";
 import DeleteFoodItemsDialog from "../components/DeleteFoodItemsDialog/DeleteFoodItemsDialog";
 import FoodItemEditorDialog from "../components/FoodItemEditorDialog/FoodItemEditorDialog";
 import AppliedFilters from "../components/Inventory/AppliedFilters";
@@ -15,8 +16,12 @@ import PantryToolbar from "../components/Inventory/PantryToolbar";
 import { useInventory } from "../hooks/useInventory";
 import { useLocalDay } from "../hooks/useLocalDay";
 import { usePantryItems } from "../hooks/usePantryItems";
+import { registerPantryContext } from "../itemDetailsNavigation";
 
 export default function PantryPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [pantryContextId] = useState(() => crypto.randomUUID());
   const inventory = useInventory();
   const localDay = useLocalDay();
   const pantry = usePantryItems(inventory.invalidate);
@@ -46,6 +51,21 @@ export default function PantryPage() {
   const queryKey = JSON.stringify([inventory.query, pantry.revision]);
   const { hasMore, loading, error, loadMore } = inventory;
   const mobileSelecting = selecting || inventory.selected.length > 0;
+
+  useLayoutEffect(
+    () => registerPantryContext(pantryContextId),
+    [pantryContextId],
+  );
+
+  function openDetails(item: (typeof inventory.items)[number]) {
+    void navigate(`/pantry/items/${item.id}`, {
+      state: {
+        pantryContextId,
+        pantryLocation: location,
+        seedItem: item,
+      },
+    });
+  }
 
   function restoreDesktopBulkFocus() {
     if (desktopSelectAll.current && !desktopSelectAll.current.disabled) {
@@ -390,6 +410,7 @@ export default function PantryPage() {
             selectedIds={inventory.selectedIds}
             selectAllRef={desktopSelectAll}
             onSelectionChange={inventory.setSelectedIds}
+            onOpenDetails={openDetails}
             {...actions}
           />
           {empty && (
@@ -443,6 +464,7 @@ export default function PantryPage() {
             selecting={mobileSelecting}
             selectedIds={inventory.selectedIds}
             onSelectionChange={inventory.setSelectedIds}
+            onOpenDetails={openDetails}
             {...actions}
             onEdit={(item) => {
               pendingMobileActionFocus.current = {

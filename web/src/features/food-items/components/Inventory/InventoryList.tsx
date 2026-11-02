@@ -5,12 +5,20 @@ import { formatDate } from "@/utils/date";
 import type { FoodItemActions } from "../../types/foodItems";
 import ExpirationStatus from "./ExpirationStatus";
 
+function itemCardText(item: FoodItem) {
+  const quantity = `${item.quantity} ${item.unit === "item" ? "items" : item.unit}`;
+  const date = item.expiresOn ? formatDate(item.expiresOn) : "No date";
+
+  return `${item.name} ${quantity} ${date}`;
+}
+
 interface InventoryListProps extends FoodItemActions {
   items: FoodItem[];
   now: Date;
   selecting: boolean;
   selectedIds: Set<string>;
   onSelectionChange: (ids: Set<string>) => void;
+  onOpenDetails: (item: FoodItem) => void;
 }
 
 export default function InventoryList({
@@ -19,6 +27,7 @@ export default function InventoryList({
   selecting,
   selectedIds,
   onSelectionChange,
+  onOpenDetails,
   disabled,
   onEdit,
   onDelete,
@@ -79,15 +88,41 @@ export default function InventoryList({
           key={item.id}
           className="flex min-w-0 flex-wrap items-start gap-2 px-4 py-3"
         >
-          <div className="min-w-0 flex-1">
-            <p className="wrap-anywhere font-medium">{item.name}</p>
-            <p className="mt-1 text-sm text-content-muted">
-              {item.quantity} {item.unit === "item" ? "items" : item.unit}
-            </p>
-            <p className="mt-1 text-sm text-content-muted">
-              {item.expiresOn ? formatDate(item.expiresOn) : "No date"}
-            </p>
-          </div>
+          {selecting ? (
+            <label
+              htmlFor={`inventory-select-${item.id}`}
+              className="min-w-0 flex-1 text-left"
+            >
+              <span className="sr-only">Select </span>
+              <span className="block wrap-anywhere font-medium">
+                {item.name}
+              </span>
+              <span className="mt-1 block text-sm text-content-muted">
+                {item.quantity} {item.unit === "item" ? "items" : item.unit}
+              </span>
+              <span className="mt-1 block text-sm text-content-muted">
+                {item.expiresOn ? formatDate(item.expiresOn) : "No date"}
+              </span>
+            </label>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                onOpenDetails(item);
+              }}
+              className="min-w-0 flex-1 rounded-control text-left"
+            >
+              <span className="block wrap-anywhere font-medium">
+                {item.name}
+              </span>
+              <span className="mt-1 block text-sm text-content-muted">
+                {item.quantity} {item.unit === "item" ? "items" : item.unit}
+              </span>
+              <span className="mt-1 block text-sm text-content-muted">
+                {item.expiresOn ? formatDate(item.expiresOn) : "No date"}
+              </span>
+            </button>
+          )}
           <div className="flex max-w-full shrink-0 items-start gap-2">
             {item.expiresOn && (
               <div className="min-w-0 flex-1 pt-0.5 text-right">
@@ -100,8 +135,9 @@ export default function InventoryList({
             >
               {selecting ? (
                 <input
+                  id={`inventory-select-${item.id}`}
                   type="checkbox"
-                  aria-label={`Select ${item.name}`}
+                  aria-label={`Select ${itemCardText(item)}`}
                   checked={selectedIds.has(item.id)}
                   disabled={disabled}
                   className="size-4 accent-brand"

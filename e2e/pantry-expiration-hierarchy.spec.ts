@@ -47,7 +47,6 @@ for (const width of [320, 390, 440]) {
     ]);
 
     await expect(noDate).toHaveCount(1);
-    expect(await noDate.evaluate((element) => element.tagName)).toBe("P");
     expect(
       await noDate.evaluate((element) => element.parentElement?.textContent),
     ).toContain("1 kg");

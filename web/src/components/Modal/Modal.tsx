@@ -18,7 +18,10 @@ interface ModalBaseProps {
   title: string;
   description?: string;
   children: ReactNode;
+  closeButtonTarget?: "compact" | "touch";
   headerActions?: ReactNode;
+  headerLayout?: "responsive" | "inline";
+  headerSupportingContent?: ReactNode;
   onClose: () => void;
   onRestoreFocusFallback?: (() => void) | undefined;
   presentation?: "centered" | "responsive";
@@ -86,7 +89,10 @@ export default function Modal({
   title,
   description,
   children,
+  closeButtonTarget = "compact",
   headerActions,
+  headerLayout = "responsive",
+  headerSupportingContent,
   onClose,
   onRestoreFocusFallback,
   presentation = "centered",
@@ -228,13 +234,22 @@ export default function Modal({
     >
       <div
         data-modal-header
+        data-header-layout={headerLayout}
         className={`grid items-start gap-4 border-b border-border-default bg-surface px-6 py-5 ${
-          presentation === "responsive"
-            ? "grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto]"
-            : "grid-cols-[minmax(0,1fr)_auto]"
+          headerLayout === "inline"
+            ? "max-h-[50dvh] grid-cols-[minmax(0,1fr)_auto]"
+            : presentation === "responsive"
+              ? "grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto]"
+              : "grid-cols-[minmax(0,1fr)_auto]"
         } ${scroll === "contained" ? "sticky top-0 z-10 shrink-0" : ""}`}
       >
-        <div className="min-w-0">
+        <div
+          className={`min-w-0 ${
+            headerLayout === "inline"
+              ? "min-h-0 overflow-y-auto overscroll-contain"
+              : ""
+          }`}
+        >
           <h2
             ref={titleRef}
             id={titleId}
@@ -251,6 +266,11 @@ export default function Modal({
               {description}
             </p>
           )}
+          {headerSupportingContent && (
+            <div data-modal-header-supporting className="mt-1.5">
+              {headerSupportingContent}
+            </div>
+          )}
         </div>
         <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
           {headerActions}
@@ -259,7 +279,9 @@ export default function Modal({
             disabled={!dismissalPolicy.closeButton}
             onClick={onClose}
             aria-label="Close modal"
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-control text-content-muted hover:bg-surface-hover hover:text-content disabled:opacity-40 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            className={`inline-flex shrink-0 items-center justify-center rounded-control text-content-muted hover:bg-surface-hover hover:text-content disabled:opacity-40 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand ${
+              closeButtonTarget === "touch" ? "size-11" : "size-8"
+            }`}
           >
             <LuX aria-hidden="true" className="size-5" />
           </button>

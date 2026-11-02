@@ -570,6 +570,7 @@ test("mobile row actions close when focus leaves and restore focus on Escape", a
   await page.setViewportSize({ width: 390, height: 800 });
   await foodApi(page, [milk, rice]);
   await page.goto("/pantry");
+  const list = page.getByRole("list", { name: "Food inventory" });
   const actions = page.getByRole("button", { name: "Actions for Milk" });
   const nextActions = page.getByRole("button", { name: "Actions for Rice" });
   await actions.focus();
@@ -579,6 +580,10 @@ test("mobile row actions close when focus leaves and restore focus on Escape", a
   await expect(page.getByRole("button", { name: "Edit Milk" })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Delete Milk" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(
+    list.getByRole("button").filter({ hasText: "Rice" }),
+  ).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(nextActions).toBeFocused();
   await expect(actions).toHaveAttribute("aria-expanded", "false");
@@ -595,6 +600,10 @@ test("mobile row actions close when focus leaves and restore focus on Escape", a
   await expect(page.getByRole("button", { name: "Edit Milk" })).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(actions).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(
+    list.getByRole("button").filter({ hasText: "Milk" }),
+  ).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(
     page.getByRole("button", { name: "Filter", exact: true }),
