@@ -1,5 +1,5 @@
 import { foodItemQuerySchema, foodUnitSchema } from "@sari/contracts";
-import { useEffect, useRef, useState } from "react";
+import { type FocusEvent, useEffect, useRef, useState } from "react";
 import { LuPlus, LuTrash2 } from "react-icons/lu";
 import Modal from "@/components/Modal/Modal";
 import { foodUnitLabels } from "../../utils/foodUnits";
@@ -33,6 +33,15 @@ type ValidationTarget = "field" | "operator" | "value" | "to" | "unit";
 interface ValidationError {
   message: string;
   target: ValidationTarget;
+}
+
+function omitValidationError(
+  errors: Record<number, ValidationError>,
+  id: number,
+): Record<number, ValidationError> {
+  return Object.fromEntries(
+    Object.entries(errors).filter(([key]) => key !== String(id)),
+  );
 }
 
 const focusClass =
@@ -225,58 +234,78 @@ export default function FilterDialog({
 
   function update(id: number, change: Partial<Editor>) {
     const currentEditor = editors.find((editor) => editor.id === id);
-    if (!currentEditor) return;
+    if (!currentEditor) {
+      return;
+    }
 
     const nextEditor = { ...currentEditor, ...change, started: true };
     setEditors((current) =>
-      current.map((editor) =>
-        editor.id === id ? nextEditor : editor,
-      ),
+      current.map((editor) => (editor.id === id ? nextEditor : editor)),
     );
     setErrors((current) => {
-      if (!current[id]) return current;
+      if (!current[id]) {
+        return current;
+      }
 
       if (editorIsUnused(nextEditor)) {
-        const next = { ...current };
-        delete next[id];
-        return next;
+        return omitValidationError(current, id);
       }
 
       const parsed = editorPredicates(nextEditor);
-      const next = { ...current };
       if (parsed.error === undefined) {
-        delete next[id];
-      } else {
-        next[id] = { message: parsed.error, target: parsed.target };
+        return omitValidationError(current, id);
       }
-      return next;
+      return {
+        ...current,
+        [id]: { message: parsed.error, target: parsed.target },
+      };
     });
   }
 
   function validateAfterLeaving(editor: Editor) {
     if (!editor.started || editorIsUnused(editor)) {
       setErrors((current) => {
-        if (!current[editor.id]) return current;
+        if (!current[editor.id]) {
+          return current;
+        }
 
-        const next = { ...current };
-        delete next[editor.id];
-        return next;
+        return omitValidationError(current, editor.id);
       });
       return;
     }
 
     const parsed = editorPredicates(editor);
     setErrors((current) => {
-      const next = { ...current };
       if (parsed.error === undefined) {
-        delete next[editor.id];
-      } else {
-        next[editor.id] = {
+        return omitValidationError(current, editor.id);
+      }
+      return {
+        ...current,
+        [editor.id]: {
           message: parsed.error,
           target: parsed.target,
-        };
+        },
+      };
+    });
+  }
+
+  function handleEditorBlur(editor: Editor, event: FocusEvent<HTMLElement>) {
+    const fieldset = event.currentTarget.closest("fieldset");
+    if (!fieldset) {
+      return;
+    }
+
+    if (event.relatedTarget instanceof Node) {
+      if (!fieldset.contains(event.relatedTarget)) {
+        validateAfterLeaving(editor);
       }
-      return next;
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      if (fieldset.isConnected && !fieldset.contains(document.activeElement)) {
+        validateAfterLeaving(editor);
+      }
     });
   }
 
@@ -293,18 +322,16 @@ export default function FilterDialog({
     const next = remaining.length ? remaining : [emptyEditor(nextId.current++)];
     pendingFocus.current = next[Math.min(index, next.length - 1)]?.id ?? null;
     setEditors(next);
-    setErrors((current) => {
-      const nextErrors = { ...current };
-      delete nextErrors[id];
-      return nextErrors;
-    });
+    setErrors((current) => omitValidationError(current, id));
   }
 
   function apply() {
     const applied: InventoryFilters = {};
     const nextErrors: Record<number, ValidationError> = {};
     for (const editor of editors) {
-      if (editorIsUnused(editor)) continue;
+      if (editorIsUnused(editor)) {
+        continue;
+      }
 
       const parsed = editorPredicates(editor);
       if (parsed.error !== undefined) {
@@ -318,8 +345,12 @@ export default function FilterDialog({
     }
     const firstInvalid = editors.find((editor) => nextErrors[editor.id]);
     if (firstInvalid) {
-      setErrors(nextErrors);
       const target = nextErrors[firstInvalid.id]?.target;
+      if (target === undefined) {
+        return;
+      }
+
+      setErrors(nextErrors);
       editorRefs.current
         .get(firstInvalid.id)
         ?.querySelector<HTMLElement>(`[data-filter-control="${target}"]`)
@@ -393,6 +424,9 @@ export default function FilterDialog({
                 onChange={(event) => {
                   update(editor.id, { [key]: event.target.value });
                 }}
+                onBlur={(event) => {
+                  handleEditorBlur(editor, event);
+                }}
                 className={`${controlClass} ${controlStateClass(key)}`}
               />
             </label>
@@ -407,15 +441,6 @@ export default function FilterDialog({
                 } else {
                   editorRefs.current.delete(editor.id);
                 }
-              }}
-              onBlur={(event) => {
-                if (
-                  event.relatedTarget instanceof Node &&
-                  event.currentTarget.contains(event.relatedTarget)
-                ) {
-                  return;
-                }
-                validateAfterLeaving(editor);
               }}
               className="@container space-y-3 border-t border-border-default py-4 first:border-t-0 first:pt-0 last:pb-0"
             >
@@ -435,6 +460,9 @@ export default function FilterDialog({
                     }
                     onClick={() => {
                       remove(editor.id);
+                    }}
+                    onBlur={(event) => {
+                      handleEditorBlur(editor, event);
                     }}
                     className={`inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center text-danger ${focusClass}`}
                   >
@@ -476,6 +504,9 @@ export default function FilterDialog({
                           unit: "",
                         });
                       }}
+                      onBlur={(event) => {
+                        handleEditorBlur(editor, event);
+                      }}
                       className={`${controlClass} ${controlStateClass("field")}`}
                     >
                       <option value="">Choose a field</option>
@@ -513,6 +544,9 @@ export default function FilterDialog({
                                   : editor.value,
                               to: operator === "inRange" ? editor.to : "",
                             });
+                          }}
+                          onBlur={(event) => {
+                            handleEditorBlur(editor, event);
                           }}
                           className={`${controlClass} ${controlStateClass("operator")}`}
                         >
@@ -557,6 +591,9 @@ export default function FilterDialog({
                                   update(editor.id, {
                                     unit: event.target.value,
                                   });
+                                }}
+                                onBlur={(event) => {
+                                  handleEditorBlur(editor, event);
                                 }}
                                 className={`${controlClass} ${controlStateClass("unit")}`}
                               >
