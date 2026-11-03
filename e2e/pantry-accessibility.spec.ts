@@ -559,6 +559,69 @@ test("filter removal and dialog Apply restore focus to a surviving control", asy
   await expect(filter).toBeFocused();
 });
 
+test("filter dialog keeps a stable height and scrolls only its filter content", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 900, height: 720 });
+  await foodApi(page, [milk]);
+  await page.goto("/pantry");
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Filter items" });
+  const content = dialog.locator("[data-filter-dialog-content]");
+  const modalScrollRegion = dialog.locator("[data-modal-scroll-region]");
+  const initialBox = await dialog.boundingBox();
+  expect(initialBox).not.toBeNull();
+
+  const first = dialog.getByRole("group", { name: "Filter 1" });
+  await first.getByLabel("Filter by").selectOption("amount");
+  await first.getByLabel("Condition").selectOption("inRange");
+  await dialog.getByRole("button", { name: "Add another filter" }).click();
+  const second = dialog.getByRole("group", { name: "Filter 2" });
+  await second.getByLabel("Filter by").selectOption("expiresOn");
+  await second.getByLabel("Condition").selectOption("inRange");
+  const add = dialog.getByRole("button", { name: "Add another filter" });
+  await add.scrollIntoViewIfNeeded();
+  await expect(add).toBeVisible();
+  await add.click();
+  const third = dialog.getByRole("group", { name: "Filter 3" });
+  await expect(third.getByLabel("Filter by")).toHaveValue("");
+  await third.getByLabel("Filter by").selectOption("createdAt");
+  await third.getByLabel("Condition").selectOption("inRange");
+
+  const populatedBox = await dialog.boundingBox();
+  expect(populatedBox).not.toBeNull();
+  expect(populatedBox?.height).toBeCloseTo(initialBox?.height ?? 0, 0);
+  const scrollSize = await content.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(scrollSize.scrollHeight).toBeGreaterThan(scrollSize.clientHeight);
+  const modalScrollSize = await modalScrollRegion.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(modalScrollSize.scrollHeight).toBe(modalScrollSize.clientHeight);
+
+  await expect(add).toHaveCount(0);
+  await expect(dialog.locator("[data-modal-header]")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Apply" })).toBeVisible();
+
+  await page.setViewportSize({ width: 720, height: 420 });
+  const shortViewportBox = await dialog.boundingBox();
+  expect(shortViewportBox).not.toBeNull();
+  expect(shortViewportBox?.height ?? 421).toBeLessThanOrEqual(420);
+  const shortModalScrollSize = await modalScrollRegion.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(shortModalScrollSize.scrollHeight).toBe(
+    shortModalScrollSize.clientHeight,
+  );
+  await expect(dialog.locator("[data-modal-header]")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Apply" })).toBeVisible();
+});
+
 test("filter errors identify and focus the invalid control", async ({
   page,
 }) => {
@@ -567,16 +630,43 @@ test("filter errors identify and focus the invalid control", async ({
   await page.getByRole("button", { name: "Filter", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Filter items" });
   await dialog.getByLabel("Filter by").selectOption("amount");
+  await dialog.getByLabel("Condition").focus();
+  await page.keyboard.press("Tab");
+  await expect(dialog.getByRole("alert")).toHaveCount(0);
   await dialog.getByLabel("Quantity").fill("2");
-  await dialog.getByRole("button", { name: "Apply" }).click();
+  await dialog.getByLabel("Unit").focus();
+  await page.keyboard.press("Tab");
 
   const unit = dialog.getByLabel("Unit");
   const quantity = dialog.getByLabel("Quantity");
-  await expect(unit).toBeFocused();
+  await expect(
+    dialog.getByRole("button", { name: "Add another filter" }),
+  ).toBeFocused();
   await expect(unit).toHaveAttribute("aria-invalid", "true");
   await expect(unit).toHaveAccessibleDescription("Choose a unit.");
   await expect(quantity).not.toHaveAttribute("aria-invalid");
   await expect(quantity).not.toHaveAttribute("aria-describedby");
+  await unit.selectOption("l");
+  await expect(dialog.getByRole("alert")).toHaveCount(0);
+  await expect(unit).not.toHaveAttribute("aria-invalid");
+  await unit.focus();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Shift+Tab");
+  await expect(unit).toBeFocused();
+  await expect(unit).toHaveCSS("outline-color", "rgb(36, 115, 79)");
+  await expect(unit).toHaveCSS("outline-width", "2px");
+  await expect(unit).toHaveCSS("outline-offset", "2px");
+  await expect(unit).toHaveCSS("border-radius", "8px");
+
+  await unit.selectOption("");
+  await dialog.getByRole("button", { name: "Apply" }).click();
+  await expect(unit).toBeFocused();
+  await expect(unit).toHaveAttribute("aria-invalid", "true");
+  await expect(unit).toHaveAccessibleDescription("Choose a unit.");
+  await expect(unit).toHaveCSS("border-color", "rgb(180, 35, 24)");
+  await expect(unit).toHaveCSS("outline-color", "rgb(180, 35, 24)");
+  await expect(unit).toHaveCSS("outline-width", "2px");
+  await expect(unit).toHaveCSS("outline-offset", "2px");
   await expectAccessible(page);
 });
 
