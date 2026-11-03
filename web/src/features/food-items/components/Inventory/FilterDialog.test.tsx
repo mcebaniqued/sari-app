@@ -332,14 +332,14 @@ describe("FilterDialog", () => {
       ),
     ).toHaveValue("");
     expect(
-      within(
-        dialog.getByRole("group", { name: "Filter 2" }),
-      ).getByLabelText("Filter by"),
+      within(dialog.getByRole("group", { name: "Filter 2" })).getByLabelText(
+        "Filter by",
+      ),
     ).toHaveFocus();
     expect(
-      dialog.getAllByRole("group").map((group) =>
-        group.querySelector("legend")?.textContent,
-      ),
+      dialog
+        .getAllByRole("group")
+        .map((group) => group.querySelector("legend")?.textContent),
     ).toEqual(["Filter 1", "Filter 2"]);
     fireEvent.click(dialog.getByRole("button", { name: "Apply" }));
     expect(onApply).not.toHaveBeenCalled();
@@ -358,9 +358,7 @@ describe("FilterDialog", () => {
     expect(
       dialog.getByRole("button", { name: "Add another filter" }),
     ).toBeVisible();
-    fireEvent.click(
-      dialog.getByRole("button", { name: "Add another filter" }),
-    );
+    fireEvent.click(dialog.getByRole("button", { name: "Add another filter" }));
     expect(
       within(dialog.getByRole("group", { name: "Filter 2" })).getByLabelText(
         "Filter by",
