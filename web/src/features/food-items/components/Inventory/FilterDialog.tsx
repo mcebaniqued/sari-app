@@ -1,5 +1,11 @@
 import { foodItemQuerySchema, foodUnitSchema } from "@sari/contracts";
-import { type FocusEvent, useEffect, useRef, useState } from "react";
+import {
+  type FocusEvent,
+  type PointerEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { LuPlus, LuTrash2 } from "react-icons/lu";
 import Modal from "@/components/Modal/Modal";
 import { foodUnitLabels } from "../../utils/foodUnits";
@@ -316,6 +322,19 @@ export default function FilterDialog({
     setErrors({});
   }
 
+  function addEditor() {
+    const editor = emptyEditor(nextId.current++);
+    pendingFocus.current = editor.id;
+    setEditors((current) => [...current, editor]);
+  }
+
+  function preserveAddActivation(event: PointerEvent<HTMLButtonElement>) {
+    if (event.button === 0) {
+      // Blur validation can add content and move this button before click fires.
+      event.preventDefault();
+    }
+  }
+
   function remove(id: number) {
     const index = editors.findIndex((editor) => editor.id === id);
     const remaining = editors.filter((editor) => editor.id !== id);
@@ -627,11 +646,8 @@ export default function FilterDialog({
         {canAdd && (
           <button
             type="button"
-            onClick={() => {
-              const editor = emptyEditor(nextId.current++);
-              pendingFocus.current = editor.id;
-              setEditors((current) => [...current, editor]);
-            }}
+            onPointerDown={preserveAddActivation}
+            onClick={addEditor}
             className={`inline-flex min-h-11 items-center gap-2 text-sm font-medium ${focusClass}`}
           >
             <LuPlus aria-hidden="true" /> Add another filter

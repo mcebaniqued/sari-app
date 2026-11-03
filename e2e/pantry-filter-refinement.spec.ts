@@ -44,7 +44,7 @@ for (const width of [1280, 390, 320]) {
     await expect(first.getByLabel("Filter by")).toBeFocused();
     await expect(
       dialog.getByRole("button", { name: "Add another filter" }),
-    ).toHaveCount(0);
+    ).toBeVisible();
     await capture("zero");
     await dialog.getByRole("button", { name: "Apply" }).click();
     await expect(dialog).toHaveCount(0);

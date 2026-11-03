@@ -578,6 +578,11 @@ test("filter dialog keeps a stable height and scrolls only its filter content", 
   await first.getByLabel("Condition").selectOption("inRange");
   await dialog.getByRole("button", { name: "Add another filter" }).click();
   const second = dialog.getByRole("group", { name: "Filter 2" });
+  await expect(first.getByRole("alert")).toHaveText(
+    "Enter the From and To quantities.",
+  );
+  await expect(second.getByLabel("Filter by")).toBeFocused();
+  await expect(second.getByLabel("Filter by")).toHaveValue("");
   await second.getByLabel("Filter by").selectOption("expiresOn");
   await second.getByLabel("Condition").selectOption("inRange");
   const add = dialog.getByRole("button", { name: "Add another filter" });

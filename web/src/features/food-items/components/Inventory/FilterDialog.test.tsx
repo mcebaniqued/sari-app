@@ -367,6 +367,29 @@ describe("FilterDialog", () => {
     expect(first.getByLabelText("Filter by")).toHaveValue("amount");
   });
 
+  it("adds and focuses a filter after touch activation leaves an incomplete range", () => {
+    const { dialog } = setup();
+    const first = within(dialog.getByRole("group", { name: "Filter 1" }));
+    change(first.getByLabelText("Filter by"), "amount");
+    change(first.getByLabelText("Condition"), "inRange");
+    first.getByLabelText("Condition").focus();
+
+    const add = dialog.getByRole("button", { name: "Add another filter" });
+    fireEvent.pointerDown(add, {
+      button: 0,
+      pointerId: 1,
+      pointerType: "touch",
+    });
+    fireEvent.click(add);
+
+    const second = within(dialog.getByRole("group", { name: "Filter 2" }));
+    expect(first.getByRole("alert")).toHaveTextContent(
+      "Enter the From and To quantities.",
+    );
+    expect(second.getByLabelText("Filter by")).toHaveFocus();
+    expect(second.getByLabelText("Filter by")).toHaveValue("");
+  });
+
   it("validates only after focus leaves a started filter and clears the error when corrected", () => {
     const { dialog } = setup();
     const group = dialog.getByRole("group", { name: "Filter 1" });
