@@ -371,8 +371,11 @@ test("filter controls serialize three logical filters with AND semantics", async
   ]);
   await expect(
     dialog.getByRole("button", { name: "Add another filter" }),
-  ).toHaveCount(0);
+  ).toBeVisible();
   await first.getByLabel("Filter by").selectOption("amount");
+  await expect(
+    dialog.getByRole("button", { name: "Add another filter" }),
+  ).toBeVisible();
   await expect(dialog.getByLabel("Filter by")).toHaveCount(1);
   await expect(first.getByLabel("Condition").locator("option")).toHaveText([
     "Equals",
@@ -409,6 +412,9 @@ test("filter controls serialize three logical filters with AND semantics", async
   await second.getByLabel("Date", { exact: true }).fill("2029-01-01");
   await dialog.getByRole("button", { name: "Add another filter" }).click();
   const third = dialog.getByRole("group", { name: "Filter 3" });
+  await expect(
+    dialog.getByRole("button", { name: "Add another filter" }),
+  ).toHaveCount(0);
   await third.getByLabel("Filter by").selectOption("createdAt");
   await expect(third.getByLabel("Condition").locator("option")).toHaveText([
     "On",
@@ -509,9 +515,19 @@ test("applied chips edit and clear filters without losing search or sort", async
   dialog = page.getByRole("dialog", { name: "Filter items" });
   await dialog.getByRole("button", { name: "Add another filter" }).click();
   await dialog.getByRole("button", { name: "Apply" }).click();
+  await expect(dialog).toHaveCount(0);
   await expect(
-    dialog.getByRole("group", { name: "Filter 2" }).getByRole("alert"),
-  ).toHaveText("Choose a field or remove this filter.");
+    chips.getByRole("button", { name: "Edit Amount filter" }),
+  ).toHaveText("Amount: > 2 items");
+  await expect(page.getByRole("button", { name: "Filter (1)" })).toBeVisible();
+  expect(JSON.parse(api.queries.at(-1)?.get("filters") ?? "{}")).toEqual({
+    quantity: { filterType: "number", type: "greaterThan", filter: 2 },
+    unit: { filterType: "text", type: "equals", filter: "item" },
+  });
+  expect(api.queries.at(-1)?.get("search")).toBe("a");
+  expect(api.queries.at(-1)?.get("sort")).toContain('"name"');
+  await page.getByRole("button", { name: "Filter (1)" }).click();
+  dialog = page.getByRole("dialog", { name: "Filter items" });
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await chips.getByRole("button", { name: "Clear all" }).click();
   await expect(chips).toHaveCount(0);

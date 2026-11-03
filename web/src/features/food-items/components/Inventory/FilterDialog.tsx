@@ -1,5 +1,11 @@
 import { foodItemQuerySchema, foodUnitSchema } from "@sari/contracts";
-import { useEffect, useRef, useState } from "react";
+import {
+  type FocusEvent,
+  type PointerEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { LuPlus, LuTrash2 } from "react-icons/lu";
 import Modal from "@/components/Modal/Modal";
 import { foodUnitLabels } from "../../utils/foodUnits";
@@ -15,6 +21,7 @@ import {
 
 interface Editor {
   id: number;
+  started: boolean;
   field: LogicalFilterField | "";
   operator: string;
   value: string;
@@ -29,12 +36,29 @@ interface Editor {
 
 type ValidationTarget = "field" | "operator" | "value" | "to" | "unit";
 
+interface ValidationError {
+  message: string;
+  target: ValidationTarget;
+}
+
+function omitValidationError(
+  errors: Record<number, ValidationError>,
+  id: number,
+): Record<number, ValidationError> {
+  return Object.fromEntries(
+    Object.entries(errors).filter(([key]) => key !== String(id)),
+  );
+}
+
+const focusClass =
+  "rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
 const controlClass =
-  "mt-1 min-h-11 w-full min-w-0 rounded-control border border-border-control bg-surface px-3";
+  "mt-1 min-h-11 w-full min-w-0 rounded-control border bg-surface px-3 focus-visible:outline-2 focus-visible:outline-offset-2";
 
 function emptyEditor(id: number): Editor {
   return {
     id,
+    started: false,
     field: "",
     operator: "equals",
     value: "",
@@ -172,6 +196,16 @@ function editorPredicates(
   return { error: issue?.message ?? "Check the filter values.", target };
 }
 
+function editorIsUnused(editor: Editor) {
+  return (
+    !editor.legacy &&
+    !editor.field &&
+    !editor.value.trim() &&
+    !editor.to.trim() &&
+    !editor.unit
+  );
+}
+
 interface FilterDialogProps {
   filters: InventoryFilters;
   focusField?: LogicalFilterField | undefined;
@@ -191,11 +225,7 @@ export default function FilterDialog({
   const nextId = useRef(6);
   const editorRefs = useRef(new Map<number, HTMLFieldSetElement>());
   const pendingFocus = useRef<number | null>(null);
-  const [error, setError] = useState<{
-    id: number;
-    message: string;
-    target: ValidationTarget;
-  } | null>(null);
+  const [errors, setErrors] = useState<Record<number, ValidationError>>({});
 
   useEffect(() => {
     if (pendingFocus.current !== null) {
@@ -209,19 +239,100 @@ export default function FilterDialog({
   }, [editors]);
 
   function update(id: number, change: Partial<Editor>) {
+    const currentEditor = editors.find((editor) => editor.id === id);
+    if (!currentEditor) {
+      return;
+    }
+
+    const nextEditor = { ...currentEditor, ...change, started: true };
     setEditors((current) =>
-      current.map((editor) =>
-        editor.id === id ? { ...editor, ...change } : editor,
-      ),
+      current.map((editor) => (editor.id === id ? nextEditor : editor)),
     );
-    setError(null);
+    setErrors((current) => {
+      if (!current[id]) {
+        return current;
+      }
+
+      if (editorIsUnused(nextEditor)) {
+        return omitValidationError(current, id);
+      }
+
+      const parsed = editorPredicates(nextEditor);
+      if (parsed.error === undefined) {
+        return omitValidationError(current, id);
+      }
+      return {
+        ...current,
+        [id]: { message: parsed.error, target: parsed.target },
+      };
+    });
+  }
+
+  function validateAfterLeaving(editor: Editor) {
+    if (!editor.started || editorIsUnused(editor)) {
+      setErrors((current) => {
+        if (!current[editor.id]) {
+          return current;
+        }
+
+        return omitValidationError(current, editor.id);
+      });
+      return;
+    }
+
+    const parsed = editorPredicates(editor);
+    setErrors((current) => {
+      if (parsed.error === undefined) {
+        return omitValidationError(current, editor.id);
+      }
+      return {
+        ...current,
+        [editor.id]: {
+          message: parsed.error,
+          target: parsed.target,
+        },
+      };
+    });
+  }
+
+  function handleEditorBlur(editor: Editor, event: FocusEvent<HTMLElement>) {
+    const fieldset = event.currentTarget.closest("fieldset");
+    if (!fieldset) {
+      return;
+    }
+
+    if (event.relatedTarget instanceof Node) {
+      if (!fieldset.contains(event.relatedTarget)) {
+        validateAfterLeaving(editor);
+      }
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      if (fieldset.isConnected && !fieldset.contains(document.activeElement)) {
+        validateAfterLeaving(editor);
+      }
+    });
   }
 
   function reset() {
     const editor = emptyEditor(nextId.current++);
     pendingFocus.current = editor.id;
     setEditors([editor]);
-    setError(null);
+    setErrors({});
+  }
+
+  function addEditor() {
+    const editor = emptyEditor(nextId.current++);
+    pendingFocus.current = editor.id;
+    setEditors((current) => [...current, editor]);
+  }
+
+  function preserveAddActivation(event: PointerEvent<HTMLButtonElement>) {
+    if (event.button === 0) {
+      // Blur validation can add content and move this button before click fires.
+      event.preventDefault();
+    }
   }
 
   function remove(id: number) {
@@ -230,34 +341,42 @@ export default function FilterDialog({
     const next = remaining.length ? remaining : [emptyEditor(nextId.current++)];
     pendingFocus.current = next[Math.min(index, next.length - 1)]?.id ?? null;
     setEditors(next);
-    setError(null);
+    setErrors((current) => omitValidationError(current, id));
   }
 
   function apply() {
-    if (editors.length === 1 && !editors[0]?.field) {
-      onApply({});
-      return;
-    }
-
     const applied: InventoryFilters = {};
+    const nextErrors: Record<number, ValidationError> = {};
     for (const editor of editors) {
+      if (editorIsUnused(editor)) {
+        continue;
+      }
+
       const parsed = editorPredicates(editor);
       if (parsed.error !== undefined) {
-        setError({
-          id: editor.id,
+        nextErrors[editor.id] = {
           message: parsed.error,
           target: parsed.target,
-        });
-        editorRefs.current
-          .get(editor.id)
-          ?.querySelector<HTMLElement>(
-            `[data-filter-control="${parsed.target}"]`,
-          )
-          ?.focus();
+        };
+      } else {
+        Object.assign(applied, parsed.filters);
+      }
+    }
+    const firstInvalid = editors.find((editor) => nextErrors[editor.id]);
+    if (firstInvalid) {
+      const target = nextErrors[firstInvalid.id]?.target;
+      if (target === undefined) {
         return;
       }
-      Object.assign(applied, parsed.filters);
+
+      setErrors(nextErrors);
+      editorRefs.current
+        .get(firstInvalid.id)
+        ?.querySelector<HTMLElement>(`[data-filter-control="${target}"]`)
+        ?.focus();
+      return;
     }
+    setErrors({});
     onApply(applied);
   }
 
@@ -270,17 +389,22 @@ export default function FilterDialog({
             (editor.field === "quantity" || editor.field === "unit")),
       ),
   );
-  const canAdd =
-    available.length > 0 &&
-    editors.every((editor) => editorPredicates(editor).error === undefined);
+  const emptyEditorCount = editors.filter(
+    (editor) => !editor.legacy && !editor.field,
+  ).length;
+  const canAdd = available.length > emptyEditorCount;
 
   return (
     <Modal
       title="Filter items"
       onClose={onClose}
       onRestoreFocusFallback={onRestoreFocusFallback}
+      scroll="contained"
     >
-      <div className="max-h-[calc(100dvh-13rem)] space-y-4 overflow-y-auto px-6 py-5">
+      <div
+        data-filter-dialog-content
+        className="h-[min(27rem,calc(100dvh-12.5rem))] shrink-0 space-y-4 overflow-y-auto overscroll-contain px-6 py-5"
+      >
         {editors.map((editor, index) => {
           const label =
             editor.legacy?.label ??
@@ -297,10 +421,15 @@ export default function FilterDialog({
           const autofocus = focusField
             ? editor.field === focusField
             : index === 0;
+          const error = errors[editor.id];
           const invalid = (target: ValidationTarget) =>
-            error?.id === editor.id && error.target === target;
+            error?.target === target;
           const describedBy = (target: ValidationTarget) =>
             invalid(target) ? `filter-error-${editor.id}` : undefined;
+          const controlStateClass = (target: ValidationTarget) =>
+            invalid(target)
+              ? "border-danger focus-visible:outline-danger"
+              : "border-border-control focus-visible:outline-brand";
           const input = (inputLabel: string, key: "value" | "to") => (
             <label className="block min-w-0 text-sm font-medium">
               {inputLabel}
@@ -314,7 +443,10 @@ export default function FilterDialog({
                 onChange={(event) => {
                   update(editor.id, { [key]: event.target.value });
                 }}
-                className={controlClass}
+                onBlur={(event) => {
+                  handleEditorBlur(editor, event);
+                }}
+                className={`${controlClass} ${controlStateClass(key)}`}
               />
             </label>
           );
@@ -329,7 +461,7 @@ export default function FilterDialog({
                   editorRefs.current.delete(editor.id);
                 }
               }}
-              className="@container space-y-3 rounded-control border border-border-default p-3"
+              className="@container space-y-3 border-t border-border-default py-4 first:border-t-0 first:pt-0 last:pb-0"
             >
               <legend className="sr-only">Filter {index + 1}</legend>
               <div className="flex items-center justify-between gap-2">
@@ -348,7 +480,10 @@ export default function FilterDialog({
                     onClick={() => {
                       remove(editor.id);
                     }}
-                    className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-control text-danger focus-visible:outline-2 focus-visible:outline-brand"
+                    onBlur={(event) => {
+                      handleEditorBlur(editor, event);
+                    }}
+                    className={`inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center text-danger ${focusClass}`}
                   >
                     <LuTrash2 aria-hidden="true" />
                   </button>
@@ -358,7 +493,7 @@ export default function FilterDialog({
                 <div
                   tabIndex={-1}
                   data-autofocus={autofocus || undefined}
-                  className="space-y-2 rounded-control text-sm focus-visible:outline-2 focus-visible:outline-brand"
+                  className={`space-y-2 text-sm ${focusClass}`}
                 >
                   <p>{editor.legacy.description}</p>
                   <p className="text-content-muted">
@@ -388,7 +523,10 @@ export default function FilterDialog({
                           unit: "",
                         });
                       }}
-                      className={controlClass}
+                      onBlur={(event) => {
+                        handleEditorBlur(editor, event);
+                      }}
+                      className={`${controlClass} ${controlStateClass("field")}`}
                     >
                       <option value="">Choose a field</option>
                       {filterFields
@@ -426,7 +564,10 @@ export default function FilterDialog({
                               to: operator === "inRange" ? editor.to : "",
                             });
                           }}
-                          className={controlClass}
+                          onBlur={(event) => {
+                            handleEditorBlur(editor, event);
+                          }}
+                          className={`${controlClass} ${controlStateClass("operator")}`}
                         >
                           {conditions.map((condition) => (
                             <option
@@ -470,7 +611,10 @@ export default function FilterDialog({
                                     unit: event.target.value,
                                   });
                                 }}
-                                className={controlClass}
+                                onBlur={(event) => {
+                                  handleEditorBlur(editor, event);
+                                }}
+                                className={`${controlClass} ${controlStateClass("unit")}`}
                               >
                                 <option value="">Choose a unit</option>
                                 {foodUnitSchema.options.map((unit) => (
@@ -487,7 +631,7 @@ export default function FilterDialog({
                   )}
                 </>
               )}
-              {error?.id === editor.id && (
+              {error && (
                 <p
                   id={`filter-error-${editor.id}`}
                   role="alert"
@@ -502,37 +646,33 @@ export default function FilterDialog({
         {canAdd && (
           <button
             type="button"
-            onClick={() => {
-              const editor = emptyEditor(nextId.current++);
-              pendingFocus.current = editor.id;
-              setEditors((current) => [...current, editor]);
-              setError(null);
-            }}
-            className="inline-flex min-h-11 items-center gap-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-brand"
+            onPointerDown={preserveAddActivation}
+            onClick={addEditor}
+            className={`inline-flex min-h-11 items-center gap-2 text-sm font-medium ${focusClass}`}
           >
             <LuPlus aria-hidden="true" /> Add another filter
           </button>
         )}
       </div>
-      <div className="flex items-center gap-3 border-t border-border-default px-6 py-4">
+      <div className="flex shrink-0 items-center gap-3 border-t border-border-default px-6 py-4">
         <button
           type="button"
           onClick={reset}
-          className="mr-auto min-h-11 rounded-control px-3 text-sm underline focus-visible:outline-2 focus-visible:outline-brand"
+          className={`mr-auto min-h-11 px-3 text-sm underline ${focusClass}`}
         >
           Reset
         </button>
         <button
           type="button"
           onClick={onClose}
-          className="min-h-11 rounded-control border border-border-default px-3 text-sm focus-visible:outline-2 focus-visible:outline-brand"
+          className={`min-h-11 border border-border-default px-3 text-sm ${focusClass}`}
         >
           Cancel
         </button>
         <button
           type="button"
           onClick={apply}
-          className="min-h-11 rounded-control bg-brand px-4 text-sm font-semibold text-content-inverse focus-visible:outline-2 focus-visible:outline-brand"
+          className={`min-h-11 bg-brand px-4 text-sm font-semibold text-content-inverse ${focusClass}`}
         >
           Apply
         </button>
